@@ -18,7 +18,6 @@ type ShuntInfo struct {
 	Rule   string `json:"rule"`
 	Prio   uint32 `json:"prio"`
 	Out    string `json:"out"`
-	ApiUrl string `json:"api_url"`
 }
 
 type WgInfo struct {

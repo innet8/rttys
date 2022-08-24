@@ -8,7 +8,7 @@ import (
 )
 
 // GetCmd 获取分流脚本
-func GetCmd(Shunt ShuntInfo) string {
+func GetCmd(Shunt ShuntInfo, ApiUrl string) string {
 	th := fmt.Sprintf("hi-th-%d", Shunt.ID)
 	id16 := strconv.FormatInt(int64(Shunt.ID), 16)
 	table := Shunt.ID%10000 + 10000
@@ -53,7 +53,7 @@ func GetCmd(Shunt ShuntInfo) string {
 			}
 		}
 		if len(domain) > 0 {
-			install = append(install, fmt.Sprintf("curl -sSL '%s/hi/shunt/domain/%s' | sh", Shunt.ApiUrl, th))
+			install = append(install, fmt.Sprintf("curl -sSL '%s/hi/shunt/domain/%s' | sh", ApiUrl, th))
 			var envMap = make(map[string]interface{})
 			envMap["dnsIp"] = dnsIp
 			envMap["th"] = th

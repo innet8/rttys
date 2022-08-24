@@ -784,13 +784,9 @@ func apiStart(br *broker) {
 
 		if action == "rule" {
 			c.JSON(http.StatusOK, gin.H{
-				"ret": 1,
-				"msg": "success",
-				"data": gin.H{
-					"id":     info.ID,
-					"source": hi.String2Array(info.Source),
-					"rule":   hi.String2Array(info.Rule),
-				},
+				"ret":  1,
+				"msg":  "success",
+				"data": info,
 			})
 			return
 		}
@@ -805,9 +801,8 @@ func apiStart(br *broker) {
 			return
 		}
 
-		info.ApiUrl = os.Getenv("API_URL")
 		if action == "cmd" {
-			c.String(http.StatusOK, hi.GetCmd(info))
+			c.String(http.StatusOK, hi.GetCmd(info, os.Getenv("API_URL")))
 		} else if action == "domain" {
 			c.String(http.StatusOK, hi.GetDomain(info))
 		} else {
