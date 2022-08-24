@@ -590,7 +590,7 @@ func apiStart(br *broker) {
 		}
 	})
 
-	// action=set|cancel|get  devid=设备id
+	// action=set|cancel|get|cmd  devid=设备id
 	r.POST("/hi/wg/:action/:devid", func(c *gin.Context) {
 		action := c.Param("action")
 		devid := c.Param("devid")
@@ -613,6 +613,7 @@ func apiStart(br *broker) {
 			var info hi.WgInfo
 			info.Devid = devid
 			info.Conf = jsoniter.Get(content, "conf").ToString()
+			info.LanIp = jsoniter.Get(content, "lan_ip").ToString()
 			info.Status = "use"
 			result := db.Table("hi_wg").Create(&info)
 			if result.Error != nil {
@@ -655,6 +656,15 @@ func apiStart(br *broker) {
 					"msg":  "success",
 					"data": info,
 				})
+			}
+		} else if action == "cmd" {
+			// 命令
+			var info hi.WgInfo
+			db.Table("hi_wg").Where("devid = ? AND status = ?", devid, "use").Order("id desc").First(&info)
+			if info.ID == 0 {
+				c.String(http.StatusOK, "#!/bin/sh\n#echo No configuration")
+			} else {
+				c.String(http.StatusOK, hi.WireguardCmd(info))
 			}
 		} else {
 			c.JSON(http.StatusOK, gin.H{
@@ -783,6 +793,7 @@ func apiStart(br *broker) {
 		}
 
 		if action == "rule" {
+			// 规则详情
 			c.JSON(http.StatusOK, gin.H{
 				"ret":  1,
 				"msg":  "success",
@@ -792,6 +803,7 @@ func apiStart(br *broker) {
 		}
 
 		if action == "delete" {
+			// 删除
 			db.Table("hi_shunt").Delete(&info, shuntId)
 			c.JSON(http.StatusOK, gin.H{
 				"ret":  1,
@@ -802,8 +814,10 @@ func apiStart(br *broker) {
 		}
 
 		if action == "cmd" {
+			// 命令
 			c.String(http.StatusOK, hi.GetCmd(info, os.Getenv("API_URL")))
 		} else if action == "domain" {
+			// 域名命令
 			c.String(http.StatusOK, hi.GetDomain(info))
 		} else {
 			c.Status(http.StatusForbidden)

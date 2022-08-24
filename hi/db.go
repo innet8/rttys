@@ -24,6 +24,7 @@ type WgInfo struct {
 	ID     uint32 `json:"id"`
 	Devid  string `json:"devid"`
 	Conf   string `json:"conf"`
+	LanIp  string `json:"lan_ip"`
 	Status string `json:"status"`
 }
 

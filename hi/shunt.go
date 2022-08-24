@@ -125,5 +125,5 @@ func GetDomain(Shunt ShuntInfo) string {
 		install = append(install, `# echo "Domain not exist"`)
 	}
 	installString := strings.Join(install, "\n")
-	return fmt.Sprintf("<<<EOF\n#!/bin/bash\n%s\nEOF", installString)
+	return fmt.Sprintf("<<<EOF\n#!/bin/sh\n%s\nEOF", installString)
 }
