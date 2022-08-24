@@ -21,6 +21,13 @@ type ShuntInfo struct {
 	ApiUrl string `json:"api_url"`
 }
 
+type WgInfo struct {
+	ID     uint32 `json:"id"`
+	Devid  string `json:"devid"`
+	Conf   string `json:"conf"`
+	Status string `json:"status"`
+}
+
 func InstanceDB(str string) (*gorm.DB, error) {
 	sp := strings.Split(str, "://")
 	if len(sp) == 2 {

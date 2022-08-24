@@ -37,7 +37,12 @@ func initDb(cfg *config.Config) error {
 		return err
 	}
 
-	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS shunt(id integer NOT NULL PRIMARY KEY AUTOINCREMENT, devid TEXT NOT NULL, source TEXT NOT NULL, rule TEXT NOT NULL, prio INT NOT NULL, out TEXT NOT NULL)`)
+	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS hi_shunt(id integer NOT NULL PRIMARY KEY AUTOINCREMENT, devid TEXT NOT NULL, source TEXT NOT NULL, rule TEXT NOT NULL, prio INT NOT NULL, out TEXT NOT NULL)`)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS hi_wg(id integer NOT NULL PRIMARY KEY AUTOINCREMENT, devid TEXT NOT NULL, conf TEXT NOT NULL, status TEXT NOT NULL)`)
 
 	return err
 }

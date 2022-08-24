@@ -590,6 +590,81 @@ func apiStart(br *broker) {
 		}
 	})
 
+	// action=set|cancel|get  devid=设备id
+	r.POST("/hi/wg/:action/:devid", func(c *gin.Context) {
+		action := c.Param("action")
+		devid := c.Param("devid")
+
+		db, err := hi.InstanceDB(cfg.DB)
+		if err != nil {
+			log.Error().Msg(err.Error())
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+
+		content, err := ioutil.ReadAll(c.Request.Body)
+		if err != nil {
+			c.Status(http.StatusBadRequest)
+			return
+		}
+
+		if action == "set" {
+			// 设置
+			var info hi.WgInfo
+			info.Devid = devid
+			info.Conf = jsoniter.Get(content, "conf").ToString()
+			info.Status = "use"
+			result := db.Table("hi_wg").Create(&info)
+			if result.Error != nil {
+				c.JSON(http.StatusOK, gin.H{
+					"ret": 0,
+					"msg": "创建失败",
+					"data": gin.H{
+						"error": result.Error.Error(),
+					},
+				})
+			} else {
+				db.Table("hi_wg").Where("id != ? AND status = ?", info.ID, "use").Update("status", "cancel")
+				c.JSON(http.StatusOK, gin.H{
+					"ret":  1,
+					"msg":  "success",
+					"data": info,
+				})
+			}
+		} else if action == "cancel" {
+			// 取消
+			db.Table("hi_wg").Where("devid = ? AND status = ?", devid, "use").Update("status", "cancel")
+			c.JSON(http.StatusOK, gin.H{
+				"ret":  1,
+				"msg":  "success",
+				"data": nil,
+			})
+		} else if action == "get" {
+			// 当前配置
+			var info hi.WgInfo
+			db.Table("hi_wg").Where("devid = ? AND status = ?", devid, "use").Order("id desc").First(&info)
+			if info.ID == 0 {
+				c.JSON(http.StatusOK, gin.H{
+					"ret":  0,
+					"msg":  "当前没有配置",
+					"data": nil,
+				})
+			} else {
+				c.JSON(http.StatusOK, gin.H{
+					"ret":  1,
+					"msg":  "success",
+					"data": info,
+				})
+			}
+		} else {
+			c.JSON(http.StatusOK, gin.H{
+				"ret":  0,
+				"msg":  "参数错误",
+				"data": nil,
+			})
+		}
+	})
+
 	// action=modify  devid=设备id  sid=分流id（0表示添加）
 	r.POST("/hi/shunt/modify/:devid/:sid", func(c *gin.Context) {
 		devid := c.Param("devid")
@@ -610,7 +685,7 @@ func apiStart(br *broker) {
 
 		var info hi.ShuntInfo
 		if shuntId > 0 {
-			db.Table("shunt").Where("id = ? AND devid = ?", shuntId, devid).First(&info)
+			db.Table("hi_shunt").Where("id = ? AND devid = ?", shuntId, devid).First(&info)
 			if info.ID == 0 {
 				c.JSON(http.StatusOK, gin.H{
 					"ret":  0,
@@ -630,7 +705,7 @@ func apiStart(br *broker) {
 			info.Rule = jsoniter.Get(content, "rule").ToString()
 			info.Prio = jsoniter.Get(content, "prio").ToUint32()
 			info.Out = jsoniter.Get(content, "out").ToString()
-			result := db.Create(&info)
+			result := db.Table("hi_shunt").Create(&info)
 			if result.Error != nil {
 				c.JSON(http.StatusOK, gin.H{
 					"ret": 0,
@@ -662,7 +737,7 @@ func apiStart(br *broker) {
 
 		var infos []hi.ShuntInfo
 
-		result := db.Table("shunt").Select([]string{"id", "devid", "source", "prio", "out"}).Where("devid = ?", devid).Find(&infos)
+		result := db.Table("hi_shunt").Select([]string{"id", "devid", "source", "prio", "out"}).Where("devid = ?", devid).Find(&infos)
 		if result.Error != nil {
 			c.JSON(http.StatusOK, gin.H{
 				"ret": 0,
@@ -694,7 +769,7 @@ func apiStart(br *broker) {
 		}
 
 		var info hi.ShuntInfo
-		db.Table("shunt").Where("id = ?", shuntId).First(&info)
+		db.Table("hi_shunt").Where("id = ?", shuntId).First(&info)
 
 		if err != nil {
 			log.Error().Msg(err.Error())
@@ -721,7 +796,7 @@ func apiStart(br *broker) {
 		}
 
 		if action == "delete" {
-			db.Table("shunt").Delete(&info, shuntId)
+			db.Table("hi_shunt").Delete(&info, shuntId)
 			c.JSON(http.StatusOK, gin.H{
 				"ret":  1,
 				"msg":  "success",
