@@ -13,9 +13,10 @@ type Array []string
 
 type ShuntInfo struct {
 	ID     uint32 `json:"id"`
+	Devid  string `json:"devid"`
 	Source string `json:"source"`
 	Rule   string `json:"rule"`
-	Prio   string `json:"prio"`
+	Prio   uint32 `json:"prio"`
 	Out    string `json:"out"`
 	ApiUrl string `json:"api_url"`
 }

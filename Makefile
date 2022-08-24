@@ -19,14 +19,14 @@ OS_ARCHS		:=darwin:amd64 darwin:arm64 linux:amd64 linux:arm64
 .PHONY: build
 build: | ; $(info $(M) building…)
 	$(shell mkdir -p release)
-	$(shell cp rttys.conf release)
+	$(shell cp -r -n rttys.conf release/rttys.conf)
 	$Q CGO_ENABLED=1 $(GO) build -ldflags '$(LDFLAGS)' -o ./release/rttys
 
 ## build-all: Build all
 .PHONY: build-all
 build-all: | ; $(info $(M) building all…)
 	$(shell mkdir -p release)
-	$(shell cp rttys.conf release)
+	$(shell cp -r -n rttys.conf release/rttys.conf)
 	@$(foreach n, $(OS_ARCHS),\
 		os=$(shell echo "$(n)" | cut -d : -f 1);\
 		arch=$(shell echo "$(n)" | cut -d : -f 2);\

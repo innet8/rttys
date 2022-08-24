@@ -12,7 +12,7 @@ func GetCmd(Shunt ShuntInfo) string {
 	th := fmt.Sprintf("hi-th-%d", Shunt.ID)
 	id16 := strconv.FormatInt(int64(Shunt.ID), 16)
 	table := Shunt.ID%10000 + 10000
-	prio, _ := strconv.Atoi(Shunt.Prio)
+	prio := Shunt.Prio
 	if prio == 0 {
 		prio = 50
 	}
