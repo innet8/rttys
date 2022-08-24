@@ -7,25 +7,18 @@ import (
 	"strings"
 )
 
-type ShuntInfo struct {
-	ID     uint32   `json:"id"`
-	Source []string `json:"source"`
-	Rule   []string `json:"rule"`
-	Prio   uint8    `json:"prio"`
-	Out    string   `json:"out"`
-	ApiUrl string   `json:"api_url"`
-}
-
 // GetCmd 获取分流脚本
-func GetCmd(Shunt *ShuntInfo) string {
-	th := fmt.Sprintf("th%d", Shunt.ID)
+func GetCmd(Shunt ShuntInfo) string {
+	th := fmt.Sprintf("hi-th-%d", Shunt.ID)
 	id16 := strconv.FormatInt(int64(Shunt.ID), 16)
 	table := Shunt.ID%10000 + 10000
-	prio := Shunt.Prio
-	if Shunt.Prio == 0 {
+	prio, _ := strconv.Atoi(Shunt.Prio)
+	if prio == 0 {
 		prio = 50
 	}
 	//
+	source := String2Array(Shunt.Source)
+	rule := String2Array(Shunt.Rule)
 	dnsIp := "${localGwIp}"
 	//
 	var install []string
@@ -40,41 +33,40 @@ func GetCmd(Shunt *ShuntInfo) string {
 	} else {
 		install = append(install, fmt.Sprintf("ip route add default via ${localGwIp} table %d", table))
 	}
-	if len(Shunt.Rule) > 0 {
+	if len(rule) > 0 {
 		install = append(install, fmt.Sprintf("ipset create %s hash:net maxelem 1000000", th))
 		var domain []string
-		for _, item := range Shunt.Rule {
+		for _, item := range rule {
 			if IsCidr(item) {
 				install = append(install, fmt.Sprintf("ipset add %s %s", th, item))
 			} else if IsDomain(item) {
 				domain = append(domain, item)
 			}
 		}
-		for _, source := range Shunt.Source {
-			if strings.Contains(source, "-") {
-				install = append(install, fmt.Sprintf("iptables -t mangle -I shunt-%d -m iprange --src-range %s -m set --match-set %s dst -j ACCEPT", prio, source, th))
-				install = append(install, fmt.Sprintf("iptables -t mangle -I shunt-%d -m iprange --src-range %s -m set --match-set %s dst -j MARK --set-xmark 0x%s/0xffffffff", prio, source, th, id16))
+		for _, item := range source {
+			if strings.Contains(item, "-") {
+				install = append(install, fmt.Sprintf("iptables -t mangle -I shunt-%d -m iprange --src-range %s -m set --match-set %s dst -j ACCEPT", prio, item, th))
+				install = append(install, fmt.Sprintf("iptables -t mangle -I shunt-%d -m iprange --src-range %s -m set --match-set %s dst -j MARK --set-xmark 0x%s/0xffffffff", prio, item, th, id16))
 			} else {
-				install = append(install, fmt.Sprintf("iptables -t mangle -I shunt-%d -s %s -m set --match-set %s dst -j ACCEPT", prio, source, th))
-				install = append(install, fmt.Sprintf("iptables -t mangle -I shunt-%d -s %s -m set --match-set %s dst -j MARK --set-xmark 0x%s/0xffffffff", prio, source, th, id16))
+				install = append(install, fmt.Sprintf("iptables -t mangle -I shunt-%d -s %s -m set --match-set %s dst -j ACCEPT", prio, item, th))
+				install = append(install, fmt.Sprintf("iptables -t mangle -I shunt-%d -s %s -m set --match-set %s dst -j MARK --set-xmark 0x%s/0xffffffff", prio, item, th, id16))
 			}
 		}
 		if len(domain) > 0 {
-			install = append(install, fmt.Sprintf("curl -sSL '%s/hi/shunt/domain/%d' | sh", Shunt.ApiUrl, Shunt.ID))
+			install = append(install, fmt.Sprintf("curl -sSL '%s/hi/shunt/domain/%s' | sh", Shunt.ApiUrl, th))
 			var envMap = make(map[string]interface{})
 			envMap["dnsIp"] = dnsIp
-			envMap["id"] = Shunt.ID
 			envMap["th"] = th
 			install = append(install, ShuntDomainTemplate(envMap))
 		}
 	} else {
-		for _, source := range Shunt.Source {
-			if strings.Contains(source, "-") {
-				install = append(install, fmt.Sprintf("iptables -t mangle -I shunt-%d -m iprange --src-range %s -j ACCEPT", prio, source))
-				install = append(install, fmt.Sprintf("iptables -t mangle -I shunt-%d -m iprange --src-range %s -j MARK --set-xmark 0x%s/0xffffffff", prio, source, id16))
+		for _, item := range source {
+			if strings.Contains(item, "-") {
+				install = append(install, fmt.Sprintf("iptables -t mangle -I shunt-%d -m iprange --src-range %s -j ACCEPT", prio, item))
+				install = append(install, fmt.Sprintf("iptables -t mangle -I shunt-%d -m iprange --src-range %s -j MARK --set-xmark 0x%s/0xffffffff", prio, item, id16))
 			} else {
-				install = append(install, fmt.Sprintf("iptables -t mangle -I shunt-%d -s %s -j ACCEPT", prio, source))
-				install = append(install, fmt.Sprintf("iptables -t mangle -I shunt-%d -s %s -j MARK --set-xmark 0x%s/0xffffffff", prio, source, id16))
+				install = append(install, fmt.Sprintf("iptables -t mangle -I shunt-%d -s %s -j ACCEPT", prio, item))
+				install = append(install, fmt.Sprintf("iptables -t mangle -I shunt-%d -s %s -j MARK --set-xmark 0x%s/0xffffffff", prio, item, id16))
 			}
 		}
 	}
@@ -108,24 +100,25 @@ func GetCmd(Shunt *ShuntInfo) string {
 	envMap["outIp"] = Shunt.Out
 	envMap["installString"] = installString
 	envMap["removeString"] = removeString
-	envMap["id"] = Shunt.ID
 	envMap["th"] = th
 	return ShuntTemplate(envMap)
 }
 
 // GetDomain 获取域名脚本
-func GetDomain(Shunt *ShuntInfo) string {
+func GetDomain(Shunt ShuntInfo) string {
+	th := fmt.Sprintf("hi-th-%d", Shunt.ID)
 	var install []string
 	var domain []string
-	if len(Shunt.Rule) > 0 {
-		for _, item := range Shunt.Rule {
+	rule := String2Array(Shunt.Rule)
+	if len(rule) > 0 {
+		for _, item := range rule {
 			if IsDomain(item) {
 				domain = append(domain, item)
 			}
 		}
 	}
 	if len(domain) > 0 {
-		install = append(install, fmt.Sprintf("cat > /tmp/hicloud/shunt/%d.domain <<-EOF", Shunt.ID))
+		install = append(install, fmt.Sprintf("cat > /tmp/hicloud/shunt/%s.domain <<-EOF", th))
 		install = append(install, strings.Join(domain, "\n"))
 		install = append(install, "EOF")
 	} else {

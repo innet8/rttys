@@ -18,7 +18,9 @@ OS_ARCHS		:=darwin:amd64 darwin:arm64 linux:amd64 linux:arm64
 ## build: Build
 .PHONY: build
 build: | ; $(info $(M) building…)
-	$Q CGO_ENABLED=0 $(GO) build -ldflags '$(LDFLAGS)' -o .
+	$(shell mkdir -p release)
+	$(shell cp rttys.conf release)
+	$Q CGO_ENABLED=1 $(GO) build -ldflags '$(LDFLAGS)' -o ./release/rttys
 
 ## build-all: Build all
 .PHONY: build-all
@@ -30,7 +32,7 @@ build-all: | ; $(info $(M) building all…)
 		arch=$(shell echo "$(n)" | cut -d : -f 2);\
 		gomips=$(shell echo "$(n)" | cut -d : -f 3);\
 		target_suffix=$${os}_$${arch};\
-		env CGO_ENABLED=0 GOOS=$${os} GOARCH=$${arch} GOMIPS=$${gomips} go build -trimpath -ldflags "$(LDFLAGS)" -o ./release/rttys_$${target_suffix};\
+		env CGO_ENABLED=1 GOOS=$${os} GOARCH=$${arch} GOMIPS=$${gomips} go build -trimpath -ldflags "$(LDFLAGS)" -o ./release/rttys_$${target_suffix};\
 	)
 
 ## help: Show this help

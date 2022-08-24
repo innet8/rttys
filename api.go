@@ -597,22 +597,21 @@ func apiStart(br *broker) {
 			return
 		}
 
-		db, err := instanceDB(cfg.DB)
+		db, err := hi.InstanceDB(cfg.DB)
 		if err != nil {
 			log.Error().Msg(err.Error())
 			c.Status(http.StatusInternalServerError)
 			return
 		}
-		defer db.Close()
+		var info hi.ShuntInfo
+		db.Table("shunt").Where("id = (?)", shuntId).First(&info)
 
-		info := &hi.ShuntInfo{
-			ID: 0,
-		}
-		db.QueryRow("SELECT id,source,rule,prio,out FROM shunt WHERE id = ? LIMIT 0,1", shuntId).Scan(info.ID, info.Source, info.Rule, info.Prio, info.Out)
-		if info.ID == 0 {
-			c.String(http.StatusOK, "#!/bin/sh\n # shunt not exist")
+		if err != nil {
+			log.Error().Msg(err.Error())
+			c.Status(http.StatusInternalServerError)
 			return
 		}
+
 		if action == "cmd" {
 			c.String(http.StatusOK, hi.GetCmd(info))
 		} else if action == "domain" {
