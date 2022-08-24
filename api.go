@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"rttys/hi"
 	"strconv"
 	"strings"
 	"time"
@@ -584,6 +585,40 @@ func apiStart(br *broker) {
 
 			c.DataFromReader(http.StatusOK, -1, "application/octet-stream", fp.reader, nil)
 			br.fileProxy.Delete(sid)
+		}
+	})
+
+	r.GET("/hi/shunt/:action/:sid", func(c *gin.Context) {
+		action := c.Param("action")
+		shuntId, _ := strconv.Atoi(c.Param("sid"))
+
+		if shuntId == 0 {
+			c.String(http.StatusOK, "#!/bin/sh\n # id error")
+			return
+		}
+
+		db, err := instanceDB(cfg.DB)
+		if err != nil {
+			log.Error().Msg(err.Error())
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+		defer db.Close()
+
+		info := &hi.ShuntInfo{
+			ID: 0,
+		}
+		db.QueryRow("SELECT id,source,rule,prio,out FROM shunt WHERE id = ? LIMIT 0,1", shuntId).Scan(info.ID, info.Source, info.Rule, info.Prio, info.Out)
+		if info.ID == 0 {
+			c.String(http.StatusOK, "#!/bin/sh\n # shunt not exist")
+			return
+		}
+		if action == "cmd" {
+			c.String(http.StatusOK, hi.GetCmd(info))
+		} else if action == "domain" {
+			c.String(http.StatusOK, hi.GetDomain(info))
+		} else {
+			c.Status(http.StatusForbidden)
 		}
 	})
 
