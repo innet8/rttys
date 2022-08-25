@@ -10,7 +10,7 @@ import (
 
 const ShuntDomainContent = string(`
 for D in ` + "`cat ${DOMAINFILE} 2>/dev/null`" + `; do
-    sed -i '/^server=/${D}/*/d' /etc/dnsmasq.conf
+    sed -i "/^server=/${D}/*/d" /etc/dnsmasq.conf
     echo "server=/${D}/{{.dnsIp}} #{{.th}}#" >> /etc/dnsmasq.conf
     #
     charA="$(cat $DNSFILE | grep -n "ipset=/${D}/")"
@@ -55,7 +55,7 @@ sed -i '/\/{{.th}}$/d' ${DNSFILE}
 
 if [ -z "${ACTION}" ]; then
     echo "install" >> ${LOGFILE}
-    if [ -z ` + "`iptables -L shunt-1 -t mangle 2>/dev/null | grep shunt-1`" + ` ]; then
+    if [[ -z ` + "`iptables -L shunt-1 -t mangle 2>/dev/null | grep shunt-1`" + ` ]]; then
         for i in ` + "`seq 1 80`" + `; do
             iptables -t mangle -N shunt-${i}
             iptables -t mangle -A PREROUTING -j shunt-${i}
@@ -77,10 +77,10 @@ array=(
 )
 
 for file in ` + "`ls /tmp/hicloud/shunt 2>/dev/null`" + `; do
-    if [[ "\${file}" =~ .*\.sh$ ]] && [[ ! "\${array[@]}" =~ ":\${file}" ]]; then
-        sh +x /tmp/hicloud/shunt/\${file} remove
-        pathname="$(echo \${file} | sed 's/\.sh$//')"
-        rm -f /tmp/hicloud/shunt/\${pathname}.* &> /dev/null
+    if [[ "${file}" =~ .*\.sh$ ]] && [[ ! "${array[@]}" =~ ":${file}" ]]; then
+        bash +x /tmp/hicloud/shunt/${file} remove
+        pathname="$(echo ${file} | sed 's/\.sh$//')"
+        rm -f /tmp/hicloud/shunt/${pathname}.* &> /dev/null
     fi
 done
 
