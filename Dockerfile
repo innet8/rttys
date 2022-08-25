@@ -14,6 +14,6 @@ RUN CGO_ENABLED=1 \
     BuildTime=$(date +%FT%T%z) \
     go build -ldflags="-s -w -X $VersionPath.gitCommit=$GitCommit -X $VersionPath.buildTime=$BuildTime"
 
-FROM debian:latest
+FROM debian:buster-slim
 COPY --from=rttys /rttys-build/rttys /usr/bin/rttys
 ENTRYPOINT ["/usr/bin/rttys", "run", "-c", "/conf/rttys.conf"]
