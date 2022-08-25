@@ -37,9 +37,15 @@ DNSFILE="/etc/dnsmasq.d/domain_hicloud.conf"
 LOGFILE="/tmp/hicloud/shunt/{{.th}}.log"
 DOMAINFILE="/tmp/hicloud/shunt/{{.th}}.domain"
 
+echo "start: $(date "+%Y-%m-%d %H:%M:%S")" > ${LOGFILE}
+
+mkdir -p /etc/dnsmasq.d
 mkdir -p /tmp/hicloud/shunt
 
-echo "start: $(date "+%Y-%m-%d %H:%M:%S")" > ${LOGFILE}
+if [ -z "$(cat /etc/dnsmasq.conf | grep conf-dir=/etc/dnsmasq.d)" ]; then
+	sed -i /conf-dir=/d /etc/dnsmasq.conf
+	echo conf-dir=/etc/dnsmasq.d >> /etc/dnsmasq.conf
+fi
 
 if [ ! -f "$DNSFILE" ]; then
     touch $DNSFILE
