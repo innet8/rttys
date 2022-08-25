@@ -608,6 +608,7 @@ func apiStart(br *broker) {
 			return
 		}
 
+		callUrl := jsoniter.Get(content, "call_url").ToString()
 		if action == "set" {
 			// 设置
 			var info hi.WgInfo
@@ -637,18 +638,23 @@ func apiStart(br *broker) {
 			} else {
 				db.Table("hi_wg").Where("id != ? AND status = ?", info.ID, "use").Update("status", "cancel")
 				c.JSON(http.StatusOK, gin.H{
-					"ret":  1,
-					"msg":  "success",
-					"data": info,
+					"ret": 1,
+					"msg": "success",
+					"data": gin.H{
+						"token": hiSynchWireguardConf(br, devid, callUrl),
+						"info":  info,
+					},
 				})
 			}
 		} else if action == "cancel" {
 			// 取消
 			db.Table("hi_wg").Where("devid = ? AND status = ?", devid, "use").Update("status", "cancel")
 			c.JSON(http.StatusOK, gin.H{
-				"ret":  1,
-				"msg":  "success",
-				"data": nil,
+				"ret": 1,
+				"msg": "success",
+				"data": gin.H{
+					"token": hiSynchWireguardConf(br, devid, callUrl),
+				},
 			})
 		} else if action == "get" {
 			// 当前配置
@@ -702,6 +708,7 @@ func apiStart(br *broker) {
 			c.Status(http.StatusBadRequest)
 			return
 		}
+		callUrl := jsoniter.Get(content, "call_url").ToString()
 
 		var info hi.ShuntInfo
 		if shuntId > 0 {
@@ -738,9 +745,12 @@ func apiStart(br *broker) {
 			}
 		}
 		c.JSON(http.StatusOK, gin.H{
-			"ret":  1,
-			"msg":  "success",
-			"data": info,
+			"ret": 1,
+			"msg": "success",
+			"data": gin.H{
+				"token": hiSynchShuntConf(br, devid, callUrl),
+				"info":  info,
+			},
 		})
 	})
 
@@ -802,6 +812,7 @@ func apiStart(br *broker) {
 	r.GET("/hi/shunt/:action/:sid", func(c *gin.Context) {
 		action := c.Param("action")
 		shuntId, _ := strconv.Atoi(c.Param("sid"))
+		callUrl := c.Query("call_url")
 
 		db, err := hi.InstanceDB(cfg.DB)
 		if err != nil {
@@ -838,9 +849,12 @@ func apiStart(br *broker) {
 			// 删除
 			db.Table("hi_shunt").Delete(&info, shuntId)
 			c.JSON(http.StatusOK, gin.H{
-				"ret":  1,
-				"msg":  "success",
-				"data": info,
+				"ret": 1,
+				"msg": "success",
+				"data": gin.H{
+					"token": hiSynchShuntConf(br, info.Devid, callUrl),
+					"info":  info,
+				},
 			})
 			return
 		}

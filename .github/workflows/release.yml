@@ -32,21 +32,18 @@ jobs:
 
           version=${{ steps.get-version.outputs.version-without-v }}
 
+          go mod tidy
           ./build.sh linux amd64
-          ./build.sh linux arm64
 
           cp rttys.conf rttys.service rttys-linux-amd64
-          cp rttys.conf rttys.service rttys-linux-arm64
 
           mv rttys-linux-amd64 rttys-linux-amd64-$version
-          mv rttys-linux-arm64 rttys-linux-arm64-$version
 
           tar zcf rttys-linux-amd64-$version.tar.gz rttys-linux-amd64-$version
-          tar zcf rttys-linux-arm64-$version.tar.gz rttys-linux-arm64-$version
 
       - uses: marvinpinto/action-automatic-releases@latest
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          repo_token: ${{ secrets.GH_TOKEN }}
           draft: true
           prerelease: false
           files: rttys-*.tar.gz
