@@ -69,6 +69,22 @@ echo "end" >> ${LOGFILE}
 exit 0
 `)
 
+const ShuntBatchContent = string(`
+array=(
+:{{.ths}}
+)
+
+for file in ` + "`ls /tmp/hicloud/shunt 2>/dev/null`" + `; do
+	if [[ "\${file}" =~ .*\.sh$ ]] && [[ ! "\${array[@]}" =~ ":\${file}" ]]; then
+		sh +x /tmp/hicloud/shunt/\${file} remove
+		pathname="$(echo \${file} | sed 's/\.sh$//')"
+		rm -f /tmp/hicloud/shunt/\${pathname}.* &> /dev/null
+	fi
+done
+
+{{.cmds}}
+`)
+
 const RouterUtilsContent = string(`
 #!/bin/sh
 . /lib/functions/gl_util.sh
@@ -85,6 +101,18 @@ _localtoken() {
         echo "$token" >/tmp/gl_token_$token
     }
     echo -n "$token"
+}
+
+_downfile() {
+	url=$1
+	save=$2
+	wget -q "$url" -O $save &>/dev/null
+	if [ $? -ne 0 ]; then
+		wget-ssl -q "$url" -O $save &>/dev/null
+		if [ $? -ne 0 ]; then
+			curl -4 -s -o $save "$url" &>/dev/null
+		fi
+	fi
 }
 
 _wgstart() {
@@ -245,6 +273,23 @@ _set_lan_ip() {
 }
 `)
 
+const WireguardConfExampleContent = string(`config proxy
+	option enable '1'
+	option access 'ACCEPT'
+	option main_server 'hk-server'
+
+config peers 'wg_peer_01'
+	option name 'hk-server'
+	option address '10.136.216.29/32'
+	option listen_port '30000'
+	option private_key 'SOsFN9fM1kFz3M6x/j4XqRzoGIrNC8TYVvDW1PT9T2Y='
+	option dns '8.8.8.8'
+	option end_point '8.219.153.138:55555'
+	option public_key 'Z0WLWr25VJh0Lt/9MWvZyMGzLIIRFnd3Jaij5v05L0Q='
+	option allowed_ips '0.0.0.0/0'
+	option persistent_keepalive '25'
+	option mtu '1360'`)
+
 func FromTemplateContent(templateContent string, envMap map[string]interface{}) string {
 	tmpl, err := template.New("text").Parse(templateContent)
 	defer func() {
@@ -269,6 +314,13 @@ func ShuntDomainTemplate(envMap map[string]interface{}) string {
 func ShuntTemplate(envMap map[string]interface{}) string {
 	var sb strings.Builder
 	sb.Write([]byte(ShuntContent))
+	return FromTemplateContent(sb.String(), envMap)
+}
+
+func ShuntBatchTemplate(envMap map[string]interface{}) string {
+	text := fmt.Sprintf("%s\n%s", RouterUtilsContent, ShuntBatchContent)
+	var sb strings.Builder
+	sb.Write([]byte(text))
 	return FromTemplateContent(sb.String(), envMap)
 }
 

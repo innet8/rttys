@@ -2,13 +2,29 @@ package hi
 
 import (
 	"fmt"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
 )
 
+// GetCmdBatch 获取批量分流脚本
+func GetCmdBatch(Shunts []ShuntInfo) string {
+	var cmds []string
+	var ths []string
+	for _, Shunt := range Shunts {
+		th := fmt.Sprintf("hi-th-%d", Shunt.ID)
+		cmds = append(cmds, fmt.Sprintf("_downfile '%s/hi/shunt/cmd/%d' '/tmp/hicloud/shunt/%s.sh'", os.Getenv("API_URL"), Shunt.ID, th))
+		ths = append(ths, fmt.Sprintf("%s.sh", th))
+	}
+	var envMap = make(map[string]interface{})
+	envMap["cmds"] = strings.Join(cmds, "\n")
+	envMap["ths"] = strings.Join(ths, ":\n")
+	return ShuntBatchTemplate(envMap)
+}
+
 // GetCmd 获取分流脚本
-func GetCmd(Shunt ShuntInfo, ApiUrl string) string {
+func GetCmd(Shunt ShuntInfo) string {
 	th := fmt.Sprintf("hi-th-%d", Shunt.ID)
 	id16 := strconv.FormatInt(int64(Shunt.ID), 16)
 	table := Shunt.ID%10000 + 10000
@@ -53,7 +69,7 @@ func GetCmd(Shunt ShuntInfo, ApiUrl string) string {
 			}
 		}
 		if len(domain) > 0 {
-			install = append(install, fmt.Sprintf("curl -sSL '%s/hi/shunt/domain/%s' | sh", ApiUrl, th))
+			install = append(install, fmt.Sprintf("curl -sSL '%s/hi/shunt/domain/%s' | sh", os.Getenv("API_URL"), th))
 			var envMap = make(map[string]interface{})
 			envMap["dnsIp"] = dnsIp
 			envMap["th"] = th

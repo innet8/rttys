@@ -615,6 +615,16 @@ func apiStart(br *broker) {
 			info.Conf = jsoniter.Get(content, "conf").ToString()
 			info.LanIp = jsoniter.Get(content, "lan_ip").ToString()
 			info.Status = "use"
+			if !strings.Contains(info.Conf, "config proxy") || !strings.Contains(info.Conf, "config peers") {
+				c.JSON(http.StatusOK, gin.H{
+					"ret": 0,
+					"msg": "配置格式错误，请参考示例",
+					"data": gin.H{
+						"example": hi.WireguardConfExampleContent,
+					},
+				})
+				return
+			}
 			result := db.Table("hi_wg").Create(&info)
 			if result.Error != nil {
 				c.JSON(http.StatusOK, gin.H{
@@ -766,6 +776,28 @@ func apiStart(br *broker) {
 		})
 	})
 
+	// devid=设备ID
+	r.GET("/hi/shunt/cmd/batch/:devid", func(c *gin.Context) {
+		devid := c.Param("devid")
+
+		db, err := hi.InstanceDB(cfg.DB)
+		if err != nil {
+			log.Error().Msg(err.Error())
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+
+		var infos []hi.ShuntInfo
+		result := db.Table("hi_shunt").Where("devid = ?", devid).Find(&infos)
+		if result.Error != nil {
+			log.Error().Msg(err.Error())
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+
+		c.String(http.StatusOK, hi.GetCmdBatch(infos))
+	})
+
 	// action=rule|delete|cmd|domain  sid=分流id
 	r.GET("/hi/shunt/:action/:sid", func(c *gin.Context) {
 		action := c.Param("action")
@@ -815,7 +847,7 @@ func apiStart(br *broker) {
 
 		if action == "cmd" {
 			// 命令
-			c.String(http.StatusOK, hi.GetCmd(info, os.Getenv("API_URL")))
+			c.String(http.StatusOK, hi.GetCmd(info))
 		} else if action == "domain" {
 			// 域名命令
 			c.String(http.StatusOK, hi.GetDomain(info))

@@ -40,6 +40,7 @@ type commandReq struct {
 	c      *gin.Context
 	devid  string
 	data   []byte
+	result string
 }
 
 var commands sync.Map
@@ -48,9 +49,12 @@ func handleCmdResp(data []byte) {
 	token := jsoniter.Get(data, "token").ToString()
 
 	if req, ok := commands.Load(token); ok {
-		req := req.(*commandReq)
-		req.c.String(http.StatusOK, jsoniter.Get(data, "attrs").ToString())
-		req.cancel()
+		res := req.(*commandReq)
+		res.result = jsoniter.Get(data, "attrs").ToString()
+		if res.c != nil {
+			res.c.String(http.StatusOK, res.result)
+		}
+		res.cancel()
 	}
 }
 
