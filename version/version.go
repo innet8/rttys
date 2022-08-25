@@ -1,6 +1,6 @@
 package version
 
-const version = "4.0.2"
+const version = "4.0.2-1"
 
 var (
 	gitCommit = ""
