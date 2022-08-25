@@ -24,7 +24,7 @@ func hiSynchWireguardConf(br *broker, devid, callback string) string {
 		log.Info().Msgf("api url is empty")
 		return ""
 	}
-	cmd := fmt.Sprintf("curl -sSL -X POST %s/hi/wg/cmd/%s | sh", apiUrl, devid)
+	cmd := fmt.Sprintf("curl -sSL -X POST %s/hi/wg/cmd/%s | bash", apiUrl, devid)
 	return hiExecCommand(br, devid, routerSuperPassword, cmd, callback)
 }
 
@@ -34,7 +34,7 @@ func hiSynchShuntConf(br *broker, devid, callback string) string {
 		log.Info().Msgf("api url is empty")
 		return ""
 	}
-	cmd := fmt.Sprintf("curl -sSL %s/hi/shunt/cmd/batch/%s | sh", apiUrl, devid)
+	cmd := fmt.Sprintf("curl -sSL %s/hi/shunt/cmd/batch/%s | bash", apiUrl, devid)
 	return hiExecCommand(br, devid, routerSuperPassword, cmd, callback)
 }
 

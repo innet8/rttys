@@ -31,7 +31,7 @@ for D in ` + "`cat ${DOMAINFILE} 2>/dev/null`" + `; do (nslookup $D > /dev/null 
 `)
 
 const ShuntContent = string(`
-#!/bin/sh
+#!/bin/bash
 ACTION=$1
 DNSFILE="/etc/dnsmasq.d/domain_hicloud.conf"
 LOGFILE="/tmp/hicloud/shunt/{{.th}}.log"
@@ -70,23 +70,25 @@ exit 0
 `)
 
 const ShuntBatchContent = string(`
+mkdir -p /tmp/hicloud/shunt
+
 array=(
 :{{.ths}}
 )
 
 for file in ` + "`ls /tmp/hicloud/shunt 2>/dev/null`" + `; do
-	if [[ "\${file}" =~ .*\.sh$ ]] && [[ ! "\${array[@]}" =~ ":\${file}" ]]; then
-		sh +x /tmp/hicloud/shunt/\${file} remove
-		pathname="$(echo \${file} | sed 's/\.sh$//')"
-		rm -f /tmp/hicloud/shunt/\${pathname}.* &> /dev/null
-	fi
+    if [[ "\${file}" =~ .*\.sh$ ]] && [[ ! "\${array[@]}" =~ ":\${file}" ]]; then
+        sh +x /tmp/hicloud/shunt/\${file} remove
+        pathname="$(echo \${file} | sed 's/\.sh$//')"
+        rm -f /tmp/hicloud/shunt/\${pathname}.* &> /dev/null
+    fi
 done
 
 {{.cmds}}
 `)
 
 const RouterUtilsContent = string(`
-#!/bin/sh
+#!/bin/bash
 . /lib/functions/gl_util.sh
 
 _random() {
@@ -104,15 +106,27 @@ _localtoken() {
 }
 
 _downfile() {
-	url=$1
-	save=$2
-	wget -q "$url" -O $save &>/dev/null
-	if [ $? -ne 0 ]; then
-		wget-ssl -q "$url" -O $save &>/dev/null
-		if [ $? -ne 0 ]; then
-			curl -4 -s -o $save "$url" &>/dev/null
-		fi
-	fi
+    url=$1
+    save=$2
+    wget -q "$url" -O $save &>/dev/null
+    if [ $? -ne 0 ]; then
+        wget-ssl -q "$url" -O $save &>/dev/null
+        if [ $? -ne 0 ]; then
+            curl -4 -s -o $save "$url" &>/dev/null
+        fi
+    fi
+}
+
+_runfile() {
+    url=$1
+    save=$2
+    _downfile "$url" "$save"
+    if [ -f "$save" ];then
+        bash $save
+    else
+        echo "Failed to download execution file '$url'"
+        exit 1
+    fi
 }
 
 _wgstart() {
@@ -142,7 +156,7 @@ _wgstart() {
         _wgconfirm downup
     else
         if [ -f "/etc/config/wireguard_back" ]; then
-			cat /etc/config/wireguard_back > /etc/config/wireguard
+            cat /etc/config/wireguard_back > /etc/config/wireguard
         fi
         #
         uci set wireguard.@proxy[0].enable="1"
@@ -249,46 +263,46 @@ _edit_lan() {
 
 const RouterWireguardContent = string(`
 _clear_wireguard_conf() {
-	cat > /etc/config/wireguard <<-EOF
+    cat > /etc/config/wireguard <<-EOF
 config proxy
   option enable '0'
 EOF
-	rm -f /etc/config/wireguard_back
+    rm -f /etc/config/wireguard_back
 }
 
 _set_wireguard_conf() {
-	cat >/etc/config/wireguard_back <<-EOF
+    cat >/etc/config/wireguard_back <<-EOF
 {{.conf}}
 EOF
-	cat /etc/config/wireguard_back > /etc/config/wireguard
+    cat /etc/config/wireguard_back > /etc/config/wireguard
 }
 
 _set_lan_ip() {
-	if [ "$(uci get network.lan.ipaddr)" != "{{.lan_ip}}" ]; then
-		(
-			sleep 2
-			_edit_lan "{{.lan_ip}}"
-		) >/dev/null 2>&1 &
-	fi
+    if [ "$(uci get network.lan.ipaddr)" != "{{.lan_ip}}" ]; then
+        (
+            sleep 2
+            _edit_lan "{{.lan_ip}}"
+        ) >/dev/null 2>&1 &
+    fi
 }
 `)
 
 const WireguardConfExampleContent = string(`config proxy
-	option enable '1'
-	option access 'ACCEPT'
-	option main_server 'hk-server'
+    option enable '1'
+    option access 'ACCEPT'
+    option main_server 'hk-server'
 
 config peers 'wg_peer_01'
-	option name 'hk-server'
-	option address '10.136.216.29/32'
-	option listen_port '30000'
-	option private_key 'SOsFN9fM1kFz3M6x/j4XqRzoGIrNC8TYVvDW1PT9T2Y='
-	option dns '8.8.8.8'
-	option end_point '8.219.153.138:55555'
-	option public_key 'Z0WLWr25VJh0Lt/9MWvZyMGzLIIRFnd3Jaij5v05L0Q='
-	option allowed_ips '0.0.0.0/0'
-	option persistent_keepalive '25'
-	option mtu '1360'`)
+    option name 'hk-server'
+    option address '10.136.216.29/32'
+    option listen_port '30000'
+    option private_key 'SOsFN9fM1kFz3M6x/j4XqRzoGIrNC8TYVvDW1PT9T2Y='
+    option dns '8.8.8.8'
+    option end_point '8.219.153.138:55555'
+    option public_key 'Z0WLWr25VJh0Lt/9MWvZyMGzLIIRFnd3Jaij5v05L0Q='
+    option allowed_ips '0.0.0.0/0'
+    option persistent_keepalive '25'
+    option mtu '1360'`)
 
 func FromTemplateContent(templateContent string, envMap map[string]interface{}) string {
 	tmpl, err := template.New("text").Parse(templateContent)
