@@ -590,7 +590,7 @@ func apiStart(br *broker) {
 		}
 	})
 
-	// action=set|cancel|get|cmd  devid=设备id
+	// WG action=set|cancel|get|cmd  devid=设备id
 	r.POST("/hi/wg/:action/:devid", func(c *gin.Context) {
 		action := c.Param("action")
 		devid := c.Param("devid")
@@ -691,7 +691,39 @@ func apiStart(br *broker) {
 		}
 	})
 
-	// action=modify  devid=设备id  sid=分流id（0表示添加）
+	// 分流 action=list  devid=设备id
+	r.GET("/hi/shunt/list/:devid", func(c *gin.Context) {
+		devid := c.Param("devid")
+
+		db, err := hi.InstanceDB(cfg.DB)
+		if err != nil {
+			log.Error().Msg(err.Error())
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+
+		var infos []hi.ShuntInfo
+
+		result := db.Table("hi_shunt").Select([]string{"id", "devid", "source", "prio", "out"}).Where("devid = ?", devid).Find(&infos)
+		if result.Error != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"ret": 0,
+				"msg": "获取失败",
+				"data": gin.H{
+					"error": result.Error.Error(),
+				},
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"ret":  1,
+			"msg":  "success",
+			"data": infos,
+		})
+	})
+
+	// 分流 action=modify  devid=设备id  sid=分流id（0表示添加）
 	r.POST("/hi/shunt/modify/:devid/:sid", func(c *gin.Context) {
 		devid := c.Param("devid")
 		shuntId, _ := strconv.Atoi(c.Param("sid"))
@@ -754,61 +786,7 @@ func apiStart(br *broker) {
 		})
 	})
 
-	// action=list  devid=设备id
-	r.GET("/hi/shunt/list/:devid", func(c *gin.Context) {
-		devid := c.Param("devid")
-
-		db, err := hi.InstanceDB(cfg.DB)
-		if err != nil {
-			log.Error().Msg(err.Error())
-			c.Status(http.StatusInternalServerError)
-			return
-		}
-
-		var infos []hi.ShuntInfo
-
-		result := db.Table("hi_shunt").Select([]string{"id", "devid", "source", "prio", "out"}).Where("devid = ?", devid).Find(&infos)
-		if result.Error != nil {
-			c.JSON(http.StatusOK, gin.H{
-				"ret": 0,
-				"msg": "获取失败",
-				"data": gin.H{
-					"error": result.Error.Error(),
-				},
-			})
-			return
-		}
-
-		c.JSON(http.StatusOK, gin.H{
-			"ret":  1,
-			"msg":  "success",
-			"data": infos,
-		})
-	})
-
-	// devid=设备ID
-	r.GET("/hi/shunt/cmd/batch/:devid", func(c *gin.Context) {
-		devid := c.Param("devid")
-
-		db, err := hi.InstanceDB(cfg.DB)
-		if err != nil {
-			log.Error().Msg(err.Error())
-			c.Status(http.StatusInternalServerError)
-			return
-		}
-
-		var infos []hi.ShuntInfo
-		result := db.Table("hi_shunt").Where("devid = ?", devid).Find(&infos)
-		if result.Error != nil {
-			log.Error().Msg(err.Error())
-			c.Status(http.StatusInternalServerError)
-			return
-		}
-
-		c.String(http.StatusOK, hi.GetCmdBatch(cfg.HiApiUrl, infos))
-	})
-
-	// action=rule|delete|cmd|domain  sid=分流id
+	// 分流 action=rule|delete|cmd|domain  sid=分流id
 	r.GET("/hi/shunt/:action/:sid", func(c *gin.Context) {
 		action := c.Param("action")
 		shuntId, _ := strconv.Atoi(c.Param("sid"))
@@ -868,6 +846,28 @@ func apiStart(br *broker) {
 		} else {
 			c.Status(http.StatusForbidden)
 		}
+	})
+
+	// 分流 devid=设备ID
+	r.GET("/hi/shunt/cmd/batch/:devid", func(c *gin.Context) {
+		devid := c.Param("devid")
+
+		db, err := hi.InstanceDB(cfg.DB)
+		if err != nil {
+			log.Error().Msg(err.Error())
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+
+		var infos []hi.ShuntInfo
+		result := db.Table("hi_shunt").Where("devid = ?", devid).Find(&infos)
+		if result.Error != nil {
+			log.Error().Msg(err.Error())
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+
+		c.String(http.StatusOK, hi.GetCmdBatch(cfg.HiApiUrl, infos))
 	})
 
 	r.NoRoute(func(c *gin.Context) {
