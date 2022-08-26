@@ -757,7 +757,17 @@ func apiStart(br *broker) {
 			info.Rule = jsoniter.Get(content, "rule").ToString()
 			info.Prio = jsoniter.Get(content, "prio").ToUint32()
 			info.Out = jsoniter.Get(content, "out").ToString()
-			db.Save(&info)
+			result := db.Table("hi_shunt").Save(&info)
+			if result.Error != nil {
+				c.JSON(http.StatusOK, gin.H{
+					"ret": 0,
+					"msg": "更新失败",
+					"data": gin.H{
+						"error": result.Error.Error(),
+					},
+				})
+				return
+			}
 		} else {
 			info.Devid = devid
 			info.Source = jsoniter.Get(content, "source").ToString()
