@@ -14,6 +14,7 @@ type Array []string
 type ShuntInfo struct {
 	ID     uint32 `json:"id"`
 	Devid  string `json:"devid"`
+	Onlyid string `json:"onlyid"`
 	Source string `json:"source"`
 	Rule   string `json:"rule"`
 	Prio   uint32 `json:"prio"`
@@ -23,6 +24,7 @@ type ShuntInfo struct {
 type WgInfo struct {
 	ID     uint32 `json:"id"`
 	Devid  string `json:"devid"`
+	Onlyid string `json:"onlyid"`
 	Conf   string `json:"conf"`
 	LanIp  string `json:"lan_ip"`
 	Status string `json:"status"`

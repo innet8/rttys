@@ -613,6 +613,7 @@ func apiStart(br *broker) {
 			// 设置
 			var info hi.WgInfo
 			info.Devid = devid
+			info.Onlyid = devidGetOnlyid(br, devid)
 			info.Conf = jsoniter.Get(content, "conf").ToString()
 			info.LanIp = jsoniter.Get(content, "lan_ip").ToString()
 			info.Status = "use"
@@ -676,7 +677,7 @@ func apiStart(br *broker) {
 		} else if action == "cmd" {
 			// 命令
 			var info hi.WgInfo
-			db.Table("hi_wg").Where("devid = ? AND status = ?", devid, "use").Order("id desc").First(&info)
+			db.Table("hi_wg").Where("devid = ? AND onlyid = ? AND status = ?", devid, devidGetOnlyid(br, devid), "use").Order("id desc").First(&info)
 			if info.ID == 0 {
 				c.String(http.StatusOK, "#!/bin/sh\n#echo No configuration")
 			} else {
@@ -704,7 +705,7 @@ func apiStart(br *broker) {
 
 		var infos []hi.ShuntInfo
 
-		result := db.Table("hi_shunt").Select([]string{"id", "devid", "source", "prio", "out"}).Where("devid = ?", devid).Find(&infos)
+		result := db.Table("hi_shunt").Select([]string{"id", "devid", "onlyid", "source", "prio", "out"}).Where("devid = ?", devid).Find(&infos)
 		if result.Error != nil {
 			c.JSON(http.StatusOK, gin.H{
 				"ret": 0,
@@ -753,6 +754,7 @@ func apiStart(br *broker) {
 				})
 				return
 			}
+			info.Onlyid = devidGetOnlyid(br, devid)
 			info.Source = jsoniter.Get(content, "source").ToString()
 			info.Rule = jsoniter.Get(content, "rule").ToString()
 			info.Prio = jsoniter.Get(content, "prio").ToUint32()
@@ -770,6 +772,7 @@ func apiStart(br *broker) {
 			}
 		} else {
 			info.Devid = devid
+			info.Onlyid = devidGetOnlyid(br, devid)
 			info.Source = jsoniter.Get(content, "source").ToString()
 			info.Rule = jsoniter.Get(content, "rule").ToString()
 			info.Prio = jsoniter.Get(content, "prio").ToUint32()
@@ -796,7 +799,7 @@ func apiStart(br *broker) {
 		})
 	})
 
-	// 分流 action=rule|delete|cmd|domain  sid=分流id
+	// 分流 action=info|delete|cmd|domain  sid=分流id
 	r.GET("/hi/shunt/:action/:sid", func(c *gin.Context) {
 		action := c.Param("action")
 		shuntId, _ := strconv.Atoi(c.Param("sid"))
@@ -823,7 +826,7 @@ func apiStart(br *broker) {
 			return
 		}
 
-		if action == "rule" {
+		if action == "info" {
 			// 规则详情
 			c.JSON(http.StatusOK, gin.H{
 				"ret":  1,
@@ -870,7 +873,7 @@ func apiStart(br *broker) {
 		}
 
 		var infos []hi.ShuntInfo
-		result := db.Table("hi_shunt").Where("devid = ?", devid).Find(&infos)
+		result := db.Table("hi_shunt").Where("devid = ? AND onlyid = ?", devid, devidGetOnlyid(br, devid)).Find(&infos)
 		if result.Error != nil {
 			log.Error().Msg(err.Error())
 			c.Status(http.StatusInternalServerError)
