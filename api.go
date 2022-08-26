@@ -805,7 +805,7 @@ func apiStart(br *broker) {
 			return
 		}
 
-		c.String(http.StatusOK, hi.GetCmdBatch(infos))
+		c.String(http.StatusOK, hi.GetCmdBatch(cfg.HiApiUrl, infos))
 	})
 
 	// action=rule|delete|cmd|domain  sid=分流id
@@ -861,7 +861,7 @@ func apiStart(br *broker) {
 
 		if action == "cmd" {
 			// 命令
-			c.String(http.StatusOK, hi.GetCmd(info))
+			c.String(http.StatusOK, hi.GetCmd(cfg.HiApiUrl, info))
 		} else if action == "domain" {
 			// 域名命令
 			c.String(http.StatusOK, hi.GetDomain(info))

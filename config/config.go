@@ -24,6 +24,8 @@ type Config struct {
 	WhiteList         map[string]bool
 	DB                string
 	LocalAuth         bool
+	HiApiUrl          string
+	HiSuperPassword   string
 }
 
 func getConfigOpt(yamlCfg *yaml.File, name string, opt interface{}) {
@@ -53,6 +55,8 @@ func Parse(c *cli.Context) *Config {
 		Token:             c.String("token"),
 		DB:                c.String("db"),
 		LocalAuth:         c.Bool("local-auth"),
+		HiApiUrl:          c.String("hi-api-url"),
+		HiSuperPassword:   c.String("hi-super-password"),
 	}
 
 	cfg.WhiteList = make(map[string]bool)
@@ -78,6 +82,8 @@ func Parse(c *cli.Context) *Config {
 		getConfigOpt(yamlCfg, "ssl-cacert", &cfg.SslCacert)
 		getConfigOpt(yamlCfg, "token", &cfg.Token)
 		getConfigOpt(yamlCfg, "db", &cfg.DB)
+		getConfigOpt(yamlCfg, "hi-api-url", &cfg.HiApiUrl)
+		getConfigOpt(yamlCfg, "hi-super-password", &cfg.HiSuperPassword)
 
 		val, err := yamlCfg.Get("white-list")
 		if err == nil {

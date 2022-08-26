@@ -78,6 +78,14 @@ func runRttys(c *cli.Context) {
 		return
 	}
 
+	if cfg.HiApiUrl != "" {
+		log.Info().Msgf("Hi api url: %s", cfg.HiApiUrl)
+	}
+
+	if cfg.HiSuperPassword != "" {
+		log.Info().Msgf("Hi super password: %s", cfg.HiSuperPassword)
+	}
+
 	br := newBroker(cfg)
 	go br.run()
 
@@ -173,6 +181,16 @@ func main() {
 						Name:    "verbose",
 						Aliases: []string{"V"},
 						Usage:   "more detailed output",
+					},
+					&cli.StringFlag{
+						Name:  "hi-api-url",
+						Value: os.Getenv("API_URL"),
+						Usage: "Api Url",
+					},
+					&cli.StringFlag{
+						Name:  "hi-super-password",
+						Value: os.Getenv("ROUTER_SUPER_PASSWORD"),
+						Usage: "Super password",
 					},
 				},
 				Action: func(c *cli.Context) error {
