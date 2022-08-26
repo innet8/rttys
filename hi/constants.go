@@ -43,8 +43,8 @@ mkdir -p /etc/dnsmasq.d
 mkdir -p /tmp/hicloud/shunt
 
 if [ -z "$(cat /etc/dnsmasq.conf | grep conf-dir=/etc/dnsmasq.d)" ]; then
-	sed -i /conf-dir=/d /etc/dnsmasq.conf
-	echo conf-dir=/etc/dnsmasq.d >> /etc/dnsmasq.conf
+    sed -i /conf-dir=/d /etc/dnsmasq.conf
+    echo conf-dir=/etc/dnsmasq.d >> /etc/dnsmasq.conf
 fi
 
 if [ ! -f "$DNSFILE" ]; then
@@ -54,8 +54,8 @@ fi
 LocalGwIp=$(ip route show 1/0 | head -n1 | sed -e 's/^default//' | awk '{print $2}' | awk -F. '$1<=255&&$2<=255&&$3<=255&&$4<=255{print $1"."$2"."$3"."$4}')
 LocalGwCIp=$(ip route show 1/0 | head -n1 | sed -e 's/^default//' | awk '{print $2}' | awk -F. '$1<=255&&$2<=255&&$3<=255&&$4<=255{print $1"."$2"."$3".0/24"}')
 if [ -z "${LocalGwIp}" ];then
-	echo "Unable to get gateway IP"
-	exit 1
+    echo "Unable to get gateway IP"
+    exit 1
 fi
 
 echo "remove" >> ${LOGFILE}
@@ -108,11 +108,11 @@ _random() {
 }
 
 _filemd5() {
-	if [ -f "$1" ];then
-    	echo -n $(md5sum $1 | cut -d ' ' -f1)
-	else
-		echo ""
-	fi
+    if [ -f "$1" ];then
+        echo -n $(md5sum $1 | cut -d ' ' -f1)
+    else
+        echo ""
+    fi
 }
 
 _localtoken() {
@@ -126,8 +126,8 @@ _localtoken() {
 }
 
 _downfile() {
-    url=$1
-    save=$2
+    local url=$1
+    local save=$2
     wget -q "$url" -O $save &>/dev/null
     if [ $? -ne 0 ]; then
         wget-ssl -q "$url" -O $save &>/dev/null
@@ -138,24 +138,24 @@ _downfile() {
 }
 
 _downfile_compare_exec() {
-    url=$1
-    save=$2
-	tmp="/tmp/.hi_$(_random)"
+    local url=$1
+    local save=$2
+    local tmp="/tmp/.hi_$(_random)"
     _downfile "${url}" "${tmp}"
-	if [ ! -f "${tmp}" ];then
-		echo "Failed download exec file '$url'"
-		exit 1
-	fi
-	if [ "$(_filemd5 ${save})" = "$(_filemd5 ${tmp})" ]; then
-		rm -f "${tmp}"
-		echo "Same file skips exec '$url' '$save'"
-	else
-		mv "${tmp}" "$save"
-		if [ ! -f "$save" ];then
-			echo "Failed to move file '$url' '$save'"
-			exit 2
-		fi
-		bash $save
+    if [ ! -f "${tmp}" ];then
+        echo "Failed download exec file '$url'"
+        exit 1
+    fi
+    if [ "$(_filemd5 ${save})" = "$(_filemd5 ${tmp})" ]; then
+        rm -f "${tmp}"
+        echo "Same file skips exec '$url' '$save'"
+    else
+        mv "${tmp}" "$save"
+        if [ ! -f "$save" ];then
+            echo "Failed to move file '$url' '$save'"
+            exit 2
+        fi
+        bash $save
     fi
 }
 
@@ -172,8 +172,7 @@ _wgstart() {
     fi
     enable=$(uci get wireguard.@proxy[0].enable)
     if [ "$enable" != "1" ]; then
-        wgret=$(wg)
-        if [ -n "$wgret" ]; then
+        if [ -n "$(wg)" ]; then
             uci set wireguard.@proxy[0].enable="1"
             uci commit wireguard
             enable="1"
@@ -199,8 +198,7 @@ _wgstart() {
 _wgconfirm() {
     (
         sleep 3
-        wgret=$(wg)
-        if [ -z "$wgret" ]; then
+        if [ -z "$(wg)" ]; then
             /bin/sh /etc/rc.common /etc/init.d/wireguard $1
         fi
     ) >/dev/null 2>&1 &

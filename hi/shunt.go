@@ -60,7 +60,7 @@ func GetCmd(apiUrl string, Shunt ShuntInfo) string {
 		}
 		for _, source := range sources {
 			if source == "gw" || source == "gateway" {
-				source = "${LocalGwCIp}/24"
+				source = "${LocalGwCIp}"
 			}
 			if strings.Contains(source, "-") {
 				install = append(install, fmt.Sprintf("iptables -t mangle -I shunt-%d -m iprange --src-range %s -m set --match-set %s dst -j ACCEPT", prio, source, th))
@@ -80,7 +80,7 @@ func GetCmd(apiUrl string, Shunt ShuntInfo) string {
 	} else {
 		for _, source := range sources {
 			if source == "gw" || source == "gateway" {
-				source = "${LocalGwCIp}/24"
+				source = "${LocalGwCIp}"
 			}
 			if strings.Contains(source, "-") {
 				install = append(install, fmt.Sprintf("iptables -t mangle -I shunt-%d -m iprange --src-range %s -j ACCEPT", prio, source))
