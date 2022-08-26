@@ -46,6 +46,13 @@ func (t Array) Value() (driver.Value, error) {
 }
 
 func String2Array(value string) Array {
+	value = strings.TrimSpace(value)
+	if !strings.HasPrefix(value, "[") || !strings.HasSuffix(value, "]") {
+		if len(value) > 0 {
+			return []string{value}
+		}
+		return []string{}
+	}
 	var arr Array
 	err := arr.Scan(value)
 	if err != nil {

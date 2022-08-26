@@ -32,8 +32,8 @@ func GetCmd(apiUrl string, Shunt ShuntInfo) string {
 		prio = 50
 	}
 	//
-	source := String2Array(Shunt.Source)
-	rule := String2Array(Shunt.Rule)
+	sources := String2Array(Shunt.Source)
+	rules := String2Array(Shunt.Rule)
 	dnsIp := "${localGwIp}"
 	//
 	var install []string
@@ -48,23 +48,26 @@ func GetCmd(apiUrl string, Shunt ShuntInfo) string {
 	} else {
 		install = append(install, fmt.Sprintf("ip route add default via ${localGwIp} table %d", table))
 	}
-	if len(rule) > 0 {
+	if len(rules) > 0 {
 		install = append(install, fmt.Sprintf("ipset create %s hash:net maxelem 1000000", th))
 		var domain []string
-		for _, item := range rule {
-			if IsCidr(item) {
-				install = append(install, fmt.Sprintf("ipset add %s %s", th, item))
-			} else if IsDomain(item) {
-				domain = append(domain, item)
+		for _, rule := range rules {
+			if IsCidr(rule) {
+				install = append(install, fmt.Sprintf("ipset add %s %s", th, rule))
+			} else if IsDomain(rule) {
+				domain = append(domain, rule)
 			}
 		}
-		for _, item := range source {
-			if strings.Contains(item, "-") {
-				install = append(install, fmt.Sprintf("iptables -t mangle -I shunt-%d -m iprange --src-range %s -m set --match-set %s dst -j ACCEPT", prio, item, th))
-				install = append(install, fmt.Sprintf("iptables -t mangle -I shunt-%d -m iprange --src-range %s -m set --match-set %s dst -j MARK --set-xmark 0x%s/0xffffffff", prio, item, th, id16))
+		for _, source := range sources {
+			if source == "all" {
+				source = "${localGwIp}/24"
+			}
+			if strings.Contains(source, "-") {
+				install = append(install, fmt.Sprintf("iptables -t mangle -I shunt-%d -m iprange --src-range %s -m set --match-set %s dst -j ACCEPT", prio, source, th))
+				install = append(install, fmt.Sprintf("iptables -t mangle -I shunt-%d -m iprange --src-range %s -m set --match-set %s dst -j MARK --set-xmark 0x%s/0xffffffff", prio, source, th, id16))
 			} else {
-				install = append(install, fmt.Sprintf("iptables -t mangle -I shunt-%d -s %s -m set --match-set %s dst -j ACCEPT", prio, item, th))
-				install = append(install, fmt.Sprintf("iptables -t mangle -I shunt-%d -s %s -m set --match-set %s dst -j MARK --set-xmark 0x%s/0xffffffff", prio, item, th, id16))
+				install = append(install, fmt.Sprintf("iptables -t mangle -I shunt-%d -s %s -m set --match-set %s dst -j ACCEPT", prio, source, th))
+				install = append(install, fmt.Sprintf("iptables -t mangle -I shunt-%d -s %s -m set --match-set %s dst -j MARK --set-xmark 0x%s/0xffffffff", prio, source, th, id16))
 			}
 		}
 		if len(domain) > 0 {
@@ -75,13 +78,16 @@ func GetCmd(apiUrl string, Shunt ShuntInfo) string {
 			install = append(install, ShuntDomainTemplate(envMap))
 		}
 	} else {
-		for _, item := range source {
-			if strings.Contains(item, "-") {
-				install = append(install, fmt.Sprintf("iptables -t mangle -I shunt-%d -m iprange --src-range %s -j ACCEPT", prio, item))
-				install = append(install, fmt.Sprintf("iptables -t mangle -I shunt-%d -m iprange --src-range %s -j MARK --set-xmark 0x%s/0xffffffff", prio, item, id16))
+		for _, source := range sources {
+			if source == "all" {
+				source = "${localGwIp}/24"
+			}
+			if strings.Contains(source, "-") {
+				install = append(install, fmt.Sprintf("iptables -t mangle -I shunt-%d -m iprange --src-range %s -j ACCEPT", prio, source))
+				install = append(install, fmt.Sprintf("iptables -t mangle -I shunt-%d -m iprange --src-range %s -j MARK --set-xmark 0x%s/0xffffffff", prio, source, id16))
 			} else {
-				install = append(install, fmt.Sprintf("iptables -t mangle -I shunt-%d -s %s -j ACCEPT", prio, item))
-				install = append(install, fmt.Sprintf("iptables -t mangle -I shunt-%d -s %s -j MARK --set-xmark 0x%s/0xffffffff", prio, item, id16))
+				install = append(install, fmt.Sprintf("iptables -t mangle -I shunt-%d -s %s -j ACCEPT", prio, source))
+				install = append(install, fmt.Sprintf("iptables -t mangle -I shunt-%d -s %s -j MARK --set-xmark 0x%s/0xffffffff", prio, source, id16))
 			}
 		}
 	}
@@ -124,11 +130,11 @@ func GetDomain(Shunt ShuntInfo) string {
 	th := fmt.Sprintf("hi-th-%d", Shunt.ID)
 	var install []string
 	var domain []string
-	rule := String2Array(Shunt.Rule)
-	if len(rule) > 0 {
-		for _, item := range rule {
-			if IsDomain(item) {
-				domain = append(domain, item)
+	rules := String2Array(Shunt.Rule)
+	if len(rules) > 0 {
+		for _, rule := range rules {
+			if IsDomain(rule) {
+				domain = append(domain, rule)
 			}
 		}
 	}
