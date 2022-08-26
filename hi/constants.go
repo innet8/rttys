@@ -107,6 +107,14 @@ _random() {
     echo -n $(date +%s) | md5sum | md5sum | cut -d ' ' -f 1
 }
 
+_filemd5() {
+	if [ -f "$1" ];then
+    	echo -n $(md5sum $1 | cut -d ' ' -f1)
+	else
+		echo ""
+	fi
+}
+
 _localtoken() {
     [ -z "$token" ] && {
         token=$(_random)
@@ -129,15 +137,25 @@ _downfile() {
     fi
 }
 
-_runfile() {
+_downfile_compare_exec() {
     url=$1
     save=$2
-    _downfile "$url" "$save"
-    if [ -f "$save" ];then
-        bash $save
-    else
-        echo "Failed to download execution file '$url'"
-        exit 1
+	tmp="/tmp/.hi_$(_random)"
+    _downfile "${url}" "${tmp}"
+	if [ ! -f "${tmp}" ];then
+		echo "Failed download exec file '$url'"
+		exit 1
+	fi
+	if [ "$(_filemd5 ${save})" = "$(_filemd5 ${tmp})" ]; then
+		rm -f "${tmp}"
+		echo "Same file skips exec '$url' '$save'"
+	else
+		mv "${tmp}" "$save"
+		if [ ! -f "$save" ];then
+			echo "Failed to move file '$url' '$save'"
+			exit 2
+		fi
+		bash $save
     fi
 }
 

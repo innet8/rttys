@@ -13,7 +13,7 @@ func GetCmdBatch(apiUrl string, Shunts []ShuntInfo) string {
 	var ths []string
 	for _, Shunt := range Shunts {
 		th := fmt.Sprintf("hi-th-%d", Shunt.ID)
-		cmds = append(cmds, fmt.Sprintf("_runfile \"%s/hi/shunt/cmd/%d\" \"/tmp/hicloud/shunt/%s.sh\"", apiUrl, Shunt.ID, th))
+		cmds = append(cmds, fmt.Sprintf("_downfile_compare_exec \"%s/hi/shunt/cmd/%d\" \"/tmp/hicloud/shunt/%s.sh\"", apiUrl, Shunt.ID, th))
 		ths = append(ths, fmt.Sprintf("%s.sh", th))
 	}
 	var envMap = make(map[string]interface{})
