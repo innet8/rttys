@@ -91,7 +91,7 @@ func (br *broker) run() {
 					dev.registered = true
 					br.devices[devid] = c
 					dev.UpdateDb()
-					log.Info().Msgf("Device '%s' registered, proto %d", devid, dev.proto)
+					log.Info().Msgf("Device '%s' registered, onlyid '%s', desc '%s', proto %d", devid, dev.onlyid, dev.desc, dev.proto)
 					go hiSynchWireguardConf(br, devid, "")
 					go hiSynchShuntConf(br, devid, "")
 				}

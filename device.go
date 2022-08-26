@@ -180,8 +180,13 @@ func parseDeviceInfo(dev *device, b []byte) bool {
 
 	dev.id = string(fields[0])
 	dev.desc = string(fields[1])
-	dev.onlyid = string(fields[2])
-	dev.token = string(fields[3])
+	dev.token = string(fields[2])
+
+	if strings.Contains(dev.desc, "#") {
+		arr := strings.Split(dev.desc, "#")
+		dev.onlyid = arr[0]
+		dev.desc = dev.desc[len(arr[0])+1:]
+	}
 
 	return true
 }
