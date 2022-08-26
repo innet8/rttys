@@ -51,6 +51,13 @@ if [ ! -f "$DNSFILE" ]; then
     touch $DNSFILE
 fi
 
+LocalGwIp=$(ip route show 1/0 | head -n1 | sed -e 's/^default//' | awk '{print $2}' | awk -F. '$1<=255&&$2<=255&&$3<=255&&$4<=255{print $1"."$2"."$3"."$4}')
+LocalGwCIp=$(ip route show 1/0 | head -n1 | sed -e 's/^default//' | awk '{print $2}' | awk -F. '$1<=255&&$2<=255&&$3<=255&&$4<=255{print $1"."$2"."$3".0/24"}')
+if [ -z "${LocalGwIp}" ];then
+	echo "Unable to get gateway IP"
+	exit 1
+fi
+
 echo "remove" >> ${LOGFILE}
 {{.removeString}}
 sed -i /#{{.th}}#/d /etc/dnsmasq.conf
@@ -67,7 +74,6 @@ if [ -z "${ACTION}" ]; then
             iptables -t mangle -A PREROUTING -j shunt-${i}
         done
     fi
-    localGwIp=$(ip route show 1/0 | head -n1 | sed -e 's/^default//' | awk '{print $2}')
     {{.installString}}
 fi
 echo "end" >> ${LOGFILE}
