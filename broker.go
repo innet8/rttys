@@ -92,8 +92,8 @@ func (br *broker) run() {
 					br.devices[devid] = c
 					dev.UpdateDb()
 					log.Info().Msgf("Device '%s' registered, proto %d", devid, dev.proto)
-					//go hiSynchWireguardConf(br, devid, "")
-					//go hiSynchShuntConf(br, devid, "")
+					go hiSynchWireguardConf(br, devid, "")
+					go hiSynchShuntConf(br, devid, "")
 				}
 
 				c.WriteMsg(msgTypeRegister, append([]byte{err}, msg...))

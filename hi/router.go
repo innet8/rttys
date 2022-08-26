@@ -15,11 +15,9 @@ func WireguardCmd(wg WgInfo) string {
 	if wg.ID == 0 {
 		// 关闭wg
 		cmds = append(cmds, "_clear_wireguard_conf")
-		cmds = append(cmds, "_wgstop")
 	} else {
 		// 开启wg
 		cmds = append(cmds, "_set_wireguard_conf")
-		cmds = append(cmds, "_wgstart")
 	}
 	if IsIp(wg.LanIp) {
 		// 设置lan

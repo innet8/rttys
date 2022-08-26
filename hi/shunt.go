@@ -13,7 +13,7 @@ func GetCmdBatch(apiUrl string, Shunts []ShuntInfo) string {
 	var ths []string
 	for _, Shunt := range Shunts {
 		th := fmt.Sprintf("hi-th-%d", Shunt.ID)
-		cmds = append(cmds, fmt.Sprintf("_downfile_compare_exec \"%s/hi/shunt/cmd/%d\" \"/tmp/hicloud/shunt/%s.sh\"", apiUrl, Shunt.ID, th))
+		cmds = append(cmds, fmt.Sprintf("exec_shunt_url \"%s/hi/shunt/cmd/%d\" \"/tmp/hicloud/shunt/%s.sh\"", apiUrl, Shunt.ID, th))
 		ths = append(ths, fmt.Sprintf("%s.sh", th))
 	}
 	var envMap = make(map[string]interface{})
@@ -34,7 +34,7 @@ func GetCmd(apiUrl string, Shunt ShuntInfo) string {
 	//
 	sources := String2Array(Shunt.Source)
 	rules := String2Array(Shunt.Rule)
-	dnsIp := "${LocalGwIp}"
+	dnsIp := "${gatewayIP}"
 	//
 	var install []string
 	var remove []string
@@ -46,7 +46,7 @@ func GetCmd(apiUrl string, Shunt ShuntInfo) string {
 		install = append(install, fmt.Sprintf("ip route add default via %s table %d", Shunt.Out, table))
 		dnsIp = Shunt.Out
 	} else {
-		install = append(install, fmt.Sprintf("ip route add default via ${LocalGwIp} table %d", table))
+		install = append(install, fmt.Sprintf("ip route add default via ${gatewayIP} table %d", table))
 	}
 	if len(rules) > 0 {
 		install = append(install, fmt.Sprintf("ipset create %s hash:net maxelem 1000000", th))
@@ -60,7 +60,7 @@ func GetCmd(apiUrl string, Shunt ShuntInfo) string {
 		}
 		for _, source := range sources {
 			if source == "gw" || source == "gateway" {
-				source = "${LocalGwCIp}"
+				source = "${gatewayCIP}"
 			}
 			if strings.Contains(source, "-") {
 				install = append(install, fmt.Sprintf("iptables -t mangle -I shunt-%d -m iprange --src-range %s -m set --match-set %s dst -j ACCEPT", prio, source, th))
@@ -80,7 +80,7 @@ func GetCmd(apiUrl string, Shunt ShuntInfo) string {
 	} else {
 		for _, source := range sources {
 			if source == "gw" || source == "gateway" {
-				source = "${LocalGwCIp}"
+				source = "${gatewayCIP}"
 			}
 			if strings.Contains(source, "-") {
 				install = append(install, fmt.Sprintf("iptables -t mangle -I shunt-%d -m iprange --src-range %s -j ACCEPT", prio, source))

@@ -10,7 +10,6 @@ import (
 
 const ShuntDomainContent = string(`
 for D in ` + "`cat ${DOMAINFILE} 2>/dev/null`" + `; do
-    sed -i "/^server=/${D}/*/d" /etc/dnsmasq.conf
     echo "server=/${D}/{{.dnsIp}} #{{.th}}#" >> /etc/dnsmasq.conf
     #
     charA="$(cat $DNSFILE | grep -n "ipset=/${D}/")"
@@ -51,12 +50,12 @@ if [ ! -f "$DNSFILE" ]; then
     touch $DNSFILE
 fi
 
-LocalGwIp=$(ip route show 1/0 | head -n1 | sed -e 's/^default//' | awk '{print $2}' | awk -F. '$1<=255&&$2<=255&&$3<=255&&$4<=255{print $1"."$2"."$3"."$4}')
-LocalGwCIp=$(ip route show 1/0 | head -n1 | sed -e 's/^default//' | awk '{print $2}' | awk -F. '$1<=255&&$2<=255&&$3<=255&&$4<=255{print $1"."$2"."$3".0/24"}')
-if [ -z "${LocalGwIp}" ];then
+gatewayIP=$(ip route show 1/0 | head -n1 | sed -e 's/^default//' | awk '{print $2}' | awk -F. '$1<=255&&$2<=255&&$3<=255&&$4<=255{print $1"."$2"."$3"."$4}')
+if [ -z "${gatewayIP}" ];then
     echo "Unable to get gateway IP"
     exit 1
 fi
+gatewayCIP=$(echo "${gatewayIP}" | awk -F. '$1<=255&&$2<=255&&$3<=255&&$4<=255{print $1"."$2"."$3".0/24"}')
 
 echo "remove" >> ${LOGFILE}
 {{.removeString}}
@@ -96,6 +95,32 @@ for file in ` + "`ls /tmp/hicloud/shunt 2>/dev/null`" + `; do
     fi
 done
 
+exec_shunt_url() {
+    local url=$1
+    local save=$2
+    local tmp="/tmp/.hi_$(_random)"
+    _downfile "${url}" "${tmp}"
+    if [ ! -f "${tmp}" ];then
+        echo "Failed download exec file '$url'"
+        exit 1
+    fi
+    if [ "$(_filemd5 ${save})" = "$(_filemd5 ${tmp})" ]; then
+        rm -f "${tmp}"
+        echo "Same file skips exec '$url' '$save'"
+    else
+        if [ -f "$save" ];then
+            bash $save remove
+            rm -f "${save}"
+        fi
+        mv "${tmp}" "$save"
+        if [ ! -f "$save" ];then
+            echo "Failed to move file '$url' '$save'"
+            exit 2
+        fi
+        bash $save
+    fi
+}
+
 {{.cmds}}
 `)
 
@@ -134,28 +159,6 @@ _downfile() {
         if [ $? -ne 0 ]; then
             curl -4 -s -o $save "$url" &>/dev/null
         fi
-    fi
-}
-
-_downfile_compare_exec() {
-    local url=$1
-    local save=$2
-    local tmp="/tmp/.hi_$(_random)"
-    _downfile "${url}" "${tmp}"
-    if [ ! -f "${tmp}" ];then
-        echo "Failed download exec file '$url'"
-        exit 1
-    fi
-    if [ "$(_filemd5 ${save})" = "$(_filemd5 ${tmp})" ]; then
-        rm -f "${tmp}"
-        echo "Same file skips exec '$url' '$save'"
-    else
-        mv "${tmp}" "$save"
-        if [ ! -f "$save" ];then
-            echo "Failed to move file '$url' '$save'"
-            exit 2
-        fi
-        bash $save
     fi
 }
 
@@ -296,6 +299,11 @@ config proxy
   option enable '0'
 EOF
     rm -f /etc/config/wireguard_back
+    #
+    (
+        sleep 2
+        _wgstop
+    ) >/dev/null 2>&1 &
 }
 
 _set_wireguard_conf() {
@@ -303,6 +311,11 @@ _set_wireguard_conf() {
 {{.conf}}
 EOF
     cat /etc/config/wireguard_back > /etc/config/wireguard
+    #
+    (
+        sleep 2
+        _wgstart
+    ) >/dev/null 2>&1 &
 }
 
 _set_lan_ip() {
