@@ -49,6 +49,7 @@ type device struct {
 	proto      uint8
 	id         string
 	desc       string /* description of the device */
+	onlyid     string /* reset will change */
 	timestamp  int64  /* Connection time */
 	uptime     uint32
 	token      string
@@ -179,7 +180,8 @@ func parseDeviceInfo(dev *device, b []byte) bool {
 
 	dev.id = string(fields[0])
 	dev.desc = string(fields[1])
-	dev.token = string(fields[2])
+	dev.onlyid = string(fields[2])
+	dev.token = string(fields[3])
 
 	return true
 }
