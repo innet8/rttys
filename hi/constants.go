@@ -149,6 +149,7 @@ _filemd5() {
 }
 
 _localtoken() {
+	token=$(ls /tmp/gl_token_* 2>/dev/null | awk 'END {print}' | awk -F '_' '{print $3}')
     [ -z "$token" ] && {
         token=$(_random)
     }
@@ -360,7 +361,7 @@ fi
 
 const HotplugDhcpContent = string(`
 RES=$(curl "http://127.0.0.1/cgi-bin/api/client/list" -H "Authorization: $(_localtoken)")
-curl -4 -X POST "{{.hotplugDhcpReportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(get_default_sn)',"time":"'$(date +%s)'"}'
+curl -4 -X POST "{{.hotplugDhcpReportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(get_default_sn)'","time":"'$(date +%s)'"}'
 `)
 
 func FromTemplateContent(templateContent string, envMap map[string]interface{}) string {

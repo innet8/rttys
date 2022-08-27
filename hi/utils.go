@@ -10,11 +10,6 @@ import (
 	"strings"
 )
 
-type RouterClientsModel struct {
-	Code    int    `json:"code"`
-	Clients string `json:"clients"`
-}
-
 // Cmd 执行命令
 func Cmd(arg ...string) (string, error) {
 	output, err := exec.Command("/bin/sh", arg...).CombinedOutput()

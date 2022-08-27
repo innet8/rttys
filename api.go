@@ -3,7 +3,6 @@ package main
 import (
 	"database/sql"
 	"embed"
-	"encoding/json"
 	"fmt"
 	jsoniter "github.com/json-iterator/go"
 	"io/fs"
@@ -629,23 +628,20 @@ func apiStart(br *broker) {
 		}
 
 		if action == "hotplug_dhcp" {
-			result := hi.Base64Decode(jsoniter.Get(content, "content").ToString())
+			result := hi.ApiResultCheck(hi.Base64Decode(jsoniter.Get(content, "content").ToString()))
 			devid := jsoniter.Get(content, "sn").ToString()
 			rtime := jsoniter.Get(content, "time").ToUint32()
 
-			var count int64
-			db.Table("hi_dhcp").Where("devid = ? AND time > ? AND", devid, rtime).Count(&count)
-			if count == 0 {
-				var data hi.RouterClientsModel
-				if ok := json.Unmarshal([]byte(result), &data); ok == nil {
-					if data.Code == 0 {
-						db.Table("hi_dhcp").Create(&hi.DhcpInfo{
-							Devid:   devid,
-							Onlyid:  devidGetOnlyid(br, devid),
-							Clients: data.Clients,
-							Time:    rtime,
-						})
-					}
+			if len(result) > 0 {
+				var count int64
+				db.Table("hi_dhcp").Where("devid = ? AND time > ?", devid, rtime).Count(&count)
+				if count == 0 {
+					db.Table("hi_dhcp").Create(&hi.DhcpInfo{
+						Devid:   devid,
+						Onlyid:  devidGetOnlyid(br, devid),
+						Clients: result,
+						Time:    rtime,
+					})
 				}
 			}
 

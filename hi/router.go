@@ -1,6 +1,7 @@
 package hi
 
 import (
+	"encoding/json"
 	"strings"
 )
 
@@ -24,4 +25,18 @@ func WireguardCmd(wg WgInfo) string {
 		cmds = append(cmds, "_set_lan_ip")
 	}
 	return strings.Join(cmds, "\n")
+}
+
+// ApiResultCheck 验证路由器接口返回内容是否正确（不正确返回空）
+func ApiResultCheck(result string) string {
+	type RouterClientsModel struct {
+		Code int `json:"code"`
+	}
+	var data RouterClientsModel
+	if ok := json.Unmarshal([]byte(result), &data); ok == nil {
+		if data.Code == 0 {
+			return result
+		}
+	}
+	return ""
 }
