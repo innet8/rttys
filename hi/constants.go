@@ -302,32 +302,24 @@ _get_static_leases() {
 `)
 
 const WireguardContent = string(`
-_clear_wireguard_conf() {
+clear_wireguard_conf() {
     cat > /etc/config/wireguard <<-EOF
 config proxy
   option enable '0'
 EOF
     rm -f /etc/config/wireguard_back
-    #
-    (
-        sleep 2
-        _wgstop
-    ) >/dev/null 2>&1 &
+    _wgstop
 }
 
-_set_wireguard_conf() {
+set_wireguard_conf() {
     cat >/etc/config/wireguard_back <<-EOF
 {{.conf}}
 EOF
     cat /etc/config/wireguard_back > /etc/config/wireguard
-    #
-    (
-        sleep 2
-        _wgstart
-    ) >/dev/null 2>&1 &
+    _wgstart
 }
 
-_set_lan_ip() {
+set_lan_ip() {
     if [ "$(uci get network.lan.ipaddr)" != "{{.lan_ip}}" ]; then
         (
             sleep 2
@@ -414,7 +406,7 @@ const SetStaticLeasesContent = string(`
 
 # delete
 for mac_str in $(cat /etc/config/dhcp | grep '\<host\>' | awk '{print $3}' | sed -r "s/'//g"); do
-	uci delete dhcp.$mac_str
+    uci delete dhcp.$mac_str
 done
 
 # add
@@ -423,7 +415,7 @@ uci commit dhcp
 
 # report
 if [ -f "/etc/init.d/hi-static-leases" ];then
-	/etc/init.d/hi-static-leases &
+    /etc/init.d/hi-static-leases &
 fi
 `)
 
