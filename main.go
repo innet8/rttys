@@ -37,14 +37,22 @@ func initDb(cfg *config.Config) error {
 		return err
 	}
 
+	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS hi_dhcp(id integer NOT NULL PRIMARY KEY AUTOINCREMENT, devid TEXT NOT NULL, onlyid TEXT NOT NULL, clients TEXT NOT NULL, time integer NOT NULL)`)
+	if err != nil {
+		return err
+	}
+
 	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS hi_shunt(id integer NOT NULL PRIMARY KEY AUTOINCREMENT, devid TEXT NOT NULL, onlyid TEXT NOT NULL, source TEXT NOT NULL, rule TEXT NOT NULL, prio INT NOT NULL, out TEXT NOT NULL)`)
 	if err != nil {
 		return err
 	}
 
 	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS hi_wg(id integer NOT NULL PRIMARY KEY AUTOINCREMENT, devid TEXT NOT NULL, onlyid TEXT NOT NULL, conf TEXT NOT NULL, status TEXT NOT NULL, lan_ip TEXT NOT NULL)`)
+	if err != nil {
+		return err
+	}
 
-	return err
+	return nil
 }
 
 func runRttys(c *cli.Context) {

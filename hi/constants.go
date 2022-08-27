@@ -1,11 +1,11 @@
 package hi
 
 import (
-    "bytes"
-    "fmt"
-    "log"
-    "strings"
-    "text/template"
+	"bytes"
+	"fmt"
+	"log"
+	"strings"
+	"text/template"
 )
 
 const ShuntDomainContent = string(`
@@ -360,59 +360,59 @@ fi
 
 const HotplugDhcpContent = string(`
 RES=$(curl "http://127.0.0.1/cgi-bin/api/client/list" -H "Authorization: $(_localtoken)")
-curl -4 -X POST "{{.hotplugDhcpReportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","time":"'$(date +%s)'"}'
+curl -4 -X POST "{{.hotplugDhcpReportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(get_default_sn)',"time":"'$(date +%s)'"}'
 `)
 
 func FromTemplateContent(templateContent string, envMap map[string]interface{}) string {
-    tmpl, err := template.New("text").Parse(templateContent)
-    defer func() {
-        if r := recover(); r != nil {
-            log.Println("Template parse failed:", err)
-        }
-    }()
-    if err != nil {
-        panic(1)
-    }
-    var buffer bytes.Buffer
-    _ = tmpl.Execute(&buffer, envMap)
-    return string(buffer.Bytes())
+	tmpl, err := template.New("text").Parse(templateContent)
+	defer func() {
+		if r := recover(); r != nil {
+			log.Println("Template parse failed:", err)
+		}
+	}()
+	if err != nil {
+		panic(1)
+	}
+	var buffer bytes.Buffer
+	_ = tmpl.Execute(&buffer, envMap)
+	return string(buffer.Bytes())
 }
 
 func ShuntDomainTemplate(envMap map[string]interface{}) string {
-    var sb strings.Builder
-    sb.Write([]byte(ShuntDomainContent))
-    return FromTemplateContent(sb.String(), envMap)
+	var sb strings.Builder
+	sb.Write([]byte(ShuntDomainContent))
+	return FromTemplateContent(sb.String(), envMap)
 }
 
 func ShuntTemplate(envMap map[string]interface{}) string {
-    var sb strings.Builder
-    sb.Write([]byte(ShuntContent))
-    return FromTemplateContent(sb.String(), envMap)
+	var sb strings.Builder
+	sb.Write([]byte(ShuntContent))
+	return FromTemplateContent(sb.String(), envMap)
 }
 
 func ShuntBatchTemplate(envMap map[string]interface{}) string {
-    text := fmt.Sprintf("%s\n%s", CommonUtilsContent, ShuntBatchContent)
-    var sb strings.Builder
-    sb.Write([]byte(text))
-    return FromTemplateContent(sb.String(), envMap)
+	text := fmt.Sprintf("%s\n%s", CommonUtilsContent, ShuntBatchContent)
+	var sb strings.Builder
+	sb.Write([]byte(text))
+	return FromTemplateContent(sb.String(), envMap)
 }
 
 func WireguardTemplate(envMap map[string]interface{}) string {
-    text := fmt.Sprintf("%s\n%s", CommonUtilsContent, WireguardContent)
-    var sb strings.Builder
-    sb.Write([]byte(text))
-    return FromTemplateContent(sb.String(), envMap)
+	text := fmt.Sprintf("%s\n%s", CommonUtilsContent, WireguardContent)
+	var sb strings.Builder
+	sb.Write([]byte(text))
+	return FromTemplateContent(sb.String(), envMap)
 }
 
 func InitTemplate(envMap map[string]interface{}) string {
-    var sb strings.Builder
-    sb.Write([]byte(InitContent))
-    return FromTemplateContent(sb.String(), envMap)
+	var sb strings.Builder
+	sb.Write([]byte(InitContent))
+	return FromTemplateContent(sb.String(), envMap)
 }
 
 func HotplugDhcpTemplate(envMap map[string]interface{}) string {
-    text := fmt.Sprintf("%s\n%s", CommonUtilsContent, HotplugDhcpContent)
-    var sb strings.Builder
-    sb.Write([]byte(text))
-    return FromTemplateContent(sb.String(), envMap)
+	text := fmt.Sprintf("%s\n%s", CommonUtilsContent, HotplugDhcpContent)
+	var sb strings.Builder
+	sb.Write([]byte(text))
+	return FromTemplateContent(sb.String(), envMap)
 }

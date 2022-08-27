@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"embed"
+	"encoding/json"
 	"fmt"
 	jsoniter "github.com/json-iterator/go"
 	"io/fs"
@@ -591,7 +592,7 @@ func apiStart(br *broker) {
 		}
 	})
 
-	// 基础命令
+	// 基础命令 action=init|hotplug_dhcp
 	r.GET("/hi/base/cmd/:action", func(c *gin.Context) {
 		action := c.Param("action")
 		if action == "init" {
@@ -610,9 +611,16 @@ func apiStart(br *broker) {
 		c.Status(http.StatusBadRequest)
 	})
 
-	// 上报接口
+	// 上报接口 action=hotplug_dhcp
 	r.POST("/hi/base/report/:action", func(c *gin.Context) {
 		action := c.Param("action")
+
+		db, err := hi.InstanceDB(cfg.DB)
+		if err != nil {
+			log.Error().Msg(err.Error())
+			c.Status(http.StatusInternalServerError)
+			return
+		}
 
 		content, err := ioutil.ReadAll(c.Request.Body)
 		if err != nil {
@@ -620,12 +628,31 @@ func apiStart(br *broker) {
 			return
 		}
 
-		fmt.Println(action)
-		fmt.Println(c.PostForm("content"))
-		fmt.Println(c.PostForm("time"))
-		fmt.Println(jsoniter.Get(content, "content").ToString())
-		fmt.Println(jsoniter.Get(content, "time").ToString())
-		c.String(http.StatusOK, "success")
+		if action == "hotplug_dhcp" {
+			result := hi.Base64Decode(jsoniter.Get(content, "content").ToString())
+			devid := jsoniter.Get(content, "sn").ToString()
+			rtime := jsoniter.Get(content, "time").ToUint32()
+
+			var count int64
+			db.Table("hi_dhcp").Where("devid = ? AND time > ? AND", devid, rtime).Count(&count)
+			if count == 0 {
+				var data hi.RouterClientsModel
+				if ok := json.Unmarshal([]byte(result), &data); ok == nil {
+					if data.Code == 0 {
+						db.Table("hi_dhcp").Create(&hi.DhcpInfo{
+							Devid:   devid,
+							Onlyid:  devidGetOnlyid(br, devid),
+							Clients: data.Clients,
+							Time:    rtime,
+						})
+					}
+				}
+			}
+
+			c.String(http.StatusOK, "success")
+			return
+		}
+		c.Status(http.StatusBadRequest)
 	})
 
 	// WG action=set|cancel|get|cmd  devid=设备id

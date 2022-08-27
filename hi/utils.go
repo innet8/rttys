@@ -1,12 +1,19 @@
 package hi
 
 import (
+	"encoding/base64"
+	"fmt"
 	"net"
 	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
 )
+
+type RouterClientsModel struct {
+	Code    int    `json:"code"`
+	Clients string `json:"clients"`
+}
 
 // Cmd 执行命令
 func Cmd(arg ...string) (string, error) {
@@ -50,4 +57,19 @@ func RegexpReplace(rege, src, repl string) string {
 	sampleRegexp := regexp.MustCompile(rege)
 	result := sampleRegexp.ReplaceAllString(src, repl)
 	return result
+}
+
+// Base64Encode Base64加密
+func Base64Encode(data string) string {
+	sEnc := base64.StdEncoding.EncodeToString([]byte(data))
+	return fmt.Sprintf(sEnc)
+}
+
+// Base64Decode Base64解密
+func Base64Decode(data string) string {
+	uDec, err := base64.StdEncoding.DecodeString(data)
+	if err != nil {
+		return ""
+	}
+	return string(uDec)
 }
