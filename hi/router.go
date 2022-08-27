@@ -10,7 +10,7 @@ func WireguardCmd(wg WgInfo) string {
 	var envMap = make(map[string]interface{})
 	envMap["conf"] = wg.Conf
 	envMap["lan_ip"] = wg.LanIp
-	cmds = append(cmds, RouterWireguardTemplate(envMap))
+	cmds = append(cmds, WireguardTemplate(envMap))
 	//
 	if wg.ID == 0 {
 		// 关闭wg

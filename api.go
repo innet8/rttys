@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"rttys/hi"
+	"rttys/version"
 	"strconv"
 	"strings"
 	"time"
@@ -588,6 +589,41 @@ func apiStart(br *broker) {
 			c.DataFromReader(http.StatusOK, -1, "application/octet-stream", fp.reader, nil)
 			br.fileProxy.Delete(sid)
 		}
+	})
+
+	// 基础命令
+	r.GET("/hi/base/cmd/:action", func(c *gin.Context) {
+		action := c.Param("action")
+		if action == "init" {
+			var envMap = make(map[string]interface{})
+			envMap["gitCommit"] = version.GitCommit()
+			envMap["hotplugDhcpCmdUrl"] = fmt.Sprintf("%s/hi/base/cmd/hotplug_dhcp", br.cfg.HiApiUrl)
+			c.String(http.StatusOK, hi.InitTemplate(envMap))
+			return
+		}
+		if action == "hotplug_dhcp" {
+			var envMap = make(map[string]interface{})
+			envMap["hotplugDhcpReportUrl"] = fmt.Sprintf("%s/hi/base/report/hotplug_dhcp", br.cfg.HiApiUrl)
+			c.String(http.StatusOK, hi.HotplugDhcpTemplate(envMap))
+			return
+		}
+		c.Status(http.StatusBadRequest)
+	})
+
+	// 上报接口
+	r.POST("/hi/base/report/:action", func(c *gin.Context) {
+		action := c.Param("action")
+
+		content, err := ioutil.ReadAll(c.Request.Body)
+		if err != nil {
+			c.Status(http.StatusBadRequest)
+			return
+		}
+
+		fmt.Println(action)
+		fmt.Println(jsoniter.Get(content, "content").ToString())
+		fmt.Println(jsoniter.Get(content, "time").ToString())
+		c.String(http.StatusOK, "success")
 	})
 
 	// WG action=set|cancel|get|cmd  devid=设备id

@@ -99,7 +99,7 @@ exec_shunt_url() {
     local url=$1
     local save=$2
     local tmp="/tmp/.hi_$(_random)"
-    _downfile "${url}" "${tmp}"
+    curl -sSL -4 -o "${tmp}" "${url}"
     if [ ! -f "${tmp}" ];then
         echo "Failed download exec file '$url'"
         exit 1
@@ -124,9 +124,17 @@ exec_shunt_url() {
 {{.cmds}}
 `)
 
-const RouterUtilsContent = string(`
+const CommonUtilsContent = string(`
 #!/bin/bash
 . /lib/functions/gl_util.sh
+
+_base64e() {
+    echo -n "$1" | base64 | tr -d "\n"
+}
+
+_base64d() {
+    echo -n "$1" | base64 -d | sed 's/\\n//g'
+}
 
 _random() {
     echo -n $(date +%s) | md5sum | md5sum | cut -d ' ' -f 1
@@ -148,18 +156,6 @@ _localtoken() {
         echo "$token" >/tmp/gl_token_$token
     }
     echo -n "$token"
-}
-
-_downfile() {
-    local url=$1
-    local save=$2
-    wget -q "$url" -O $save &>/dev/null
-    if [ $? -ne 0 ]; then
-        wget-ssl -q "$url" -O $save &>/dev/null
-        if [ $? -ne 0 ]; then
-            curl -4 -s -o $save "$url" &>/dev/null
-        fi
-    fi
 }
 
 _wgstart() {
@@ -281,8 +277,7 @@ EOF
 }
 
 _edit_lan() {
-    LOCALTOKEN=$(_localtoken)
-    RES=$(curl --connect-timeout 10 -m 10 -H "Authorization: $LOCALTOKEN" "http://127.0.0.1/cgi-bin/api/router/setlanip" -X POST -d "newip=$1&start=20&end=240")
+    RES=$(curl --connect-timeout 10 -m 10 -H "Authorization: $(_localtoken)" "http://127.0.0.1/cgi-bin/api/router/setlanip" -X POST -d "newip=$1&start=20&end=240")
     EXI=$(echo "$RES" | grep '.code')
     if [ -z "$EXI" ]; then
         echo -n "error"
@@ -292,7 +287,7 @@ _edit_lan() {
 }
 `)
 
-const RouterWireguardContent = string(`
+const WireguardContent = string(`
 _clear_wireguard_conf() {
     cat > /etc/config/wireguard <<-EOF
 config proxy
@@ -328,7 +323,8 @@ _set_lan_ip() {
 }
 `)
 
-const WireguardConfExampleContent = string(`config proxy
+const WireguardConfExampleContent = string(`
+config proxy
     option enable '1'
     option access 'ACCEPT'
     option main_server 'hk-server'
@@ -343,7 +339,29 @@ config peers 'wg_peer_01'
     option public_key 'Z0WLWr25VJh0Lt/9MWvZyMGzLIIRFnd3Jaij5v05L0Q='
     option allowed_ips '0.0.0.0/0'
     option persistent_keepalive '25'
-    option mtu '1360'`)
+    option mtu '1360'
+`)
+
+const InitContent = string(`
+#!/bin/bash
+
+git_commit=$(uci get rtty.general.git_commit 2>/dev/null)
+if [ "${git_commit}" != "{{.gitCommit}}" ];then
+    uci set rtty.general.git_commit="{{.gitCommit}}"
+    uci commit rtty
+
+    # dhcp
+    mkdir -p /etc/hotplug.d/dhcp/
+    curl -sSL -4 -o "/etc/hotplug.d/dhcp/99-hi-dhcp" "{{.hotplugDhcpCmdUrl}}"
+    chmod +x /etc/hotplug.d/dhcp/99-hi-dhcp
+    /etc/hotplug.d/dhcp/99-hi-dhcp
+fi
+`)
+
+const HotplugDhcpContent = string(`
+RES=$(curl --connect-timeout 20 -m 20 -H "Authorization: $(_localtoken)" "http://127.0.0.1/cgi-bin/api/client/list")
+curl --connect-timeout 30 -m 30 -4 "{{.hotplugDhcpReportUrl}}" -X POST -d "content=$(_base64e "$RES")&time=$(date +%s)"
+`)
 
 func FromTemplateContent(templateContent string, envMap map[string]interface{}) string {
 	tmpl, err := template.New("text").Parse(templateContent)
@@ -373,14 +391,27 @@ func ShuntTemplate(envMap map[string]interface{}) string {
 }
 
 func ShuntBatchTemplate(envMap map[string]interface{}) string {
-	text := fmt.Sprintf("%s\n%s", RouterUtilsContent, ShuntBatchContent)
+	text := fmt.Sprintf("%s\n%s", CommonUtilsContent, ShuntBatchContent)
 	var sb strings.Builder
 	sb.Write([]byte(text))
 	return FromTemplateContent(sb.String(), envMap)
 }
 
-func RouterWireguardTemplate(envMap map[string]interface{}) string {
-	text := fmt.Sprintf("%s\n%s", RouterUtilsContent, RouterWireguardContent)
+func WireguardTemplate(envMap map[string]interface{}) string {
+	text := fmt.Sprintf("%s\n%s", CommonUtilsContent, WireguardContent)
+	var sb strings.Builder
+	sb.Write([]byte(text))
+	return FromTemplateContent(sb.String(), envMap)
+}
+
+func InitTemplate(envMap map[string]interface{}) string {
+	var sb strings.Builder
+	sb.Write([]byte(InitContent))
+	return FromTemplateContent(sb.String(), envMap)
+}
+
+func HotplugDhcpTemplate(envMap map[string]interface{}) string {
+	text := fmt.Sprintf("%s\n%s", CommonUtilsContent, HotplugDhcpContent)
 	var sb strings.Builder
 	sb.Write([]byte(text))
 	return FromTemplateContent(sb.String(), envMap)

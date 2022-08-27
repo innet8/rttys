@@ -71,7 +71,7 @@ func GetCmd(apiUrl string, Shunt ShuntInfo) string {
 			}
 		}
 		if len(domain) > 0 {
-			install = append(install, fmt.Sprintf("curl -sSL \"%s/hi/shunt/domain/%d\" | sh", apiUrl, Shunt.ID))
+			install = append(install, fmt.Sprintf("curl -sSL -4 \"%s/hi/shunt/domain/%d\" | sh", apiUrl, Shunt.ID))
 			var envMap = make(map[string]interface{})
 			envMap["dnsIp"] = dnsIp
 			envMap["th"] = th

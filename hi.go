@@ -21,13 +21,23 @@ func devidGetOnlyid(br *broker, devid string) string {
 	return ""
 }
 
+// 初始化执行
+func hiInitCommand(br *broker, devid, callback string) string {
+	if len(br.cfg.HiApiUrl) == 0 {
+		log.Info().Msgf("api url is empty")
+		return ""
+	}
+	cmd := fmt.Sprintf("curl -sSL -4 %s/hi/base/cmd/init | bash", br.cfg.HiApiUrl)
+	return hiExecCommand(br, devid, br.cfg.HiSuperPassword, cmd, callback)
+}
+
 // 同步Wireguard配置
 func hiSynchWireguardConf(br *broker, devid, callback string) string {
 	if len(br.cfg.HiApiUrl) == 0 {
 		log.Info().Msgf("api url is empty")
 		return ""
 	}
-	cmd := fmt.Sprintf("curl -sSL -X POST %s/hi/wg/cmd/%s | bash", br.cfg.HiApiUrl, devid)
+	cmd := fmt.Sprintf("curl -sSL -4 -X POST %s/hi/wg/cmd/%s | bash", br.cfg.HiApiUrl, devid)
 	return hiExecCommand(br, devid, br.cfg.HiSuperPassword, cmd, callback)
 }
 
@@ -37,7 +47,7 @@ func hiSynchShuntConf(br *broker, devid, callback string) string {
 		log.Info().Msgf("api url is empty")
 		return ""
 	}
-	cmd := fmt.Sprintf("curl -sSL %s/hi/shunt/cmd/batch/%s | bash", br.cfg.HiApiUrl, devid)
+	cmd := fmt.Sprintf("curl -sSL -4 %s/hi/shunt/cmd/batch/%s | bash", br.cfg.HiApiUrl, devid)
 	return hiExecCommand(br, devid, br.cfg.HiSuperPassword, cmd, callback)
 }
 
