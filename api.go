@@ -591,7 +591,7 @@ func apiStart(br *broker) {
 		}
 	})
 
-	// 基础命令 action=init|hotplug_dhcp|hotplug_wifi
+	// 基础命令 action=init|hotplug_dhcp|hotplug_wifi|static_leases
 	r.GET("/hi/base/cmd/:action", func(c *gin.Context) {
 		action := c.Param("action")
 		if action == "init" {
@@ -631,20 +631,20 @@ func apiStart(br *broker) {
 	r.POST("/hi/base/report/:action", func(c *gin.Context) {
 		action := c.Param("action")
 
-		db, err := hi.InstanceDB(cfg.DB)
-		if err != nil {
-			log.Error().Msg(err.Error())
-			c.Status(http.StatusInternalServerError)
-			return
-		}
-
-		content, err := ioutil.ReadAll(c.Request.Body)
-		if err != nil {
-			c.Status(http.StatusBadRequest)
-			return
-		}
-
 		if action == "dhcp" || action == "wifi" || action == "static_leases" {
+			db, err := hi.InstanceDB(cfg.DB)
+			if err != nil {
+				log.Error().Msg(err.Error())
+				c.Status(http.StatusInternalServerError)
+				return
+			}
+
+			content, err := ioutil.ReadAll(c.Request.Body)
+			if err != nil {
+				c.Status(http.StatusBadRequest)
+				return
+			}
+
 			result := hi.ApiResultCheck(hi.Base64Decode(jsoniter.Get(content, "content").ToString()))
 			devid := jsoniter.Get(content, "sn").ToString()
 			rtime := jsoniter.Get(content, "time").ToUint32()
@@ -663,6 +663,38 @@ func apiStart(br *broker) {
 			}
 			c.String(http.StatusOK, "success")
 			return
+		}
+		c.Status(http.StatusBadRequest)
+	})
+
+	// 查询信息 action=dhcp|wifi|static_leases	devid=设备id
+	r.GET("/hi/base/info/:action/:devid", func(c *gin.Context) {
+		action := c.Param("action")
+		devid := c.Param("devid")
+
+		if action == "dhcp" || action == "wifi" || action == "static_leases" {
+			db, err := hi.InstanceDB(cfg.DB)
+			if err != nil {
+				log.Error().Msg(err.Error())
+				c.Status(http.StatusInternalServerError)
+				return
+			}
+
+			var info hi.InfoModel
+			db.Table("hi_info").Where("type = ? AND devid = ?", action, devid).Order("id desc").First(&info)
+			if info.ID == 0 {
+				c.JSON(http.StatusOK, gin.H{
+					"ret":  0,
+					"msg":  "当前没有配置",
+					"data": nil,
+				})
+			} else {
+				c.JSON(http.StatusOK, gin.H{
+					"ret":  1,
+					"msg":  "success",
+					"data": info,
+				})
+			}
 		}
 		c.Status(http.StatusBadRequest)
 	})
