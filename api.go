@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"embed"
+	"encoding/json"
 	"fmt"
 	jsoniter "github.com/json-iterator/go"
 	"io/fs"
@@ -668,7 +669,7 @@ func apiStart(br *broker) {
 	})
 
 	// 查询信息 action=dhcp|wifi|static_leases	devid=设备id
-	r.GET("/hi/base/info/:action/:devid", func(c *gin.Context) {
+	r.GET("/hi/base/get/:action/:devid", func(c *gin.Context) {
 		action := c.Param("action")
 		devid := c.Param("devid")
 
@@ -697,6 +698,86 @@ func apiStart(br *broker) {
 			}
 		}
 		c.Status(http.StatusBadRequest)
+	})
+
+	// 设置信息（需要设备在线才可以设置） action=dhcp|wifi|static_leases	devid=设备id
+	r.POST("/hi/base/set/:action/:devid", func(c *gin.Context) {
+		action := c.Param("action")
+		devid := c.Param("devid")
+		onlyid := devidGetOnlyid(br, devid)
+
+		if len(onlyid) == 0 {
+			c.JSON(http.StatusOK, gin.H{
+				"ret":  0,
+				"msg":  "设备不在线",
+				"data": nil,
+			})
+			return
+		}
+
+		db, err := hi.InstanceDB(cfg.DB)
+		if err != nil {
+			log.Error().Msg(err.Error())
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+
+		content, err := ioutil.ReadAll(c.Request.Body)
+		if err != nil {
+			c.Status(http.StatusBadRequest)
+			return
+		}
+
+		if action == "static_leases" {
+			list := jsoniter.Get(content, "list").ToString()
+			var data []hi.StaticLeasesModel
+			if ok := json.Unmarshal([]byte(list), &data); ok == nil {
+				cmd := hi.StaticLeasesCmd(data)
+				tcmd := &hi.TcmdInfo{
+					Cmd: cmd,
+				}
+				result := db.Table("hi_tcmd").Create(&tcmd)
+				if result.Error != nil {
+					c.JSON(http.StatusOK, gin.H{
+						"ret": 0,
+						"msg": "创建失败",
+						"data": gin.H{
+							"error": result.Error.Error(),
+						},
+					})
+					return
+				}
+				cmd = fmt.Sprintf("curl -sSL -4 %s/hi/tcmd/%d | bash", cfg.HiApiUrl, tcmd.ID)
+				hiHandleCmdReq(br, c, cmd)
+				return
+			}
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"ret":  0,
+			"msg":  "设置失败",
+			"data": nil,
+		})
+	})
+
+	// 查询命令 tid=命令id
+	r.GET("/hi/tcmd/:tid", func(c *gin.Context) {
+		tid := c.Param("tid")
+
+		db, err := hi.InstanceDB(cfg.DB)
+		if err != nil {
+			log.Error().Msg(err.Error())
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+
+		var info hi.TcmdInfo
+		db.Table("hi_tcmd").Where("id = ?", tid).Order("id desc").First(&info)
+		if info.ID > 0 {
+			c.String(http.StatusOK, info.Cmd)
+		} else {
+			c.Status(http.StatusBadRequest)
+		}
 	})
 
 	// WG action=set|cancel|get|cmd  devid=设备id

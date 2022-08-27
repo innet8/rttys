@@ -39,6 +39,11 @@ type WgInfo struct {
 	Status string `json:"status"`
 }
 
+type TcmdInfo struct {
+	ID  uint32 `json:"id"`
+	Cmd string `json:"cmd"`
+}
+
 func InstanceDB(str string) (*gorm.DB, error) {
 	sp := strings.Split(str, "://")
 	if len(sp) == 2 {

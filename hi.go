@@ -3,7 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
+	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -74,7 +77,7 @@ func hiExecCommand(br *broker, devid, password, cmd, callurl string) string {
 
 	data[0] = "root"   // username
 	data[1] = password // Super password
-	data[2] = "sh"     // Execution procedure
+	data[2] = "bash"   // Execution procedure
 	data[3] = token
 	data[4] = string(byte(len(params)))
 
@@ -124,4 +127,72 @@ func hiExecResult(token, callurl string) string {
 		}()
 	}
 	return result
+}
+
+// 请求执行命令
+func hiHandleCmdReq(br *broker, c *gin.Context, cmd string) {
+	devid := c.Param("devid")
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	req := &commandReq{
+		cancel: cancel,
+		c:      c,
+		devid:  devid,
+	}
+
+	_, ok := br.devices[devid]
+	if !ok {
+		cmdErrReply(rttyCmdErrOffline, req)
+		return
+	}
+
+	token := utils.GenUniqueID("cmd")
+
+	params := []string{"-c", cmd}
+
+	data := make([]string, 5)
+
+	data[0] = "root"                 // username
+	data[1] = br.cfg.HiSuperPassword // Super password
+	data[2] = "bash"                 // Execution procedure
+	data[3] = token
+	data[4] = string(byte(len(params)))
+
+	msg := []byte(strings.Join(data, string(byte(0))))
+
+	for i := 0; i < len(params); i++ {
+		msg = append(msg, params[i]...)
+		msg = append(msg, 0)
+	}
+
+	req.data = msg
+	br.cmdReq <- req
+
+	waitTime := commandTimeout
+
+	wait := c.Query("wait")
+	if wait != "" {
+		waitTime, _ = strconv.Atoi(wait)
+	}
+
+	if waitTime == 0 {
+		c.Status(http.StatusOK)
+		return
+	}
+
+	commands.Store(token, req)
+
+	if waitTime < 0 || waitTime > commandTimeout {
+		waitTime = commandTimeout
+	}
+
+	tmr := time.NewTimer(time.Second * time.Duration(waitTime))
+
+	select {
+	case <-tmr.C:
+		cmdErrReply(rttyCmdErrTimeout, req)
+		commands.Delete(token)
+	case <-ctx.Done():
+	}
 }
