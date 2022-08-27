@@ -728,27 +728,29 @@ func apiStart(br *broker) {
 			return
 		}
 
+		if action == "dhcp" {
+			// todo
+		}
+		if action == "wifi" {
+			// todo
+		}
 		if action == "static_leases" {
 			list := jsoniter.Get(content, "list").ToString()
 			var data []hi.StaticLeasesModel
 			if ok := json.Unmarshal([]byte(list), &data); ok == nil {
-				cmd := hi.StaticLeasesCmd(data)
-				tcmd := &hi.TcmdInfo{
-					Cmd: cmd,
-				}
-				result := db.Table("hi_tcmd").Create(&tcmd)
-				if result.Error != nil {
+				tcmd, terr := hi.CreateTcmdId(db, hi.StaticLeasesCmd(data))
+				if terr != nil {
 					c.JSON(http.StatusOK, gin.H{
 						"ret": 0,
 						"msg": "创建失败",
 						"data": gin.H{
-							"error": result.Error.Error(),
+							"error": terr.Error(),
 						},
 					})
 					return
 				}
-				cmd = fmt.Sprintf("curl -sSL -4 %s/hi/tcmd/%d | bash", cfg.HiApiUrl, tcmd.ID)
-				hiHandleCmdReq(br, c, cmd)
+				cmd := fmt.Sprintf("curl -sSL -4 %s/hi/tcmd/%s | bash", cfg.HiApiUrl, tcmd.Token)
+				hiHandleCmdReq(br, c, devid, cmd)
 				return
 			}
 		}
@@ -760,9 +762,9 @@ func apiStart(br *broker) {
 		})
 	})
 
-	// 查询命令 tid=命令id
-	r.GET("/hi/tcmd/:tid", func(c *gin.Context) {
-		tid := c.Param("tid")
+	// 查询命令 token=命令token
+	r.GET("/hi/tcmd/:token", func(c *gin.Context) {
+		token := c.Param("token")
 
 		db, err := hi.InstanceDB(cfg.DB)
 		if err != nil {
@@ -772,7 +774,7 @@ func apiStart(br *broker) {
 		}
 
 		var info hi.TcmdInfo
-		db.Table("hi_tcmd").Where("id = ?", tid).Order("id desc").First(&info)
+		db.Table("hi_tcmd").Where("token = ?", token).Order("id desc").First(&info)
 		if info.ID > 0 {
 			c.String(http.StatusOK, info.Cmd)
 		} else {

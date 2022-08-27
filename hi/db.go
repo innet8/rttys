@@ -40,8 +40,9 @@ type WgInfo struct {
 }
 
 type TcmdInfo struct {
-	ID  uint32 `json:"id"`
-	Cmd string `json:"cmd"`
+	ID    uint32 `json:"id"`
+	Cmd   string `json:"cmd"`
+	Token string `json:"token"`
 }
 
 func InstanceDB(str string) (*gorm.DB, error) {
@@ -83,4 +84,16 @@ func Array2String(array Array) string {
 		return ""
 	}
 	return string(marshal)
+}
+
+func CreateTcmdId(db *gorm.DB, cmd string) (*TcmdInfo, error) {
+	tcmd := &TcmdInfo{
+		Cmd:   cmd,
+		Token: RandString(24),
+	}
+	result := db.Table("hi_tcmd").Create(&tcmd)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	return tcmd, nil
 }

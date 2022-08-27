@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
-	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -106,33 +104,8 @@ func hiExecCommand(br *broker, devid, password, cmd, callurl string) string {
 	return token
 }
 
-// 获取执行命令结果
-func hiExecResult(token, callurl string) string {
-	result := ""
-	if req, ok := commands.Load(token); ok {
-		re := req.(*commandReq)
-		result = re.result
-	}
-	if strings.HasPrefix(callurl, "http://") || strings.HasPrefix(callurl, "https://") {
-		go func() {
-			_, err := gohttp.NewRequest().
-				FormData(map[string]string{
-					"token":  token,
-					"result": result,
-				}).
-				Post(callurl)
-			if err != nil {
-				log.Info().Msgf("callback error: %s", callurl)
-			}
-		}()
-	}
-	return result
-}
-
 // 请求执行命令
-func hiHandleCmdReq(br *broker, c *gin.Context, cmd string) {
-	devid := c.Param("devid")
-
+func hiHandleCmdReq(br *broker, c *gin.Context, devid, cmd string) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	req := &commandReq{
@@ -169,25 +142,9 @@ func hiHandleCmdReq(br *broker, c *gin.Context, cmd string) {
 	req.data = msg
 	br.cmdReq <- req
 
-	waitTime := commandTimeout
-
-	wait := c.Query("wait")
-	if wait != "" {
-		waitTime, _ = strconv.Atoi(wait)
-	}
-
-	if waitTime == 0 {
-		c.Status(http.StatusOK)
-		return
-	}
-
 	commands.Store(token, req)
 
-	if waitTime < 0 || waitTime > commandTimeout {
-		waitTime = commandTimeout
-	}
-
-	tmr := time.NewTimer(time.Second * time.Duration(waitTime))
+	tmr := time.NewTimer(time.Second * time.Duration(commandTimeout))
 
 	select {
 	case <-tmr.C:
@@ -195,4 +152,27 @@ func hiHandleCmdReq(br *broker, c *gin.Context, cmd string) {
 		commands.Delete(token)
 	case <-ctx.Done():
 	}
+}
+
+// 获取执行命令结果
+func hiExecResult(token, callurl string) string {
+	result := ""
+	if req, ok := commands.Load(token); ok {
+		re := req.(*commandReq)
+		result = re.result
+	}
+	if strings.HasPrefix(callurl, "http://") || strings.HasPrefix(callurl, "https://") {
+		go func() {
+			_, err := gohttp.NewRequest().
+				FormData(map[string]string{
+					"token":  token,
+					"result": result,
+				}).
+				Post(callurl)
+			if err != nil {
+				log.Info().Msgf("callback error: %s", callurl)
+			}
+		}()
+	}
+	return result
 }

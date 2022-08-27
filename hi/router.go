@@ -39,13 +39,16 @@ func StaticLeasesCmd(list []StaticLeasesModel) string {
 	//
 	for _, item := range list {
 		if IsIp(item.Ip) {
-			cmds = append(cmds, "uci add dhcp host")
-			cmds = append(cmds, fmt.Sprintf("uci set dhcp.@host[-1].name=\"%s\"", item.Name))
-			cmds = append(cmds, fmt.Sprintf("uci set dhcp.@host[-1].ip=\"%s\"", item.Ip))
-			cmds = append(cmds, fmt.Sprintf("uci set dhcp.@host[-1].mac=\"%s\"", item.Mac))
+			name := StringMd5(item.Ip)[0:6]
+			cmds = append(cmds, fmt.Sprintf("uci set dhcp.%s=host", name))
+			cmds = append(cmds, fmt.Sprintf("uci set dhcp.%s.name=\"%s\"", name, item.Name))
+			cmds = append(cmds, fmt.Sprintf("uci set dhcp.%s.ip=\"%s\"", name, item.Ip))
+			cmds = append(cmds, fmt.Sprintf("uci set dhcp.%s.mac=\"%s\"", name, item.Mac))
 		}
 	}
-	return strings.Join(cmds, "\n")
+	var envMap = make(map[string]interface{})
+	envMap["addString"] = strings.Join(cmds, "\n")
+	return SetStaticLeasesTemplate(envMap)
 }
 
 // ApiResultCheck 验证路由器接口返回内容是否正确（不正确返回空）

@@ -52,7 +52,7 @@ func initDb(cfg *config.Config) error {
 		return err
 	}
 
-	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS hi_tcmd(id integer NOT NULL PRIMARY KEY AUTOINCREMENT, cmd TEXT NOT NULL)`)
+	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS hi_tcmd(id integer NOT NULL PRIMARY KEY AUTOINCREMENT, cmd TEXT NOT NULL, token TEXT NOT NULL)`)
 	if err != nil {
 		return err
 	}

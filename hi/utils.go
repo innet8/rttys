@@ -1,13 +1,17 @@
 package hi
 
 import (
+	"crypto/md5"
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
+	"math/rand"
 	"net"
 	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Cmd 执行命令
@@ -67,4 +71,23 @@ func Base64Decode(data string) string {
 		return ""
 	}
 	return string(uDec)
+}
+
+// RandString 生成随机字符串
+func RandString(len int) string {
+	var r *rand.Rand
+	r = rand.New(rand.NewSource(time.Now().Unix()))
+	bs := make([]byte, len)
+	for i := 0; i < len; i++ {
+		b := r.Intn(26) + 65
+		bs[i] = byte(b)
+	}
+	return string(bs)
+}
+
+// StringMd5 MD5
+func StringMd5(str string) string {
+	h := md5.New()
+	h.Write([]byte(str))
+	return hex.EncodeToString(h.Sum(nil))
 }

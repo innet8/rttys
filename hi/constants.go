@@ -409,6 +409,24 @@ if [ -f "${save}" ] && [ "$(_filemd5 ${save})" != "$(_filemd5 ${tmp})" ]; then
 fi
 `)
 
+const SetStaticLeasesContent = string(`
+#!/bin/bash
+
+# delete
+for mac_str in $(cat /etc/config/dhcp | grep '\<host\>' | awk '{print $3}' | sed -r "s/'//g"); do
+	uci delete dhcp.$mac_str
+done
+
+# add
+{{.addString}}
+uci commit dhcp
+
+# report
+if [ -f "/etc/init.d/hi-static-leases" ];then
+	/etc/init.d/hi-static-leases &
+fi
+`)
+
 func FromTemplateContent(templateContent string, envMap map[string]interface{}) string {
 	tmpl, err := template.New("text").Parse(templateContent)
 	defer func() {
@@ -465,5 +483,11 @@ func ApiReportTemplate(envMap map[string]interface{}) string {
 	}
 	var sb strings.Builder
 	sb.Write([]byte(text))
+	return FromTemplateContent(sb.String(), envMap)
+}
+
+func SetStaticLeasesTemplate(envMap map[string]interface{}) string {
+	var sb strings.Builder
+	sb.Write([]byte(SetStaticLeasesContent))
 	return FromTemplateContent(sb.String(), envMap)
 }
