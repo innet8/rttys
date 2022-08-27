@@ -599,6 +599,7 @@ func apiStart(br *broker) {
 			envMap["gitCommit"] = version.GitCommit()
 			envMap["hotplugDhcpCmdUrl"] = fmt.Sprintf("%s/hi/base/cmd/hotplug_dhcp", br.cfg.HiApiUrl)
 			envMap["hotplugWifiCmdUrl"] = fmt.Sprintf("%s/hi/base/cmd/hotplug_wifi", br.cfg.HiApiUrl)
+			envMap["staticLeasesCmdUrl"] = fmt.Sprintf("%s/hi/base/cmd/static_leases", br.cfg.HiApiUrl)
 			c.String(http.StatusOK, hi.InitTemplate(envMap))
 			return
 		}
@@ -616,10 +617,17 @@ func apiStart(br *broker) {
 			c.String(http.StatusOK, hi.ApiReportTemplate(envMap))
 			return
 		}
+		if action == "static_leases" {
+			var envMap = make(map[string]interface{})
+			envMap["requestUrl"] = "static_leases"
+			envMap["reportUrl"] = fmt.Sprintf("%s/hi/base/report/static_leases", br.cfg.HiApiUrl)
+			c.String(http.StatusOK, hi.ApiReportTemplate(envMap))
+			return
+		}
 		c.Status(http.StatusBadRequest)
 	})
 
-	// 上报接口 action=dhcp|wifi
+	// 上报接口 action=dhcp|wifi|static_leases
 	r.POST("/hi/base/report/:action", func(c *gin.Context) {
 		action := c.Param("action")
 
@@ -636,7 +644,7 @@ func apiStart(br *broker) {
 			return
 		}
 
-		if action == "dhcp" || action == "wifi" {
+		if action == "dhcp" || action == "wifi" || action == "static_leases" {
 			result := hi.ApiResultCheck(hi.Base64Decode(jsoniter.Get(content, "content").ToString()))
 			devid := jsoniter.Get(content, "sn").ToString()
 			rtime := jsoniter.Get(content, "time").ToUint32()

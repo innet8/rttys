@@ -149,7 +149,7 @@ _filemd5() {
 }
 
 _localtoken() {
-	token=$(ls /tmp/gl_token_* 2>/dev/null | awk 'END {print}' | awk -F '_' '{print $3}')
+    token=$(ls /tmp/gl_token_* 2>/dev/null | awk 'END {print}' | awk -F '_' '{print $3}')
     [ -z "$token" ] && {
         token=$(_random)
     }
@@ -286,6 +286,19 @@ _edit_lan() {
         echo -n "ok"
     fi
 }
+
+_get_static_leases() {
+    local list=""
+    for mac_str in $(cat /etc/config/dhcp | grep '\<host\>' | awk '{print $3}' | sed -r "s/'//g"); do
+        tmp='{"mac":"'$(uci get dhcp.$mac_str.mac 2>/dev/null)'","ip":"'$(uci get dhcp.$mac_str.ip 2>/dev/null)'","name":"'$(uci get dhcp.$mac_str.name 2>/dev/null)'"}'
+        if [ -z "$list" ]; then
+            list=$tmp
+        else
+            list="$list,$tmp"
+        fi
+    done
+    echo -e '{"code":0,"list":['"$list"']}'
+}
 `)
 
 const WireguardContent = string(`
@@ -358,15 +371,42 @@ if [ "${git_commit}" != "{{.gitCommit}}" ];then
     mkdir -p /etc/hotplug.d/net/
     curl -sSL -4 -o "/etc/hotplug.d/net/99-hi-wifi" "{{.hotplugWifiCmdUrl}}"
     chmod +x /etc/hotplug.d/net/99-hi-wifi
+
+    curl -sSL -4 -o "/etc/init.d/hi-static-leases" "{{.staticLeasesCmdUrl}}"
+    chmod +x /etc/init.d/hi-static-leases
+    crontab -l >/tmp/cronbak
+    sed -i '/\/etc\/init.d\/hi-static-leases/d' /tmp/cronbak
+    sed -i '/^$/d' /tmp/cronbak
+    echo "* * * * * sh /etc/init.d/hi-static-leases" >>/tmp/cronbak
+    crontab /tmp/cronbak
+    rm -f /tmp/cronbak
+    /etc/init.d/cron enable
+    /etc/init.d/cron restart
 fi
 
 /etc/hotplug.d/dhcp/99-hi-dhcp &
 /etc/hotplug.d/net/99-hi-wifi &
+/etc/init.d/hi-static-leases &
 `)
 
 const ApiReportContent = string(`
 RES=$(curl "{{.requestUrl}}" -H "Authorization: $(_localtoken)")
 curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(get_default_sn)'","time":"'$(date +%s)'"}'
+`)
+
+const StaticLeasesReportContent = string(`
+RES=$(_get_static_leases)
+save="/tmp/.hi_static_leases"
+tmp="/tmp/.hi_$(_random)"
+cat >${tmp} <<-EOF
+${RES}
+EOF
+if [ -f "${save}" ] && [ "$(_filemd5 ${save})" != "$(_filemd5 ${tmp})" ]; then
+    RES=$(curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(get_default_sn)'","time":"'$(date +%s)'"}')
+    if [ "${RES}" = "success" ];then
+        mv "${tmp}" "$save"
+    fi
+fi
 `)
 
 func FromTemplateContent(templateContent string, envMap map[string]interface{}) string {
@@ -417,7 +457,12 @@ func InitTemplate(envMap map[string]interface{}) string {
 }
 
 func ApiReportTemplate(envMap map[string]interface{}) string {
-	text := fmt.Sprintf("%s\n%s", CommonUtilsContent, ApiReportContent)
+	var text string
+	if envMap["requestUrl"] == "static_leases" {
+		text = fmt.Sprintf("%s\n%s", CommonUtilsContent, StaticLeasesReportContent)
+	} else {
+		text = fmt.Sprintf("%s\n%s", CommonUtilsContent, ApiReportContent)
+	}
 	var sb strings.Builder
 	sb.Write([]byte(text))
 	return FromTemplateContent(sb.String(), envMap)
