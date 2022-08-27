@@ -37,7 +37,7 @@ func initDb(cfg *config.Config) error {
 		return err
 	}
 
-	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS hi_dhcp(id integer NOT NULL PRIMARY KEY AUTOINCREMENT, devid TEXT NOT NULL, onlyid TEXT NOT NULL, clients TEXT NOT NULL, time integer NOT NULL)`)
+	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS hi_info(id integer NOT NULL PRIMARY KEY AUTOINCREMENT, devid TEXT NOT NULL, onlyid TEXT NOT NULL, type TEXT NOT NULL, result TEXT NOT NULL, time integer NOT NULL)`)
 	if err != nil {
 		return err
 	}

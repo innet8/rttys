@@ -354,14 +354,19 @@ if [ "${git_commit}" != "{{.gitCommit}}" ];then
     mkdir -p /etc/hotplug.d/dhcp/
     curl -sSL -4 -o "/etc/hotplug.d/dhcp/99-hi-dhcp" "{{.hotplugDhcpCmdUrl}}"
     chmod +x /etc/hotplug.d/dhcp/99-hi-dhcp
+
+    mkdir -p /etc/hotplug.d/net/
+    curl -sSL -4 -o "/etc/hotplug.d/net/99-hi-wifi" "{{.hotplugWifiCmdUrl}}"
+    chmod +x /etc/hotplug.d/net/99-hi-wifi
 fi
 
-/etc/hotplug.d/dhcp/99-hi-dhcp
+/etc/hotplug.d/dhcp/99-hi-dhcp &
+/etc/hotplug.d/net/99-hi-wifi &
 `)
 
-const HotplugDhcpContent = string(`
-RES=$(curl "http://127.0.0.1/cgi-bin/api/client/list" -H "Authorization: $(_localtoken)")
-curl -4 -X POST "{{.hotplugDhcpReportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(get_default_sn)'","time":"'$(date +%s)'"}'
+const ApiReportContent = string(`
+RES=$(curl "{{.requestUrl}}" -H "Authorization: $(_localtoken)")
+curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(get_default_sn)'","time":"'$(date +%s)'"}'
 `)
 
 func FromTemplateContent(templateContent string, envMap map[string]interface{}) string {
@@ -411,8 +416,8 @@ func InitTemplate(envMap map[string]interface{}) string {
 	return FromTemplateContent(sb.String(), envMap)
 }
 
-func HotplugDhcpTemplate(envMap map[string]interface{}) string {
-	text := fmt.Sprintf("%s\n%s", CommonUtilsContent, HotplugDhcpContent)
+func ApiReportTemplate(envMap map[string]interface{}) string {
+	text := fmt.Sprintf("%s\n%s", CommonUtilsContent, ApiReportContent)
 	var sb strings.Builder
 	sb.Write([]byte(text))
 	return FromTemplateContent(sb.String(), envMap)

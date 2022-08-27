@@ -11,12 +11,13 @@ import (
 
 type Array []string
 
-type DhcpInfo struct {
-	ID      uint32 `json:"id"`
-	Devid   string `json:"devid"`
-	Onlyid  string `json:"onlyid"`
-	Clients string `json:"clients"`
-	Time    uint32 `json:"time"`
+type InfoModel struct {
+	ID     uint32 `json:"id"`
+	Type   string `json:"type"`
+	Devid  string `json:"devid"`
+	Onlyid string `json:"onlyid"`
+	Result string `json:"result"`
+	Time   uint32 `json:"time"`
 }
 
 type ShuntInfo struct {

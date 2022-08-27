@@ -591,26 +591,35 @@ func apiStart(br *broker) {
 		}
 	})
 
-	// 基础命令 action=init|hotplug_dhcp
+	// 基础命令 action=init|hotplug_dhcp|hotplug_wifi
 	r.GET("/hi/base/cmd/:action", func(c *gin.Context) {
 		action := c.Param("action")
 		if action == "init" {
 			var envMap = make(map[string]interface{})
 			envMap["gitCommit"] = version.GitCommit()
 			envMap["hotplugDhcpCmdUrl"] = fmt.Sprintf("%s/hi/base/cmd/hotplug_dhcp", br.cfg.HiApiUrl)
+			envMap["hotplugWifiCmdUrl"] = fmt.Sprintf("%s/hi/base/cmd/hotplug_wifi", br.cfg.HiApiUrl)
 			c.String(http.StatusOK, hi.InitTemplate(envMap))
 			return
 		}
 		if action == "hotplug_dhcp" {
 			var envMap = make(map[string]interface{})
-			envMap["hotplugDhcpReportUrl"] = fmt.Sprintf("%s/hi/base/report/hotplug_dhcp", br.cfg.HiApiUrl)
-			c.String(http.StatusOK, hi.HotplugDhcpTemplate(envMap))
+			envMap["requestUrl"] = "http://127.0.0.1/cgi-bin/api/client/list"
+			envMap["reportUrl"] = fmt.Sprintf("%s/hi/base/report/dhcp", br.cfg.HiApiUrl)
+			c.String(http.StatusOK, hi.ApiReportTemplate(envMap))
+			return
+		}
+		if action == "hotplug_wifi" {
+			var envMap = make(map[string]interface{})
+			envMap["requestUrl"] = "http://127.0.0.1/cgi-bin/api/ap/config"
+			envMap["reportUrl"] = fmt.Sprintf("%s/hi/base/report/wifi", br.cfg.HiApiUrl)
+			c.String(http.StatusOK, hi.ApiReportTemplate(envMap))
 			return
 		}
 		c.Status(http.StatusBadRequest)
 	})
 
-	// 上报接口 action=hotplug_dhcp
+	// 上报接口 action=dhcp|wifi
 	r.POST("/hi/base/report/:action", func(c *gin.Context) {
 		action := c.Param("action")
 
@@ -627,24 +636,23 @@ func apiStart(br *broker) {
 			return
 		}
 
-		if action == "hotplug_dhcp" {
+		if action == "dhcp" || action == "wifi" {
 			result := hi.ApiResultCheck(hi.Base64Decode(jsoniter.Get(content, "content").ToString()))
 			devid := jsoniter.Get(content, "sn").ToString()
 			rtime := jsoniter.Get(content, "time").ToUint32()
-
 			if len(result) > 0 {
 				var count int64
-				db.Table("hi_dhcp").Where("devid = ? AND time > ?", devid, rtime).Count(&count)
+				db.Table("hi_info").Where("type = ? AND devid = ? AND time > ?", action, devid, rtime).Count(&count)
 				if count == 0 {
-					db.Table("hi_dhcp").Create(&hi.DhcpInfo{
-						Devid:   devid,
-						Onlyid:  devidGetOnlyid(br, devid),
-						Clients: result,
-						Time:    rtime,
+					db.Table("hi_info").Create(&hi.InfoModel{
+						Devid:  devid,
+						Onlyid: devidGetOnlyid(br, devid),
+						Type:   action,
+						Result: result,
+						Time:   rtime,
 					})
 				}
 			}
-
 			c.String(http.StatusOK, "success")
 			return
 		}
