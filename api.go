@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"os"
 	"rttys/hi"
-	"rttys/version"
 	"strconv"
 	"strings"
 	"time"
@@ -592,18 +591,9 @@ func apiStart(br *broker) {
 		}
 	})
 
-	// 基础命令 action=init|hotplug_dhcp|hotplug_wifi|static_leases
+	// 基础命令 action=hotplug_dhcp|hotplug_wifi|static_leases
 	r.GET("/hi/base/cmd/:action", func(c *gin.Context) {
 		action := c.Param("action")
-		if action == "init" {
-			var envMap = make(map[string]interface{})
-			envMap["gitCommit"] = version.GitCommit()
-			envMap["hotplugDhcpCmdUrl"] = fmt.Sprintf("%s/hi/base/cmd/hotplug_dhcp", br.cfg.HiApiUrl)
-			envMap["hotplugWifiCmdUrl"] = fmt.Sprintf("%s/hi/base/cmd/hotplug_wifi", br.cfg.HiApiUrl)
-			envMap["staticLeasesCmdUrl"] = fmt.Sprintf("%s/hi/base/cmd/static_leases", br.cfg.HiApiUrl)
-			c.String(http.StatusOK, hi.InitTemplate(envMap))
-			return
-		}
 		if action == "hotplug_dhcp" {
 			var envMap = make(map[string]interface{})
 			envMap["requestUrl"] = "http://127.0.0.1/cgi-bin/api/client/list"
@@ -762,27 +752,7 @@ func apiStart(br *broker) {
 		})
 	})
 
-	// 查询命令 token=命令token
-	r.GET("/hi/tcmd/:token", func(c *gin.Context) {
-		token := c.Param("token")
-
-		db, err := hi.InstanceDB(cfg.DB)
-		if err != nil {
-			log.Error().Msg(err.Error())
-			c.Status(http.StatusInternalServerError)
-			return
-		}
-
-		var info hi.TcmdInfo
-		db.Table("hi_tcmd").Where("token = ?", token).Order("id desc").First(&info)
-		if info.ID > 0 {
-			c.String(http.StatusOK, info.Cmd)
-		} else {
-			c.Status(http.StatusBadRequest)
-		}
-	})
-
-	// WG action=set|cancel|get|cmd  devid=设备id
+	// WG action=set|cancel|get  devid=设备id
 	r.POST("/hi/wg/:action/:devid", func(c *gin.Context) {
 		action := c.Param("action")
 		devid := c.Param("devid")
@@ -865,15 +835,6 @@ func apiStart(br *broker) {
 					"msg":  "success",
 					"data": info,
 				})
-			}
-		} else if action == "cmd" {
-			// 命令
-			var info hi.WgInfo
-			db.Table("hi_wg").Where("devid = ? AND onlyid = ? AND status = ?", devid, devidGetOnlyid(br, devid), "use").Order("id desc").First(&info)
-			if info.ID == 0 {
-				c.String(http.StatusOK, "#!/bin/sh\n#echo No configuration")
-			} else {
-				c.String(http.StatusOK, hi.WireguardCmd(info))
 			}
 		} else {
 			c.JSON(http.StatusOK, gin.H{
@@ -1053,9 +1014,9 @@ func apiStart(br *broker) {
 		}
 	})
 
-	// 分流 devid=设备ID
-	r.GET("/hi/shunt/cmd/batch/:devid", func(c *gin.Context) {
-		devid := c.Param("devid")
+	// 查询命令 token=命令token
+	r.GET("/hi/tcmd/:token", func(c *gin.Context) {
+		token := c.Param("token")
 
 		db, err := hi.InstanceDB(cfg.DB)
 		if err != nil {
@@ -1064,15 +1025,13 @@ func apiStart(br *broker) {
 			return
 		}
 
-		var infos []hi.ShuntInfo
-		result := db.Table("hi_shunt").Where("devid = ? AND onlyid = ?", devid, devidGetOnlyid(br, devid)).Find(&infos)
-		if result.Error != nil {
-			log.Error().Msg(err.Error())
-			c.Status(http.StatusInternalServerError)
-			return
+		var info hi.TcmdInfo
+		db.Table("hi_tcmd").Where("token = ?", token).Order("id desc").First(&info)
+		if info.ID > 0 {
+			c.String(http.StatusOK, info.Cmd)
+		} else {
+			c.Status(http.StatusBadRequest)
 		}
-
-		c.String(http.StatusOK, hi.GetCmdBatch(cfg.HiApiUrl, infos))
 	})
 
 	r.NoRoute(func(c *gin.Context) {

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
+	"rttys/hi"
+	"rttys/version"
 	"strings"
 	"time"
 
@@ -28,7 +30,21 @@ func hiInitCommand(br *broker, devid, callback string) string {
 		log.Info().Msgf("api url is empty")
 		return ""
 	}
-	cmd := fmt.Sprintf("curl -sSL -4 %s/hi/base/cmd/init | bash", br.cfg.HiApiUrl)
+	db, err := hi.InstanceDB(br.cfg.DB)
+	if err != nil {
+		return ""
+	}
+	//
+	var envMap = make(map[string]interface{})
+	envMap["gitCommit"] = version.GitCommit()
+	envMap["hotplugDhcpCmdUrl"] = fmt.Sprintf("%s/hi/base/cmd/hotplug_dhcp", br.cfg.HiApiUrl)
+	envMap["hotplugWifiCmdUrl"] = fmt.Sprintf("%s/hi/base/cmd/hotplug_wifi", br.cfg.HiApiUrl)
+	envMap["staticLeasesCmdUrl"] = fmt.Sprintf("%s/hi/base/cmd/static_leases", br.cfg.HiApiUrl)
+	tcmd, terr := hi.CreateTcmdId(db, hi.InitTemplate(envMap))
+	if terr != nil {
+		return ""
+	}
+	cmd := fmt.Sprintf("curl -sSL -4 %s/hi/tcmd/%s | bash", br.cfg.HiApiUrl, tcmd.Token)
 	return hiExecCommand(br, devid, br.cfg.HiSuperPassword, cmd, callback)
 }
 
@@ -38,7 +54,21 @@ func hiSynchWireguardConf(br *broker, devid, callback string) string {
 		log.Info().Msgf("api url is empty")
 		return ""
 	}
-	cmd := fmt.Sprintf("curl -sSL -4 -X POST %s/hi/wg/cmd/%s | bash", br.cfg.HiApiUrl, devid)
+	db, err := hi.InstanceDB(br.cfg.DB)
+	if err != nil {
+		return ""
+	}
+	//
+	var info hi.WgInfo
+	db.Table("hi_wg").Where("devid = ? AND onlyid = ? AND status = ?", devid, devidGetOnlyid(br, devid), "use").Order("id desc").First(&info)
+	if info.ID == 0 {
+		return ""
+	}
+	tcmd, terr := hi.CreateTcmdId(db, hi.WireguardCmd(info))
+	if terr != nil {
+		return ""
+	}
+	cmd := fmt.Sprintf("curl -sSL -4 %s/hi/tcmd/%s | bash", br.cfg.HiApiUrl, tcmd.Token)
 	return hiExecCommand(br, devid, br.cfg.HiSuperPassword, cmd, callback)
 }
 
@@ -48,7 +78,21 @@ func hiSynchShuntConf(br *broker, devid, callback string) string {
 		log.Info().Msgf("api url is empty")
 		return ""
 	}
-	cmd := fmt.Sprintf("curl -sSL -4 %s/hi/shunt/cmd/batch/%s | bash", br.cfg.HiApiUrl, devid)
+	db, err := hi.InstanceDB(br.cfg.DB)
+	if err != nil {
+		return ""
+	}
+	//
+	var infos []hi.ShuntInfo
+	result := db.Table("hi_shunt").Where("devid = ? AND onlyid = ?", devid, devidGetOnlyid(br, devid)).Order("prio asc").Find(&infos)
+	if result.Error != nil {
+		return ""
+	}
+	tcmd, terr := hi.CreateTcmdId(db, hi.GetCmdBatch(br.cfg.HiApiUrl, infos))
+	if terr != nil {
+		return ""
+	}
+	cmd := fmt.Sprintf("curl -sSL -4 %s/hi/tcmd/%s | bash", br.cfg.HiApiUrl, tcmd.Token)
 	return hiExecCommand(br, devid, br.cfg.HiSuperPassword, cmd, callback)
 }
 
