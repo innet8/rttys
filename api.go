@@ -591,17 +591,17 @@ func apiStart(br *broker) {
 		}
 	})
 
-	// 基础命令 action=hotplug_dhcp|hotplug_wifi|static_leases
+	// 基础命令 action=dhcp|wifi|static_leases
 	r.GET("/hi/base/cmd/:action", func(c *gin.Context) {
 		action := c.Param("action")
-		if action == "hotplug_dhcp" {
+		if action == "dhcp" {
 			var envMap = make(map[string]interface{})
 			envMap["requestUrl"] = "http://127.0.0.1/cgi-bin/api/client/list"
 			envMap["reportUrl"] = fmt.Sprintf("%s/hi/base/report/dhcp", br.cfg.HiApiUrl)
 			c.String(http.StatusOK, hi.ApiReportTemplate(envMap))
 			return
 		}
-		if action == "hotplug_wifi" {
+		if action == "wifi" {
 			var envMap = make(map[string]interface{})
 			envMap["requestUrl"] = "http://127.0.0.1/cgi-bin/api/ap/config"
 			envMap["reportUrl"] = fmt.Sprintf("%s/hi/base/report/wifi", br.cfg.HiApiUrl)

@@ -357,11 +357,11 @@ if [ "${git_commit}" != "{{.gitCommit}}" ];then
     uci commit rtty
 
     mkdir -p /etc/hotplug.d/dhcp/
-    curl -sSL -4 -o "/etc/hotplug.d/dhcp/99-hi-dhcp" "{{.hotplugDhcpCmdUrl}}"
+    curl -sSL -4 -o "/etc/hotplug.d/dhcp/99-hi-dhcp" "{{.dhcpCmdUrl}}"
     chmod +x /etc/hotplug.d/dhcp/99-hi-dhcp
 
     mkdir -p /etc/hotplug.d/net/
-    curl -sSL -4 -o "/etc/hotplug.d/net/99-hi-wifi" "{{.hotplugWifiCmdUrl}}"
+    curl -sSL -4 -o "/etc/hotplug.d/net/99-hi-wifi" "{{.wifiCmdUrl}}"
     chmod +x /etc/hotplug.d/net/99-hi-wifi
 
     curl -sSL -4 -o "/etc/init.d/hi-static-leases" "{{.staticLeasesCmdUrl}}"

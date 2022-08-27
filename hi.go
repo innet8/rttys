@@ -38,8 +38,8 @@ func hiInitCommand(br *broker, devid, callback string) string {
 	//
 	var envMap = make(map[string]interface{})
 	envMap["gitCommit"] = version.GitCommit()
-	envMap["hotplugDhcpCmdUrl"] = fmt.Sprintf("%s/hi/base/cmd/hotplug_dhcp", br.cfg.HiApiUrl)
-	envMap["hotplugWifiCmdUrl"] = fmt.Sprintf("%s/hi/base/cmd/hotplug_wifi", br.cfg.HiApiUrl)
+	envMap["dhcpCmdUrl"] = fmt.Sprintf("%s/hi/base/cmd/dhcp", br.cfg.HiApiUrl)
+	envMap["wifiCmdUrl"] = fmt.Sprintf("%s/hi/base/cmd/wifi", br.cfg.HiApiUrl)
 	envMap["staticLeasesCmdUrl"] = fmt.Sprintf("%s/hi/base/cmd/static_leases", br.cfg.HiApiUrl)
 	return hiExecBefore(br, db, devid, hi.InitTemplate(envMap), callback)
 }
