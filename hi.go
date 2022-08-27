@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
+	"gorm.io/gorm"
 	"rttys/hi"
 	"rttys/version"
 	"strings"
@@ -18,8 +19,8 @@ import (
 // 设备ID取onlyid
 func devidGetOnlyid(br *broker, devid string) string {
 	if dev, ok := br.devices[devid]; ok {
-		dev := dev.(*device)
-		return dev.onlyid
+		dd := dev.(*device)
+		return dd.onlyid
 	}
 	return ""
 }
@@ -40,12 +41,7 @@ func hiInitCommand(br *broker, devid, callback string) string {
 	envMap["hotplugDhcpCmdUrl"] = fmt.Sprintf("%s/hi/base/cmd/hotplug_dhcp", br.cfg.HiApiUrl)
 	envMap["hotplugWifiCmdUrl"] = fmt.Sprintf("%s/hi/base/cmd/hotplug_wifi", br.cfg.HiApiUrl)
 	envMap["staticLeasesCmdUrl"] = fmt.Sprintf("%s/hi/base/cmd/static_leases", br.cfg.HiApiUrl)
-	tcmd, terr := hi.CreateTcmdId(db, hi.InitTemplate(envMap))
-	if terr != nil {
-		return ""
-	}
-	cmd := fmt.Sprintf("curl -sSL -4 %s/hi/tcmd/%s | bash", br.cfg.HiApiUrl, tcmd.Token)
-	return hiExecCommand(br, devid, br.cfg.HiSuperPassword, cmd, callback)
+	return hiExecBefore(br, db, devid, hi.InitTemplate(envMap), callback)
 }
 
 // 同步Wireguard配置
@@ -64,12 +60,7 @@ func hiSynchWireguardConf(br *broker, devid, callback string) string {
 	if info.ID == 0 {
 		return ""
 	}
-	tcmd, terr := hi.CreateTcmdId(db, hi.WireguardCmd(info))
-	if terr != nil {
-		return ""
-	}
-	cmd := fmt.Sprintf("curl -sSL -4 %s/hi/tcmd/%s | bash", br.cfg.HiApiUrl, tcmd.Token)
-	return hiExecCommand(br, devid, br.cfg.HiSuperPassword, cmd, callback)
+	return hiExecBefore(br, db, devid, hi.WireguardCmd(info), callback)
 }
 
 // 同步分流配置
@@ -88,15 +79,20 @@ func hiSynchShuntConf(br *broker, devid, callback string) string {
 	if result.Error != nil {
 		return ""
 	}
-	tcmd, terr := hi.CreateTcmdId(db, hi.GetCmdBatch(br.cfg.HiApiUrl, infos))
+	return hiExecBefore(br, db, devid, hi.GetCmdBatch(br.cfg.HiApiUrl, infos), callback)
+}
+
+// 执行之前
+func hiExecBefore(br *broker, db *gorm.DB, devid, cmd, callback string) string {
+	tcmd, terr := hi.CreateTcmdId(db, cmd)
 	if terr != nil {
 		return ""
 	}
-	cmd := fmt.Sprintf("curl -sSL -4 %s/hi/tcmd/%s | bash", br.cfg.HiApiUrl, tcmd.Token)
+	cmd = fmt.Sprintf("curl -sSL -4 %s/hi/tcmd/%s | bash", br.cfg.HiApiUrl, tcmd.Token)
 	return hiExecCommand(br, devid, br.cfg.HiSuperPassword, cmd, callback)
 }
 
-// 执行命令
+// 发送执行命令
 func hiExecCommand(br *broker, devid, password, cmd, callurl string) string {
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -148,6 +144,29 @@ func hiExecCommand(br *broker, devid, password, cmd, callurl string) string {
 	return token
 }
 
+// 获取执行命令结果
+func hiExecResult(token, callurl string) string {
+	result := ""
+	if req, ok := commands.Load(token); ok {
+		re := req.(*commandReq)
+		result = re.result
+	}
+	if strings.HasPrefix(callurl, "http://") || strings.HasPrefix(callurl, "https://") {
+		go func() {
+			_, err := gohttp.NewRequest().
+				FormData(map[string]string{
+					"token":  token,
+					"result": result,
+				}).
+				Post(callurl)
+			if err != nil {
+				log.Info().Msgf("callback error: %s", callurl)
+			}
+		}()
+	}
+	return result
+}
+
 // 请求执行命令
 func hiHandleCmdReq(br *broker, c *gin.Context, devid, cmd string) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -196,27 +215,4 @@ func hiHandleCmdReq(br *broker, c *gin.Context, devid, cmd string) {
 		commands.Delete(token)
 	case <-ctx.Done():
 	}
-}
-
-// 获取执行命令结果
-func hiExecResult(token, callurl string) string {
-	result := ""
-	if req, ok := commands.Load(token); ok {
-		re := req.(*commandReq)
-		result = re.result
-	}
-	if strings.HasPrefix(callurl, "http://") || strings.HasPrefix(callurl, "https://") {
-		go func() {
-			_, err := gohttp.NewRequest().
-				FormData(map[string]string{
-					"token":  token,
-					"result": result,
-				}).
-				Post(callurl)
-			if err != nil {
-				log.Info().Msgf("callback error: %s", callurl)
-			}
-		}()
-	}
-	return result
 }
