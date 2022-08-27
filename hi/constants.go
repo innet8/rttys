@@ -1,11 +1,11 @@
 package hi
 
 import (
-	"bytes"
-	"fmt"
-	"log"
-	"strings"
-	"text/template"
+    "bytes"
+    "fmt"
+    "log"
+    "strings"
+    "text/template"
 )
 
 const ShuntDomainContent = string(`
@@ -277,7 +277,7 @@ EOF
 }
 
 _edit_lan() {
-    RES=$(curl --connect-timeout 10 -m 10 -H "Authorization: $(_localtoken)" "http://127.0.0.1/cgi-bin/api/router/setlanip" -X POST -d "newip=$1&start=20&end=240")
+    RES=$(curl -X POST "http://127.0.0.1/cgi-bin/api/router/setlanip" -H "Authorization: $(_localtoken)" -d "newip=$1&start=20&end=240")
     EXI=$(echo "$RES" | grep '.code')
     if [ -z "$EXI" ]; then
         echo -n "error"
@@ -350,69 +350,69 @@ if [ "${git_commit}" != "{{.gitCommit}}" ];then
     uci set rtty.general.git_commit="{{.gitCommit}}"
     uci commit rtty
 
-    # dhcp
     mkdir -p /etc/hotplug.d/dhcp/
     curl -sSL -4 -o "/etc/hotplug.d/dhcp/99-hi-dhcp" "{{.hotplugDhcpCmdUrl}}"
     chmod +x /etc/hotplug.d/dhcp/99-hi-dhcp
-    /etc/hotplug.d/dhcp/99-hi-dhcp
 fi
+
+/etc/hotplug.d/dhcp/99-hi-dhcp
 `)
 
 const HotplugDhcpContent = string(`
-RES=$(curl --connect-timeout 20 -m 20 -H "Authorization: $(_localtoken)" "http://127.0.0.1/cgi-bin/api/client/list")
-curl --connect-timeout 30 -m 30 -4 "{{.hotplugDhcpReportUrl}}" -X POST -d "content=$(_base64e "$RES")&time=$(date +%s)"
+RES=$(curl "http://127.0.0.1/cgi-bin/api/client/list" -H "Authorization: $(_localtoken)")
+curl -4 -X POST "{{.hotplugDhcpReportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","time":"'$(date +%s)'"}'
 `)
 
 func FromTemplateContent(templateContent string, envMap map[string]interface{}) string {
-	tmpl, err := template.New("text").Parse(templateContent)
-	defer func() {
-		if r := recover(); r != nil {
-			log.Println("Template parse failed:", err)
-		}
-	}()
-	if err != nil {
-		panic(1)
-	}
-	var buffer bytes.Buffer
-	_ = tmpl.Execute(&buffer, envMap)
-	return string(buffer.Bytes())
+    tmpl, err := template.New("text").Parse(templateContent)
+    defer func() {
+        if r := recover(); r != nil {
+            log.Println("Template parse failed:", err)
+        }
+    }()
+    if err != nil {
+        panic(1)
+    }
+    var buffer bytes.Buffer
+    _ = tmpl.Execute(&buffer, envMap)
+    return string(buffer.Bytes())
 }
 
 func ShuntDomainTemplate(envMap map[string]interface{}) string {
-	var sb strings.Builder
-	sb.Write([]byte(ShuntDomainContent))
-	return FromTemplateContent(sb.String(), envMap)
+    var sb strings.Builder
+    sb.Write([]byte(ShuntDomainContent))
+    return FromTemplateContent(sb.String(), envMap)
 }
 
 func ShuntTemplate(envMap map[string]interface{}) string {
-	var sb strings.Builder
-	sb.Write([]byte(ShuntContent))
-	return FromTemplateContent(sb.String(), envMap)
+    var sb strings.Builder
+    sb.Write([]byte(ShuntContent))
+    return FromTemplateContent(sb.String(), envMap)
 }
 
 func ShuntBatchTemplate(envMap map[string]interface{}) string {
-	text := fmt.Sprintf("%s\n%s", CommonUtilsContent, ShuntBatchContent)
-	var sb strings.Builder
-	sb.Write([]byte(text))
-	return FromTemplateContent(sb.String(), envMap)
+    text := fmt.Sprintf("%s\n%s", CommonUtilsContent, ShuntBatchContent)
+    var sb strings.Builder
+    sb.Write([]byte(text))
+    return FromTemplateContent(sb.String(), envMap)
 }
 
 func WireguardTemplate(envMap map[string]interface{}) string {
-	text := fmt.Sprintf("%s\n%s", CommonUtilsContent, WireguardContent)
-	var sb strings.Builder
-	sb.Write([]byte(text))
-	return FromTemplateContent(sb.String(), envMap)
+    text := fmt.Sprintf("%s\n%s", CommonUtilsContent, WireguardContent)
+    var sb strings.Builder
+    sb.Write([]byte(text))
+    return FromTemplateContent(sb.String(), envMap)
 }
 
 func InitTemplate(envMap map[string]interface{}) string {
-	var sb strings.Builder
-	sb.Write([]byte(InitContent))
-	return FromTemplateContent(sb.String(), envMap)
+    var sb strings.Builder
+    sb.Write([]byte(InitContent))
+    return FromTemplateContent(sb.String(), envMap)
 }
 
 func HotplugDhcpTemplate(envMap map[string]interface{}) string {
-	text := fmt.Sprintf("%s\n%s", CommonUtilsContent, HotplugDhcpContent)
-	var sb strings.Builder
-	sb.Write([]byte(text))
-	return FromTemplateContent(sb.String(), envMap)
+    text := fmt.Sprintf("%s\n%s", CommonUtilsContent, HotplugDhcpContent)
+    var sb strings.Builder
+    sb.Write([]byte(text))
+    return FromTemplateContent(sb.String(), envMap)
 }

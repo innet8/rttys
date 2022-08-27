@@ -621,6 +621,8 @@ func apiStart(br *broker) {
 		}
 
 		fmt.Println(action)
+		fmt.Println(c.PostForm("content"))
+		fmt.Println(c.PostForm("time"))
 		fmt.Println(jsoniter.Get(content, "content").ToString())
 		fmt.Println(jsoniter.Get(content, "time").ToString())
 		c.String(http.StatusOK, "success")
