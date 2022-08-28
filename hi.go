@@ -55,12 +55,12 @@ func hiSynchWireguardConf(br *broker, devid, callback string) string {
 		return ""
 	}
 	//
-	var info hi.WgInfo
-	db.Table("hi_wg").Where("devid = ? AND onlyid = ? AND status = ?", devid, devidGetOnlyid(br, devid), "use").Order("id desc").First(&info)
-	if info.ID == 0 {
+	var wg hi.WgModel
+	db.Table("hi_wg").Where("devid = ? AND onlyid = ? AND status = ?", devid, devidGetOnlyid(br, devid), "use").Order("id desc").First(&wg)
+	if wg.ID == 0 {
 		return ""
 	}
-	return hiExecBefore(br, db, devid, hi.WireguardCmd(info), callback)
+	return hiExecBefore(br, db, devid, hi.WireguardCmd(wg), callback)
 }
 
 // 同步分流配置
@@ -74,46 +74,46 @@ func hiSynchShuntConf(br *broker, devid, callback string) string {
 		return ""
 	}
 	//
-	var infos []hi.ShuntInfo
-	result := db.Table("hi_shunt").Where("devid = ? AND onlyid = ?", devid, devidGetOnlyid(br, devid)).Order("prio asc").Find(&infos)
+	var shunts []hi.ShuntModel
+	result := db.Table("hi_shunt").Where("devid = ? AND onlyid = ?", devid, devidGetOnlyid(br, devid)).Order("prio asc").Find(&shunts)
 	if result.Error != nil {
 		return ""
 	}
-	return hiExecBefore(br, db, devid, hi.GetCmdBatch(br.cfg.HiApiUrl, infos), callback)
+	return hiExecBefore(br, db, devid, hi.GetCmdBatch(br.cfg.HiApiUrl, shunts), callback)
 }
 
 // 执行之前
 func hiExecBefore(br *broker, db *gorm.DB, devid, cmd, callback string) string {
 	onlyid := devidGetOnlyid(br, devid)
-	record, err := hi.CreateCmdRecord(db, devid, onlyid, cmd)
+	cmdRecord, err := hi.CreateCmdRecord(db, devid, onlyid, cmd)
 	if err != nil {
 		return ""
 	}
-	return hiExecCommand(br, record, callback)
+	return hiExecCommand(br, cmdRecord, callback)
 }
 
 // 发送执行命令
-func hiExecCommand(br *broker, record *hi.CmdRecordInfo, callurl string) string {
+func hiExecCommand(br *broker, cmdRecord *hi.CmdRecordModel, callurl string) string {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	req := &commandReq{
 		cancel: cancel,
-		devid:  record.Devid,
+		devid:  cmdRecord.Devid,
 		c:      nil,
 		h: &hiReq{
 			db:    br.cfg.DB,
-			token: record.Token,
+			token: cmdRecord.Token,
 		},
 	}
 
-	_, ok := br.devices[record.Devid]
+	_, ok := br.devices[cmdRecord.Devid]
 	if !ok {
 		return ""
 	}
 
 	token := utils.GenUniqueID("cmd")
 
-	cmd := fmt.Sprintf("curl -sSL -4 %s/hi/cmd/record/%s | bash", br.cfg.HiApiUrl, record.Token)
+	cmd := fmt.Sprintf("curl -sSL -4 %s/hi/cmd/record/%s | bash", br.cfg.HiApiUrl, cmdRecord.Token)
 	params := []string{"-c", cmd}
 
 	data := make([]string, 5)
@@ -150,20 +150,20 @@ func hiExecCommand(br *broker, record *hi.CmdRecordInfo, callurl string) string 
 }
 
 // 请求执行命令
-func hiExecRequest(br *broker, c *gin.Context, record *hi.CmdRecordInfo) {
+func hiExecRequest(br *broker, c *gin.Context, cmdRecord *hi.CmdRecordModel) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	req := &commandReq{
 		cancel: cancel,
 		c:      c,
-		devid:  record.Devid,
+		devid:  cmdRecord.Devid,
 		h: &hiReq{
 			db:    br.cfg.DB,
-			token: record.Token,
+			token: cmdRecord.Token,
 		},
 	}
 
-	_, ok := br.devices[record.Devid]
+	_, ok := br.devices[cmdRecord.Devid]
 	if !ok {
 		cmdErrReply(rttyCmdErrOffline, req)
 		return
@@ -171,7 +171,7 @@ func hiExecRequest(br *broker, c *gin.Context, record *hi.CmdRecordInfo) {
 
 	token := utils.GenUniqueID("cmd")
 
-	cmd := fmt.Sprintf("curl -sSL -4 %s/hi/cmd/record/%s | bash", br.cfg.HiApiUrl, record.Token)
+	cmd := fmt.Sprintf("curl -sSL -4 %s/hi/cmd/record/%s | bash", br.cfg.HiApiUrl, cmdRecord.Token)
 	params := []string{"-c", cmd}
 
 	data := make([]string, 5)

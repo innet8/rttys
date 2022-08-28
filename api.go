@@ -728,7 +728,7 @@ func apiStart(br *broker) {
 			list := jsoniter.Get(content, "list").ToString()
 			var data []hi.StaticLeasesModel
 			if ok := json.Unmarshal([]byte(list), &data); ok == nil {
-				record, terr := hi.CreateCmdRecord(db, devid, onlyid, hi.StaticLeasesCmd(data))
+				cmdRecord, terr := hi.CreateCmdRecord(db, devid, onlyid, hi.StaticLeasesCmd(data))
 				if terr != nil {
 					c.JSON(http.StatusOK, gin.H{
 						"ret": 0,
@@ -739,7 +739,7 @@ func apiStart(br *broker) {
 					})
 					return
 				}
-				hiExecRequest(br, c, record)
+				hiExecRequest(br, c, cmdRecord)
 				return
 			}
 		}
@@ -772,13 +772,13 @@ func apiStart(br *broker) {
 		callUrl := jsoniter.Get(content, "call_url").ToString()
 		if action == "set" {
 			// 设置
-			var info hi.WgInfo
-			info.Devid = devid
-			info.Onlyid = devidGetOnlyid(br, devid)
-			info.Conf = jsoniter.Get(content, "conf").ToString()
-			info.LanIp = jsoniter.Get(content, "lan_ip").ToString()
-			info.Status = "use"
-			if !strings.Contains(info.Conf, "config proxy") || !strings.Contains(info.Conf, "config peers") {
+			var wg hi.WgModel
+			wg.Devid = devid
+			wg.Onlyid = devidGetOnlyid(br, devid)
+			wg.Conf = jsoniter.Get(content, "conf").ToString()
+			wg.LanIp = jsoniter.Get(content, "lan_ip").ToString()
+			wg.Status = "use"
+			if !strings.Contains(wg.Conf, "config proxy") || !strings.Contains(wg.Conf, "config peers") {
 				c.JSON(http.StatusOK, gin.H{
 					"ret": 0,
 					"msg": "配置格式错误，请参考示例",
@@ -788,7 +788,7 @@ func apiStart(br *broker) {
 				})
 				return
 			}
-			result := db.Table("hi_wg").Create(&info)
+			result := db.Table("hi_wg").Create(&wg)
 			if result.Error != nil {
 				c.JSON(http.StatusOK, gin.H{
 					"ret": 0,
@@ -798,13 +798,13 @@ func apiStart(br *broker) {
 					},
 				})
 			} else {
-				db.Table("hi_wg").Where("id != ? AND status = ?", info.ID, "use").Update("status", "cancel")
+				db.Table("hi_wg").Where("id != ? AND status = ?", wg.ID, "use").Update("status", "cancel")
 				c.JSON(http.StatusOK, gin.H{
 					"ret": 1,
 					"msg": "success",
 					"data": gin.H{
 						"token": hiSynchWireguardConf(br, devid, callUrl),
-						"info":  info,
+						"wg":    wg,
 					},
 				})
 			}
@@ -820,9 +820,9 @@ func apiStart(br *broker) {
 			})
 		} else if action == "get" {
 			// 当前配置
-			var info hi.WgInfo
-			db.Table("hi_wg").Where("devid = ? AND status = ?", devid, "use").Order("id desc").First(&info)
-			if info.ID == 0 {
+			var wg hi.WgModel
+			db.Table("hi_wg").Where("devid = ? AND status = ?", devid, "use").Order("id desc").First(&wg)
+			if wg.ID == 0 {
 				c.JSON(http.StatusOK, gin.H{
 					"ret":  0,
 					"msg":  "当前没有配置",
@@ -830,9 +830,11 @@ func apiStart(br *broker) {
 				})
 			} else {
 				c.JSON(http.StatusOK, gin.H{
-					"ret":  1,
-					"msg":  "success",
-					"data": info,
+					"ret": 1,
+					"msg": "success",
+					"data": gin.H{
+						"wg": wg,
+					},
 				})
 			}
 		} else {
@@ -855,9 +857,9 @@ func apiStart(br *broker) {
 			return
 		}
 
-		var infos []hi.ShuntInfo
+		var shunts []hi.ShuntModel
 
-		result := db.Table("hi_shunt").Select([]string{"id", "devid", "onlyid", "source", "prio", "out"}).Where("devid = ?", devid).Find(&infos)
+		result := db.Table("hi_shunt").Select([]string{"id", "devid", "onlyid", "source", "prio", "out"}).Where("devid = ?", devid).Find(&shunts)
 		if result.Error != nil {
 			c.JSON(http.StatusOK, gin.H{
 				"ret": 0,
@@ -872,7 +874,7 @@ func apiStart(br *broker) {
 		c.JSON(http.StatusOK, gin.H{
 			"ret":  1,
 			"msg":  "success",
-			"data": infos,
+			"data": shunts,
 		})
 	})
 
@@ -895,10 +897,10 @@ func apiStart(br *broker) {
 		}
 		callUrl := jsoniter.Get(content, "call_url").ToString()
 
-		var info hi.ShuntInfo
+		var shunt hi.ShuntModel
 		if shuntId > 0 {
-			db.Table("hi_shunt").Where("id = ? AND devid = ?", shuntId, devid).First(&info)
-			if info.ID == 0 {
+			db.Table("hi_shunt").Where("id = ? AND devid = ?", shuntId, devid).First(&shunt)
+			if shunt.ID == 0 {
 				c.JSON(http.StatusOK, gin.H{
 					"ret":  0,
 					"msg":  "分流不存在",
@@ -906,12 +908,12 @@ func apiStart(br *broker) {
 				})
 				return
 			}
-			info.Onlyid = devidGetOnlyid(br, devid)
-			info.Source = jsoniter.Get(content, "source").ToString()
-			info.Rule = jsoniter.Get(content, "rule").ToString()
-			info.Prio = jsoniter.Get(content, "prio").ToUint32()
-			info.Out = jsoniter.Get(content, "out").ToString()
-			result := db.Table("hi_shunt").Save(&info)
+			shunt.Onlyid = devidGetOnlyid(br, devid)
+			shunt.Source = jsoniter.Get(content, "source").ToString()
+			shunt.Rule = jsoniter.Get(content, "rule").ToString()
+			shunt.Prio = jsoniter.Get(content, "prio").ToUint32()
+			shunt.Out = jsoniter.Get(content, "out").ToString()
+			result := db.Table("hi_shunt").Save(&shunt)
 			if result.Error != nil {
 				c.JSON(http.StatusOK, gin.H{
 					"ret": 0,
@@ -923,13 +925,13 @@ func apiStart(br *broker) {
 				return
 			}
 		} else {
-			info.Devid = devid
-			info.Onlyid = devidGetOnlyid(br, devid)
-			info.Source = jsoniter.Get(content, "source").ToString()
-			info.Rule = jsoniter.Get(content, "rule").ToString()
-			info.Prio = jsoniter.Get(content, "prio").ToUint32()
-			info.Out = jsoniter.Get(content, "out").ToString()
-			result := db.Table("hi_shunt").Create(&info)
+			shunt.Devid = devid
+			shunt.Onlyid = devidGetOnlyid(br, devid)
+			shunt.Source = jsoniter.Get(content, "source").ToString()
+			shunt.Rule = jsoniter.Get(content, "rule").ToString()
+			shunt.Prio = jsoniter.Get(content, "prio").ToUint32()
+			shunt.Out = jsoniter.Get(content, "out").ToString()
+			result := db.Table("hi_shunt").Create(&shunt)
 			if result.Error != nil {
 				c.JSON(http.StatusOK, gin.H{
 					"ret": 0,
@@ -946,7 +948,7 @@ func apiStart(br *broker) {
 			"msg": "success",
 			"data": gin.H{
 				"token": hiSynchShuntConf(br, devid, callUrl),
-				"info":  info,
+				"shunt": shunt,
 			},
 		})
 	})
@@ -964,8 +966,8 @@ func apiStart(br *broker) {
 			return
 		}
 
-		var info hi.ShuntInfo
-		db.Table("hi_shunt").Where("id = ?", shuntId).First(&info)
+		var shunt hi.ShuntModel
+		db.Table("hi_shunt").Where("id = ?", shuntId).First(&shunt)
 
 		if err != nil {
 			log.Error().Msg(err.Error())
@@ -973,7 +975,7 @@ func apiStart(br *broker) {
 			return
 		}
 
-		if info.ID == 0 {
+		if shunt.ID == 0 {
 			c.Status(http.StatusNotFound)
 			return
 		}
@@ -981,22 +983,24 @@ func apiStart(br *broker) {
 		if action == "info" {
 			// 规则详情
 			c.JSON(http.StatusOK, gin.H{
-				"ret":  1,
-				"msg":  "success",
-				"data": info,
+				"ret": 1,
+				"msg": "success",
+				"data": gin.H{
+					"shunt": shunt,
+				},
 			})
 			return
 		}
 
 		if action == "delete" {
 			// 删除
-			db.Table("hi_shunt").Delete(&info, shuntId)
+			db.Table("hi_shunt").Delete(&shunt, shuntId)
 			c.JSON(http.StatusOK, gin.H{
 				"ret": 1,
 				"msg": "success",
 				"data": gin.H{
-					"token": hiSynchShuntConf(br, info.Devid, callUrl),
-					"info":  info,
+					"token": hiSynchShuntConf(br, shunt.Devid, callUrl),
+					"shunt": shunt,
 				},
 			})
 			return
@@ -1004,10 +1008,10 @@ func apiStart(br *broker) {
 
 		if action == "cmd" {
 			// 命令
-			c.String(http.StatusOK, hi.GetCmd(cfg.HiApiUrl, info))
+			c.String(http.StatusOK, hi.GetCmd(cfg.HiApiUrl, shunt))
 		} else if action == "domain" {
 			// 域名命令
-			c.String(http.StatusOK, hi.GetDomain(info))
+			c.String(http.StatusOK, hi.GetDomain(shunt))
 		} else {
 			c.Status(http.StatusForbidden)
 		}
@@ -1024,10 +1028,10 @@ func apiStart(br *broker) {
 			return
 		}
 
-		var record hi.CmdRecordInfo
-		db.Table("hi_cmd_record").Where("token = ?", token).Order("id desc").First(&record)
-		if record.ID > 0 {
-			c.String(http.StatusOK, record.Cmd)
+		var cmdRecord hi.CmdRecordModel
+		db.Table("hi_cmd_record").Where("token = ?", token).Order("id desc").First(&cmdRecord)
+		if cmdRecord.ID > 0 {
+			c.String(http.StatusOK, cmdRecord.Cmd)
 		} else {
 			c.Status(http.StatusBadRequest)
 		}

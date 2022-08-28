@@ -12,7 +12,7 @@ type StaticLeasesModel struct {
 	Name string `json:"name"`
 }
 
-func WireguardCmd(wg WgInfo) string {
+func WireguardCmd(wg WgModel) string {
 	var cmds []string
 	//
 	var envMap = make(map[string]interface{})
@@ -39,7 +39,7 @@ func StaticLeasesCmd(list []StaticLeasesModel) string {
 	//
 	for _, item := range list {
 		if IsIp(item.Ip) {
-			name := StringMd5(item.Ip)[0:6]
+			name := RandString(6)
 			cmds = append(cmds, fmt.Sprintf("uci set dhcp.%s=host", name))
 			cmds = append(cmds, fmt.Sprintf("uci set dhcp.%s.name=\"%s\"", name, item.Name))
 			cmds = append(cmds, fmt.Sprintf("uci set dhcp.%s.ip=\"%s\"", name, item.Ip))

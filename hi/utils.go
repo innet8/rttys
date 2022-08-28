@@ -74,15 +74,15 @@ func Base64Decode(data string) string {
 }
 
 // RandString 生成随机字符串
-func RandString(len int) string {
-	var r *rand.Rand
-	r = rand.New(rand.NewSource(time.Now().Unix()))
-	bs := make([]byte, len)
-	for i := 0; i < len; i++ {
-		b := r.Intn(26) + 65
-		bs[i] = byte(b)
+func RandString(length int) string {
+	str := "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	bytes := []byte(str)
+	var result []byte
+	rand.Seed(time.Now().UnixNano() + int64(rand.Intn(100)))
+	for i := 0; i < length; i++ {
+		result = append(result, bytes[rand.Intn(len(bytes))])
 	}
-	return string(bs)
+	return string(result)
 }
 
 // StringMd5 MD5

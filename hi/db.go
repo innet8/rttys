@@ -21,7 +21,7 @@ type InfoModel struct {
 	Time   uint32 `json:"time"`
 }
 
-type ShuntInfo struct {
+type ShuntModel struct {
 	ID     uint32 `json:"id"`
 	Devid  string `json:"devid"`
 	Onlyid string `json:"onlyid"`
@@ -31,7 +31,7 @@ type ShuntInfo struct {
 	Out    string `json:"out"`
 }
 
-type WgInfo struct {
+type WgModel struct {
 	ID     uint32 `json:"id"`
 	Devid  string `json:"devid"`
 	Onlyid string `json:"onlyid"`
@@ -40,7 +40,7 @@ type WgInfo struct {
 	Status string `json:"status"`
 }
 
-type CmdRecordInfo struct {
+type CmdRecordModel struct {
 	ID        uint32 `json:"id"`
 	Devid     string `json:"devid"`
 	Onlyid    string `json:"onlyid"`
@@ -92,17 +92,17 @@ func Array2String(array Array) string {
 	return string(marshal)
 }
 
-func CreateCmdRecord(db *gorm.DB, devid, onlyid, cmd string) (*CmdRecordInfo, error) {
-	record := &CmdRecordInfo{
+func CreateCmdRecord(db *gorm.DB, devid, onlyid, cmd string) (*CmdRecordModel, error) {
+	cmdRecord := &CmdRecordModel{
 		Devid:     devid,
 		Onlyid:    onlyid,
 		Token:     RandString(24),
-		Cmd:       cmd,
+		Cmd:       strings.TrimSpace(cmd),
 		StartTime: uint32(time.Now().Unix()),
 	}
-	result := db.Table("hi_cmd_record").Create(&record)
+	result := db.Table("hi_cmd_record").Create(&cmdRecord)
 	if result.Error != nil {
 		return nil, result.Error
 	}
-	return record, nil
+	return cmdRecord, nil
 }

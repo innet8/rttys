@@ -1,11 +1,11 @@
 package hi
 
 import (
-	"bytes"
-	"fmt"
-	"log"
-	"strings"
-	"text/template"
+    "bytes"
+    "fmt"
+    "log"
+    "strings"
+    "text/template"
 )
 
 const ShuntDomainContent = string(`
@@ -179,7 +179,7 @@ _wgstart() {
         fi
     fi
     if [ "$enable" = "1" ]; then
-        if [ $(_wghotup) = "no" ]; then
+        if [ "$(_wghotup)" = "no" ]; then
             /bin/sh /etc/rc.common /etc/init.d/wireguard downup
         fi
         _wgconfirm downup
@@ -420,66 +420,66 @@ fi
 `)
 
 func FromTemplateContent(templateContent string, envMap map[string]interface{}) string {
-	tmpl, err := template.New("text").Parse(templateContent)
-	defer func() {
-		if r := recover(); r != nil {
-			log.Println("Template parse failed:", err)
-		}
-	}()
-	if err != nil {
-		panic(1)
-	}
-	var buffer bytes.Buffer
-	_ = tmpl.Execute(&buffer, envMap)
-	return string(buffer.Bytes())
+    tmpl, err := template.New("text").Parse(templateContent)
+    defer func() {
+        if r := recover(); r != nil {
+            log.Println("Template parse failed:", err)
+        }
+    }()
+    if err != nil {
+        panic(1)
+    }
+    var buffer bytes.Buffer
+    _ = tmpl.Execute(&buffer, envMap)
+    return string(buffer.Bytes())
 }
 
 func ShuntDomainTemplate(envMap map[string]interface{}) string {
-	var sb strings.Builder
-	sb.Write([]byte(ShuntDomainContent))
-	return FromTemplateContent(sb.String(), envMap)
+    var sb strings.Builder
+    sb.Write([]byte(ShuntDomainContent))
+    return FromTemplateContent(sb.String(), envMap)
 }
 
 func ShuntTemplate(envMap map[string]interface{}) string {
-	var sb strings.Builder
-	sb.Write([]byte(ShuntContent))
-	return FromTemplateContent(sb.String(), envMap)
+    var sb strings.Builder
+    sb.Write([]byte(ShuntContent))
+    return FromTemplateContent(sb.String(), envMap)
 }
 
 func ShuntBatchTemplate(envMap map[string]interface{}) string {
-	text := fmt.Sprintf("%s\n%s", CommonUtilsContent, ShuntBatchContent)
-	var sb strings.Builder
-	sb.Write([]byte(text))
-	return FromTemplateContent(sb.String(), envMap)
+    text := fmt.Sprintf("%s\n%s", CommonUtilsContent, ShuntBatchContent)
+    var sb strings.Builder
+    sb.Write([]byte(text))
+    return FromTemplateContent(sb.String(), envMap)
 }
 
 func WireguardTemplate(envMap map[string]interface{}) string {
-	text := fmt.Sprintf("%s\n%s", CommonUtilsContent, WireguardContent)
-	var sb strings.Builder
-	sb.Write([]byte(text))
-	return FromTemplateContent(sb.String(), envMap)
+    text := fmt.Sprintf("%s\n%s", CommonUtilsContent, WireguardContent)
+    var sb strings.Builder
+    sb.Write([]byte(text))
+    return FromTemplateContent(sb.String(), envMap)
 }
 
 func InitTemplate(envMap map[string]interface{}) string {
-	var sb strings.Builder
-	sb.Write([]byte(InitContent))
-	return FromTemplateContent(sb.String(), envMap)
+    var sb strings.Builder
+    sb.Write([]byte(InitContent))
+    return FromTemplateContent(sb.String(), envMap)
 }
 
 func ApiReportTemplate(envMap map[string]interface{}) string {
-	var text string
-	if envMap["requestUrl"] == "static_leases" {
-		text = fmt.Sprintf("%s\n%s", CommonUtilsContent, StaticLeasesReportContent)
-	} else {
-		text = fmt.Sprintf("%s\n%s", CommonUtilsContent, ApiReportContent)
-	}
-	var sb strings.Builder
-	sb.Write([]byte(text))
-	return FromTemplateContent(sb.String(), envMap)
+    var text string
+    if envMap["requestUrl"] == "static_leases" {
+        text = fmt.Sprintf("%s\n%s", CommonUtilsContent, StaticLeasesReportContent)
+    } else {
+        text = fmt.Sprintf("%s\n%s", CommonUtilsContent, ApiReportContent)
+    }
+    var sb strings.Builder
+    sb.Write([]byte(text))
+    return FromTemplateContent(sb.String(), envMap)
 }
 
 func SetStaticLeasesTemplate(envMap map[string]interface{}) string {
-	var sb strings.Builder
-	sb.Write([]byte(SetStaticLeasesContent))
-	return FromTemplateContent(sb.String(), envMap)
+    var sb strings.Builder
+    sb.Write([]byte(SetStaticLeasesContent))
+    return FromTemplateContent(sb.String(), envMap)
 }

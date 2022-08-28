@@ -8,12 +8,12 @@ import (
 )
 
 // GetCmdBatch 获取批量分流脚本
-func GetCmdBatch(apiUrl string, Shunts []ShuntInfo) string {
+func GetCmdBatch(apiUrl string, shunts []ShuntModel) string {
 	var cmds []string
 	var ths []string
-	for _, Shunt := range Shunts {
-		th := fmt.Sprintf("hi-th-%d", Shunt.ID)
-		cmds = append(cmds, fmt.Sprintf("exec_shunt_url \"%s/hi/shunt/cmd/%d\" \"/tmp/hicloud/shunt/%s.sh\"", apiUrl, Shunt.ID, th))
+	for _, shunt := range shunts {
+		th := fmt.Sprintf("hi-th-%d", shunt.ID)
+		cmds = append(cmds, fmt.Sprintf("exec_shunt_url \"%s/hi/shunt/cmd/%d\" \"/tmp/hicloud/shunt/%s.sh\"", apiUrl, shunt.ID, th))
 		ths = append(ths, fmt.Sprintf("%s.sh", th))
 	}
 	var envMap = make(map[string]interface{})
@@ -23,28 +23,28 @@ func GetCmdBatch(apiUrl string, Shunts []ShuntInfo) string {
 }
 
 // GetCmd 获取分流脚本
-func GetCmd(apiUrl string, Shunt ShuntInfo) string {
-	th := fmt.Sprintf("hi-th-%d", Shunt.ID)
-	id16 := strconv.FormatInt(int64(Shunt.ID), 16)
-	table := Shunt.ID%10000 + 10000
-	prio := Shunt.Prio
+func GetCmd(apiUrl string, shunt ShuntModel) string {
+	th := fmt.Sprintf("hi-th-%d", shunt.ID)
+	id16 := strconv.FormatInt(int64(shunt.ID), 16)
+	table := shunt.ID%10000 + 10000
+	prio := shunt.Prio
 	if prio == 0 {
 		prio = 50
 	}
 	//
-	sources := String2Array(Shunt.Source)
-	rules := String2Array(Shunt.Rule)
+	sources := String2Array(shunt.Source)
+	rules := String2Array(shunt.Rule)
 	dnsIp := "${gatewayIP}"
 	//
 	var install []string
 	var remove []string
 	//
 	install = append(install, fmt.Sprintf("ip rule add fwmark 0x%s/0xffffffff table %d prio %d", id16, table, prio))
-	if Shunt.Out == "blackhole" {
+	if shunt.Out == "blackhole" {
 		install = append(install, fmt.Sprintf("ip route add blackhole default table %d", table))
-	} else if IsIp(Shunt.Out) {
-		install = append(install, fmt.Sprintf("ip route add default via %s table %d", Shunt.Out, table))
-		dnsIp = Shunt.Out
+	} else if IsIp(shunt.Out) {
+		install = append(install, fmt.Sprintf("ip route add default via %s table %d", shunt.Out, table))
+		dnsIp = shunt.Out
 	} else {
 		install = append(install, fmt.Sprintf("ip route add default via ${gatewayIP} table %d", table))
 	}
@@ -71,7 +71,7 @@ func GetCmd(apiUrl string, Shunt ShuntInfo) string {
 			}
 		}
 		if len(domain) > 0 {
-			install = append(install, fmt.Sprintf("curl -sSL -4 \"%s/hi/shunt/domain/%d\" | sh", apiUrl, Shunt.ID))
+			install = append(install, fmt.Sprintf("curl -sSL -4 \"%s/hi/shunt/domain/%d\" | sh", apiUrl, shunt.ID))
 			var envMap = make(map[string]interface{})
 			envMap["dnsIp"] = dnsIp
 			envMap["th"] = th
@@ -118,7 +118,7 @@ func GetCmd(apiUrl string, Shunt ShuntInfo) string {
 	removeString := strings.Join(remove, "\n")
 	//
 	var envMap = make(map[string]interface{})
-	envMap["outIp"] = Shunt.Out
+	envMap["outIp"] = shunt.Out
 	envMap["installString"] = installString
 	envMap["removeString"] = removeString
 	envMap["th"] = th
@@ -126,11 +126,11 @@ func GetCmd(apiUrl string, Shunt ShuntInfo) string {
 }
 
 // GetDomain 获取域名脚本
-func GetDomain(Shunt ShuntInfo) string {
-	th := fmt.Sprintf("hi-th-%d", Shunt.ID)
+func GetDomain(shunt ShuntModel) string {
+	th := fmt.Sprintf("hi-th-%d", shunt.ID)
 	var install []string
 	var domain []string
-	rules := String2Array(Shunt.Rule)
+	rules := String2Array(shunt.Rule)
 	if len(rules) > 0 {
 		for _, rule := range rules {
 			if IsDomain(rule) {
