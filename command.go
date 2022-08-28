@@ -69,7 +69,7 @@ func handleCmdResp(data []byte) {
 			res.h.result = fmt.Sprintf(`{"ret":1,"msg":"","data":%s}`, attrs)
 			var d commandRes
 			if o := json.Unmarshal([]byte(attrs), &d); o == nil {
-				if d.Code != 0 || len(d.Stderr) > 0 {
+				if d.Code != 0 {
 					res.h.result = fmt.Sprintf(`{"ret":0,"msg":"","data":%s}`, attrs)
 				}
 			}

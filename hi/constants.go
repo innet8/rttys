@@ -25,7 +25,7 @@ _random() {
 }
 
 _filemd5() {
-    if [ -f "$1" ];then
+    if [ -f "$1" ]; then
         echo -n $(md5sum $1 | cut -d ' ' -f1)
     else
         echo ""
@@ -87,7 +87,7 @@ if [ ! -f "$DNSFILE" ]; then
 fi
 
 gatewayIP=$(ip route show 1/0 | head -n1 | sed -e 's/^default//' | awk '{print $2}' | awk -F. '$1<=255&&$2<=255&&$3<=255&&$4<=255{print $1"."$2"."$3"."$4}')
-if [ -z "${gatewayIP}" ];then
+if [ -z "${gatewayIP}" ]; then
     echo "Unable to get gateway IP"
     exit 1
 fi
@@ -122,7 +122,7 @@ exec_shunt_url() {
     local save=$2
     local tmp="/tmp/.hi_$(_random)"
     curl -sSL -4 -o "${tmp}" "${url}"
-    if [ ! -f "${tmp}" ];then
+    if [ ! -f "${tmp}" ]; then
         echo "Failed download exec file '$url'"
         exit 1
     fi
@@ -130,12 +130,12 @@ exec_shunt_url() {
         rm -f "${tmp}"
         echo "Same file skips exec '$url' '$save'"
     else
-        if [ -f "$save" ];then
+        if [ -f "$save" ]; then
             bash $save remove
             rm -f "${save}"
         fi
         mv "${tmp}" "$save"
-        if [ ! -f "$save" ];then
+        if [ ! -f "$save" ]; then
             echo "Failed to move file '$url' '$save'"
             exit 2
         fi
@@ -207,7 +207,9 @@ wireguard_confirm() {
 }
 
 wireguard_stop() {
-    /bin/sh /etc/rc.common /etc/init.d/wireguard stop
+    if [ -n "$(wg)" ]; then
+        /bin/sh /etc/rc.common /etc/init.d/wireguard stop
+    fi
     uci set wireguard.@proxy[0].enable="0"
     uci commit wireguard
 }
@@ -329,7 +331,7 @@ const InitContent = string(`
 #!/bin/bash
 
 git_commit=$(uci get rtty.general.git_commit 2>/dev/null)
-if [ "${git_commit}" != "{{.gitCommit}}" ];then
+if [ "${git_commit}" != "{{.gitCommit}}" ]; then
     uci set rtty.general.git_commit="{{.gitCommit}}"
     uci commit rtty
 
@@ -386,7 +388,7 @@ ${RES}
 EOF
 if [ ! -f "${save}" ] || [ "$(_filemd5 ${save})" != "$(_filemd5 ${tmp})" ]; then
     RES=$(curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(get_default_sn)'","time":"'$(date +%s)'"}')
-    if [ "${RES}" = "success" ];then
+    if [ "${RES}" = "success" ]; then
         mv "${tmp}" "$save"
     fi
 fi
@@ -405,7 +407,7 @@ done
 uci commit dhcp
 
 # report
-if [ -f "/etc/init.d/hi-static-leases" ];then
+if [ -f "/etc/init.d/hi-static-leases" ]; then
     /etc/init.d/hi-static-leases &
 fi
 `)

@@ -137,6 +137,7 @@ func hiExecCommand(br *broker, cmdr *hi.CmdrModel, callurl string) string {
 		select {
 		case <-tmr.C:
 			hiExecCallback(token, callurl, true)
+			hiExecOvertime(token)
 			commands.Delete(token)
 		case <-ctx.Done():
 			hiExecCallback(token, callurl, false)
@@ -196,6 +197,7 @@ func hiExecRequest(br *broker, c *gin.Context, cmdr *hi.CmdrModel) {
 	select {
 	case <-tmr.C:
 		cmdErrReply(rttyCmdErrTimeout, req)
+		hiExecOvertime(token)
 		commands.Delete(token)
 	case <-ctx.Done():
 	}
@@ -241,4 +243,15 @@ func hiExecResult(hir *hiReq) {
 		"result":   hir.result,
 		"end_time": uint32(time.Now().Unix()),
 	})
+}
+
+// 执行命令结果（超时）
+func hiExecOvertime(token string) {
+	if req, ok := commands.Load(token); ok {
+		re := req.(*commandReq)
+		if re.h != nil {
+			re.h.result = `{"ret":0,"msg":"overtime","data":{}}`
+			go hiExecResult(re.h)
+		}
+	}
 }
