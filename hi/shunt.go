@@ -40,11 +40,11 @@ func GetCmd(apiUrl string, shunt ShuntModel) string {
 	var remove []string
 	//
 	install = append(install, fmt.Sprintf("ip rule add fwmark 0x%s/0xffffffff table %d prio %d", id16, table, prio))
-	if shunt.Out == "blackhole" {
+	if shunt.OutIp == "blackhole" {
 		install = append(install, fmt.Sprintf("ip route add blackhole default table %d", table))
-	} else if IsIp(shunt.Out) {
-		install = append(install, fmt.Sprintf("ip route add default via %s table %d", shunt.Out, table))
-		dnsIp = shunt.Out
+	} else if IsIp(shunt.OutIp) {
+		install = append(install, fmt.Sprintf("ip route add default via %s table %d", shunt.OutIp, table))
+		dnsIp = shunt.OutIp
 	} else {
 		install = append(install, fmt.Sprintf("ip route add default via ${gatewayIP} table %d", table))
 	}
@@ -118,7 +118,7 @@ func GetCmd(apiUrl string, shunt ShuntModel) string {
 	removeString := strings.Join(remove, "\n")
 	//
 	var envMap = make(map[string]interface{})
-	envMap["outIp"] = shunt.Out
+	envMap["outIp"] = shunt.OutIp
 	envMap["installString"] = installString
 	envMap["removeString"] = removeString
 	envMap["th"] = th

@@ -28,7 +28,7 @@ type ShuntModel struct {
 	Source string `json:"source"`
 	Rule   string `json:"rule"`
 	Prio   uint32 `json:"prio"`
-	Out    string `json:"out"`
+	OutIp  string `json:"out_ip"`
 }
 
 type WgModel struct {
@@ -53,10 +53,16 @@ type CmdrModel struct {
 
 func InstanceDB(str string) (*gorm.DB, error) {
 	sp := strings.Split(str, "://")
+	dbType := "sqlite"
+	dbPath := str
 	if len(sp) == 2 {
-		return gorm.Open(sqlite.Open(sp[1]), &gorm.Config{})
+		dbType = strings.ToLower(sp[0])
+		dbPath = sp[1]
+	}
+	if dbType == "mysql" {
+		return gorm.Open(mysql.Open(dbPath), &gorm.Config{})
 	} else {
-		return gorm.Open(mysql.Open(sp[1]), &gorm.Config{})
+		return gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
 	}
 }
 

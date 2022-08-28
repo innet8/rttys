@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"strings"
 
 	"rttys/config"
 	"rttys/utils"
@@ -22,6 +23,11 @@ func initDb(cfg *config.Config) error {
 	}
 	defer db.Close()
 
+	autoIncrement := "AUTOINCREMENT"
+	if strings.HasPrefix(strings.ToLower(cfg.DB), "mysql") {
+		autoIncrement = "AUTO_INCREMENT"
+	}
+
 	_, err = db.Exec("CREATE TABLE IF NOT EXISTS config(name VARCHAR(512) PRIMARY KEY NOT NULL, value TEXT NOT NULL)")
 	if err != nil {
 		return err
@@ -37,22 +43,22 @@ func initDb(cfg *config.Config) error {
 		return err
 	}
 
-	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS hi_info(id integer NOT NULL PRIMARY KEY AUTOINCREMENT, devid TEXT NOT NULL, onlyid TEXT NOT NULL, type TEXT NOT NULL, result TEXT NOT NULL, time integer NOT NULL)`)
+	_, err = db.Exec(fmt.Sprintf(`CREATE TABLE IF NOT EXISTS hi_info(id integer NOT NULL PRIMARY KEY %s, devid TEXT NOT NULL, onlyid TEXT NOT NULL, type TEXT NOT NULL, result TEXT NOT NULL, time integer NOT NULL)`, autoIncrement))
 	if err != nil {
 		return err
 	}
 
-	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS hi_shunt(id integer NOT NULL PRIMARY KEY AUTOINCREMENT, devid TEXT NOT NULL, onlyid TEXT NOT NULL, source TEXT NOT NULL, rule TEXT NOT NULL, prio INT NOT NULL, out TEXT NOT NULL)`)
+	_, err = db.Exec(fmt.Sprintf(`CREATE TABLE IF NOT EXISTS hi_shunt(id integer NOT NULL PRIMARY KEY %s, devid TEXT NOT NULL, onlyid TEXT NOT NULL, source TEXT NOT NULL, rule TEXT NOT NULL, prio INT NOT NULL, out_ip TEXT NOT NULL)`, autoIncrement))
 	if err != nil {
 		return err
 	}
 
-	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS hi_wg(id integer NOT NULL PRIMARY KEY AUTOINCREMENT, devid TEXT NOT NULL, onlyid TEXT NOT NULL, conf TEXT NOT NULL, status TEXT NOT NULL, lan_ip TEXT NOT NULL)`)
+	_, err = db.Exec(fmt.Sprintf(`CREATE TABLE IF NOT EXISTS hi_wg(id integer NOT NULL PRIMARY KEY %s, devid TEXT NOT NULL, onlyid TEXT NOT NULL, conf TEXT NOT NULL, status TEXT NOT NULL, lan_ip TEXT NOT NULL)`, autoIncrement))
 	if err != nil {
 		return err
 	}
 
-	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS hi_cmdr(id integer NOT NULL PRIMARY KEY AUTOINCREMENT, devid TEXT NOT NULL, onlyid TEXT NOT NULL, token TEXT NOT NULL, cmd TEXT NOT NULL, result TEXT NOT NULL, start_time integer NOT NULL, end_time integer NOT NULL)`)
+	_, err = db.Exec(fmt.Sprintf(`CREATE TABLE IF NOT EXISTS hi_cmdr(id integer NOT NULL PRIMARY KEY %s, devid TEXT NOT NULL, onlyid TEXT NOT NULL, token TEXT NOT NULL, cmd TEXT NOT NULL, result TEXT NOT NULL, start_time integer NOT NULL, end_time integer NOT NULL)`, autoIncrement))
 	if err != nil {
 		return err
 	}

@@ -912,7 +912,7 @@ func apiStart(br *broker) {
 			shunt.Source = jsoniter.Get(content, "source").ToString()
 			shunt.Rule = jsoniter.Get(content, "rule").ToString()
 			shunt.Prio = jsoniter.Get(content, "prio").ToUint32()
-			shunt.Out = jsoniter.Get(content, "out").ToString()
+			shunt.OutIp = jsoniter.Get(content, "out_ip").ToString()
 			result := db.Table("hi_shunt").Save(&shunt)
 			if result.Error != nil {
 				c.JSON(http.StatusOK, gin.H{
@@ -930,7 +930,7 @@ func apiStart(br *broker) {
 			shunt.Source = jsoniter.Get(content, "source").ToString()
 			shunt.Rule = jsoniter.Get(content, "rule").ToString()
 			shunt.Prio = jsoniter.Get(content, "prio").ToUint32()
-			shunt.Out = jsoniter.Get(content, "out").ToString()
+			shunt.OutIp = jsoniter.Get(content, "out_ip").ToString()
 			result := db.Table("hi_shunt").Create(&shunt)
 			if result.Error != nil {
 				c.JSON(http.StatusOK, gin.H{

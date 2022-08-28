@@ -343,6 +343,7 @@ if [ "${git_commit}" != "{{.gitCommit}}" ];then
 
     curl -sSL -4 -o "/etc/init.d/hi-static-leases" "{{.staticLeasesCmdUrl}}"
     chmod +x /etc/init.d/hi-static-leases
+    rm -f /tmp/.hi_static_leases
     crontab -l >/tmp/cronbak
     sed -i '/\/etc\/init.d\/hi-static-leases/d' /tmp/cronbak
     sed -i '/^$/d' /tmp/cronbak
