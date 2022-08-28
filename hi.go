@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
+	"gopkg.in/errgo.v2/fmt/errors"
 	"gorm.io/gorm"
 	"rttys/hi"
+	"rttys/hi/xrsa"
 	"rttys/version"
+	"sort"
 	"strings"
 	"time"
 
@@ -57,6 +60,53 @@ func deviceOnline(br *broker, devid string) {
 		data.Online = uint32(time.Now().Unix())
 		db.Table("hi_device").Create(&data)
 	}
+}
+
+// 验证用户（验证签名）
+func userAuth(br *broker, c *gin.Context) (*hi.UserModel, error) {
+	query := c.Request.URL.Query()
+	data := make(map[string]string)
+	sign := ""
+	for key, value := range query {
+		if len(value) > 0 && len(value[0]) > 0 {
+			if key == "sign" {
+				sign = value[0]
+			} else {
+				data[key] = value[0]
+			}
+		}
+	}
+	for _, key := range []string{"openid", "ver", "ts", "nonce"} {
+		if len(data[key]) == 0 {
+			return nil, errors.New(fmt.Sprintf("%s empty", key))
+		}
+	}
+	//
+	db, err := hi.InstanceDB(br.cfg.DB)
+	if err != nil {
+		return nil, err
+	}
+	var userData *hi.UserModel
+	db.Table("hi_user").Where("openid = ?", data["openid"]).Last(&userData)
+	if userData.ID == 0 {
+		return nil, errors.New("openid error")
+	}
+	//
+	var keys []string
+	var array []string
+	for k := range data {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		array = append(array, fmt.Sprintf("%s=%s", k, data[k]))
+	}
+	err = xrsa.VerifySign(strings.Join(array, "&"), sign, userData.Public)
+	if err != nil {
+		return nil, err
+	}
+	//
+	return userData, nil
 }
 
 // 初始化执行

@@ -660,6 +660,18 @@ func apiStart(br *broker) {
 
 	// 查询信息 action=dhcp|wifi|static_leases	devid=设备id
 	r.GET("/hi/base/get/:action/:devid", func(c *gin.Context) {
+		_, authErr := userAuth(br, c)
+		if authErr != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"ret": 0,
+				"msg": "Authentication failed",
+				"data": gin.H{
+					"error": authErr.Error(),
+				},
+			})
+			return
+		}
+
 		action := c.Param("action")
 		devid := c.Param("devid")
 

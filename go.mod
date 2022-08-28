@@ -27,6 +27,7 @@ require (
 	github.com/nahid/gohttp v0.0.1
 	github.com/ugorji/go v1.2.6 // indirect
 	google.golang.org/protobuf v1.27.1 // indirect
+	gopkg.in/errgo.v2 v2.1.0
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gorm.io/driver/mysql v1.3.6
 	gorm.io/driver/sqlite v1.3.6

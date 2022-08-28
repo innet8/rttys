@@ -121,6 +121,15 @@ func Decrypt(encrypted, publicKey string, privateKey string) string {
 	return decrypted
 }
 
+// VerifySign 验证签名
+func VerifySign(data string, sign string, publicKey string) error {
+	xrsb, err := NewXRsa([]byte(publicKey), nil)
+	if err != nil {
+		return err
+	}
+	return xrsb.Verify(data, sign)
+}
+
 // PublicEncrypt 公钥加密
 func (r *XRsa) PublicEncrypt(data string) (string, error) {
 	partLen := r.publicKey.N.BitLen()/8 - 11
