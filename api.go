@@ -1037,6 +1037,11 @@ func apiStart(br *broker) {
 		}
 	})
 
+	// 创建用户 action=create
+	r.GET("/hi/user/:action", func(c *gin.Context) {
+
+	})
+
 	r.NoRoute(func(c *gin.Context) {
 		fs, _ := fs.Sub(staticFs, "ui/dist")
 

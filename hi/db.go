@@ -12,6 +12,24 @@ import (
 
 type Array []string
 
+type UserModel struct {
+	ID      uint32 `json:"id"`
+	Openid  string `json:"openid"`
+	Public  string `json:"public"`
+	Private string `json:"private"`
+	Time    uint32 `json:"time"`
+}
+
+type DeviceModel struct {
+	ID          uint32 `json:"id"`
+	Devid       string `json:"devid"`
+	Onlyid      string `json:"onlyid"`
+	Description string `json:"description"`
+	Online      uint32 `json:"online"`
+	BindOpenid  string `json:"bind_openid"`
+	BindTime    uint32 `json:"bind_time"`
+}
+
 type InfoModel struct {
 	ID     uint32 `json:"id"`
 	Type   string `json:"type"`

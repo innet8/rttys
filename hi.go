@@ -16,6 +16,15 @@ import (
 	"github.com/nahid/gohttp"
 )
 
+// 设备ID取设备信息
+func devidGetDev(br *broker, devid string) *device {
+	if dev, ok := br.devices[devid]; ok {
+		dd := dev.(*device)
+		return dd
+	}
+	return nil
+}
+
 // 设备ID取onlyid
 func devidGetOnlyid(br *broker, devid string) string {
 	if dev, ok := br.devices[devid]; ok {
@@ -23,6 +32,31 @@ func devidGetOnlyid(br *broker, devid string) string {
 		return dd.onlyid
 	}
 	return ""
+}
+
+// 保存设备信息（设备上线）
+func deviceOnline(br *broker, devid string) {
+	db, err := hi.InstanceDB(br.cfg.DB)
+	if err != nil {
+		return
+	}
+	devInfo := devidGetDev(br, devid)
+	if devInfo == nil {
+		return
+	}
+	//
+	var data hi.DeviceModel
+	db.Table("hi_device").Where("devid = ? AND onlyid = ?", devid, devInfo.onlyid).Last(&data)
+	if data.ID > 0 {
+		data.Online = uint32(time.Now().Unix())
+		db.Table("hi_device").Save(data)
+	} else {
+		data.Devid = devInfo.id
+		data.Onlyid = devInfo.onlyid
+		data.Description = devInfo.desc
+		data.Online = uint32(time.Now().Unix())
+		db.Table("hi_device").Create(&data)
+	}
 }
 
 // 初始化执行
