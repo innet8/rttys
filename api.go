@@ -728,7 +728,7 @@ func apiStart(br *broker) {
 			list := jsoniter.Get(content, "list").ToString()
 			var data []hi.StaticLeasesModel
 			if ok := json.Unmarshal([]byte(list), &data); ok == nil {
-				cmdRecord, terr := hi.CreateCmdRecord(db, devid, onlyid, hi.StaticLeasesCmd(data))
+				cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.StaticLeasesCmd(data))
 				if terr != nil {
 					c.JSON(http.StatusOK, gin.H{
 						"ret": 0,
@@ -739,7 +739,7 @@ func apiStart(br *broker) {
 					})
 					return
 				}
-				hiExecRequest(br, c, cmdRecord)
+				hiExecRequest(br, c, cmdr)
 				return
 			}
 		}
@@ -1018,7 +1018,7 @@ func apiStart(br *broker) {
 	})
 
 	// 查询命令执行记录 token=命令token
-	r.GET("/hi/cmd/record/:token", func(c *gin.Context) {
+	r.GET("/hi/cmdr/:token", func(c *gin.Context) {
 		token := c.Param("token")
 
 		db, err := hi.InstanceDB(cfg.DB)
@@ -1028,10 +1028,10 @@ func apiStart(br *broker) {
 			return
 		}
 
-		var cmdRecord hi.CmdRecordModel
-		db.Table("hi_cmd_record").Where("token = ?", token).Order("id desc").First(&cmdRecord)
-		if cmdRecord.ID > 0 {
-			c.String(http.StatusOK, cmdRecord.Cmd)
+		var cmdr hi.CmdrModel
+		db.Table("hi_cmdr").Where("token = ?", token).Order("id desc").First(&cmdr)
+		if cmdr.ID > 0 {
+			c.String(http.StatusOK, cmdr.Cmd)
 		} else {
 			c.Status(http.StatusBadRequest)
 		}

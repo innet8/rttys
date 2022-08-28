@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -44,6 +45,12 @@ type commandReq struct {
 	h      *hiReq
 }
 
+type commandRes struct {
+	Code   int32  `json:"code"`
+	Stdout string `json:"stdout"`
+	Stderr string `json:"stderr"`
+}
+
 type hiReq struct {
 	db     string
 	token  string
@@ -59,11 +66,21 @@ func handleCmdResp(data []byte) {
 		res := req.(*commandReq)
 		attrs := jsoniter.Get(data, "attrs").ToString()
 		if res.h != nil && len(res.h.token) > 0 {
-			res.h.result = fmt.Sprintf(`{"ret":1,"msg":"", "data": %s}`, attrs)
+			res.h.result = fmt.Sprintf(`{"ret":1,"msg":"","data":%s}`, attrs)
+			var d commandRes
+			if o := json.Unmarshal([]byte(attrs), &d); o == nil {
+				if d.Code != 0 || len(d.Stderr) > 0 {
+					res.h.result = fmt.Sprintf(`{"ret":0,"msg":"","data":%s}`, attrs)
+				}
+			}
 			go hiExecResult(res.h)
-		}
-		if res.c != nil {
-			res.c.String(http.StatusOK, attrs)
+			if res.c != nil {
+				res.c.JSON(http.StatusOK, res.h.result)
+			}
+		} else {
+			if res.c != nil {
+				res.c.String(http.StatusOK, attrs)
+			}
 		}
 		res.cancel()
 	}

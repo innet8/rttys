@@ -1,11 +1,11 @@
 package hi
 
 import (
-    "bytes"
-    "fmt"
-    "log"
-    "strings"
-    "text/template"
+	"bytes"
+	"fmt"
+	"log"
+	"strings"
+	"text/template"
 )
 
 const ShuntDomainContent = string(`
@@ -158,8 +158,10 @@ _localtoken() {
     }
     echo -n "$token"
 }
+`)
 
-_wgstart() {
+const WireguardContent = string(`
+wireguard_start() {
     model=$(get_model)
     if [ "$model" = "x300b" ]; then
         if [ "$(uci get glconfig.route_policy)" != "route_policy" ]; then
@@ -179,10 +181,10 @@ _wgstart() {
         fi
     fi
     if [ "$enable" = "1" ]; then
-        if [ "$(_wghotup)" = "no" ]; then
+        if [ "$(wireguard_hotup)" = "no" ]; then
             /bin/sh /etc/rc.common /etc/init.d/wireguard downup
         fi
-        _wgconfirm downup
+        wireguard_confirm downup
     else
         if [ -f "/etc/config/wireguard_back" ]; then
             cat /etc/config/wireguard_back > /etc/config/wireguard
@@ -191,11 +193,11 @@ _wgstart() {
         uci set wireguard.@proxy[0].enable="1"
         uci commit wireguard
         /bin/sh /etc/rc.common /etc/init.d/wireguard start
-        _wgconfirm start
+        wireguard_confirm start
     fi
 }
 
-_wgconfirm() {
+wireguard_confirm() {
     (
         sleep 3
         if [ -z "$(wg)" ]; then
@@ -204,13 +206,13 @@ _wgconfirm() {
     ) >/dev/null 2>&1 &
 }
 
-_wgstop() {
+wireguard_stop() {
     /bin/sh /etc/rc.common /etc/init.d/wireguard stop
     uci set wireguard.@proxy[0].enable="0"
     uci commit wireguard
 }
 
-_wghotup() {
+wireguard_hotup() {
     ip address show wg0 &>/dev/null
     if [ $? -ne 0 ]; then
         echo "no"
@@ -267,63 +269,38 @@ EOF
         fi
         AllowIPV4=$(echo $AllowedIPs | cut -d ',' -f 1)
         if [ -n "$AllowIPV4" -a "$AllowIPV4" != "0.0.0.0/0" ]; then
-            ip route add "$AllowIPV4" dev wg0
+            ip route add "$AllowIPV4" dev wg0 &> /dev/null
         else
-            ip route add 0/1 dev wg0
-            ip route add 128/1 dev wg0
+            ip route add 0/1 dev wg0 &> /dev/null
+            ip route add 128/1 dev wg0 &> /dev/null
         fi
     else
         echo "no"
     fi
 }
 
-_edit_lan() {
-    RES=$(curl -X POST "http://127.0.0.1/cgi-bin/api/router/setlanip" -H "Authorization: $(_localtoken)" -d "newip=$1&start=20&end=240")
-    EXI=$(echo "$RES" | grep '.code')
-    if [ -z "$EXI" ]; then
-        echo -n "error"
-    else
-        echo -n "ok"
-    fi
+set_wireguard_conf() {
+    cat >/etc/config/wireguard_back <<-EOF
+{{.wg_conf}}
+EOF
+    cat /etc/config/wireguard_back > /etc/config/wireguard
+    wireguard_start
 }
 
-_get_static_leases() {
-    local list=""
-    for mac_str in $(cat /etc/config/dhcp | grep '\<host\>' | awk '{print $3}' | sed -r "s/'//g"); do
-        tmp='{"mac":"'$(uci get dhcp.$mac_str.mac 2>/dev/null)'","ip":"'$(uci get dhcp.$mac_str.ip 2>/dev/null)'","name":"'$(uci get dhcp.$mac_str.name 2>/dev/null)'"}'
-        if [ -z "$list" ]; then
-            list=$tmp
-        else
-            list="$list,$tmp"
-        fi
-    done
-    echo -e '{"code":0,"list":['"$list"']}'
-}
-`)
-
-const WireguardContent = string(`
 clear_wireguard_conf() {
     cat > /etc/config/wireguard <<-EOF
 config proxy
   option enable '0'
 EOF
     rm -f /etc/config/wireguard_back
-    _wgstop
+    wireguard_stop
 }
 
-set_wireguard_conf() {
-    cat >/etc/config/wireguard_back <<-EOF
-{{.conf}}
-EOF
-    cat /etc/config/wireguard_back > /etc/config/wireguard
-    _wgstart
-}
-
-set_lan_ip() {
+set_lanip() {
     if [ "$(uci get network.lan.ipaddr)" != "{{.lan_ip}}" ]; then
         (
             sleep 2
-            _edit_lan "{{.lan_ip}}"
+			curl -X POST "http://127.0.0.1/cgi-bin/api/router/setlanip" -H "Authorization: $(_localtoken)" -d "newip={{.lan_ip}}&start=20&end=240"
         ) >/dev/null 2>&1 &
     fi
 }
@@ -387,7 +364,20 @@ curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"conte
 `)
 
 const StaticLeasesReportContent = string(`
-RES=$(_get_static_leases)
+get_static_leases() {
+    local list=""
+    for mac_str in $(cat /etc/config/dhcp | grep '\<host\>' | awk '{print $3}' | sed -r "s/'//g"); do
+        tmp='{"mac":"'$(uci get dhcp.$mac_str.mac 2>/dev/null)'","ip":"'$(uci get dhcp.$mac_str.ip 2>/dev/null)'","name":"'$(uci get dhcp.$mac_str.name 2>/dev/null)'"}'
+        if [ -z "$list" ]; then
+            list=$tmp
+        else
+            list="$list,$tmp"
+        fi
+    done
+    echo -e '{"code":0,"list":['"$list"']}'
+}
+
+RES=$(get_static_leases)
 save="/tmp/.hi_static_leases"
 tmp="/tmp/.hi_$(_random)"
 cat >${tmp} <<-EOF
@@ -420,66 +410,66 @@ fi
 `)
 
 func FromTemplateContent(templateContent string, envMap map[string]interface{}) string {
-    tmpl, err := template.New("text").Parse(templateContent)
-    defer func() {
-        if r := recover(); r != nil {
-            log.Println("Template parse failed:", err)
-        }
-    }()
-    if err != nil {
-        panic(1)
-    }
-    var buffer bytes.Buffer
-    _ = tmpl.Execute(&buffer, envMap)
-    return string(buffer.Bytes())
+	tmpl, err := template.New("text").Parse(templateContent)
+	defer func() {
+		if r := recover(); r != nil {
+			log.Println("Template parse failed:", err)
+		}
+	}()
+	if err != nil {
+		panic(1)
+	}
+	var buffer bytes.Buffer
+	_ = tmpl.Execute(&buffer, envMap)
+	return string(buffer.Bytes())
 }
 
 func ShuntDomainTemplate(envMap map[string]interface{}) string {
-    var sb strings.Builder
-    sb.Write([]byte(ShuntDomainContent))
-    return FromTemplateContent(sb.String(), envMap)
+	var sb strings.Builder
+	sb.Write([]byte(ShuntDomainContent))
+	return FromTemplateContent(sb.String(), envMap)
 }
 
 func ShuntTemplate(envMap map[string]interface{}) string {
-    var sb strings.Builder
-    sb.Write([]byte(ShuntContent))
-    return FromTemplateContent(sb.String(), envMap)
+	var sb strings.Builder
+	sb.Write([]byte(ShuntContent))
+	return FromTemplateContent(sb.String(), envMap)
 }
 
 func ShuntBatchTemplate(envMap map[string]interface{}) string {
-    text := fmt.Sprintf("%s\n%s", CommonUtilsContent, ShuntBatchContent)
-    var sb strings.Builder
-    sb.Write([]byte(text))
-    return FromTemplateContent(sb.String(), envMap)
+	text := fmt.Sprintf("%s\n%s", CommonUtilsContent, ShuntBatchContent)
+	var sb strings.Builder
+	sb.Write([]byte(text))
+	return FromTemplateContent(sb.String(), envMap)
 }
 
 func WireguardTemplate(envMap map[string]interface{}) string {
-    text := fmt.Sprintf("%s\n%s", CommonUtilsContent, WireguardContent)
-    var sb strings.Builder
-    sb.Write([]byte(text))
-    return FromTemplateContent(sb.String(), envMap)
+	text := fmt.Sprintf("%s\n%s", CommonUtilsContent, WireguardContent)
+	var sb strings.Builder
+	sb.Write([]byte(text))
+	return FromTemplateContent(sb.String(), envMap)
 }
 
 func InitTemplate(envMap map[string]interface{}) string {
-    var sb strings.Builder
-    sb.Write([]byte(InitContent))
-    return FromTemplateContent(sb.String(), envMap)
+	var sb strings.Builder
+	sb.Write([]byte(InitContent))
+	return FromTemplateContent(sb.String(), envMap)
 }
 
 func ApiReportTemplate(envMap map[string]interface{}) string {
-    var text string
-    if envMap["requestUrl"] == "static_leases" {
-        text = fmt.Sprintf("%s\n%s", CommonUtilsContent, StaticLeasesReportContent)
-    } else {
-        text = fmt.Sprintf("%s\n%s", CommonUtilsContent, ApiReportContent)
-    }
-    var sb strings.Builder
-    sb.Write([]byte(text))
-    return FromTemplateContent(sb.String(), envMap)
+	var text string
+	if envMap["requestUrl"] == "static_leases" {
+		text = fmt.Sprintf("%s\n%s", CommonUtilsContent, StaticLeasesReportContent)
+	} else {
+		text = fmt.Sprintf("%s\n%s", CommonUtilsContent, ApiReportContent)
+	}
+	var sb strings.Builder
+	sb.Write([]byte(text))
+	return FromTemplateContent(sb.String(), envMap)
 }
 
 func SetStaticLeasesTemplate(envMap map[string]interface{}) string {
-    var sb strings.Builder
-    sb.Write([]byte(SetStaticLeasesContent))
-    return FromTemplateContent(sb.String(), envMap)
+	var sb strings.Builder
+	sb.Write([]byte(SetStaticLeasesContent))
+	return FromTemplateContent(sb.String(), envMap)
 }

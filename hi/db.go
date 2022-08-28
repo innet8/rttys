@@ -40,7 +40,7 @@ type WgModel struct {
 	Status string `json:"status"`
 }
 
-type CmdRecordModel struct {
+type CmdrModel struct {
 	ID        uint32 `json:"id"`
 	Devid     string `json:"devid"`
 	Onlyid    string `json:"onlyid"`
@@ -92,17 +92,17 @@ func Array2String(array Array) string {
 	return string(marshal)
 }
 
-func CreateCmdRecord(db *gorm.DB, devid, onlyid, cmd string) (*CmdRecordModel, error) {
-	cmdRecord := &CmdRecordModel{
+func CreateCmdr(db *gorm.DB, devid, onlyid, cmd string) (*CmdrModel, error) {
+	cmdr := &CmdrModel{
 		Devid:     devid,
 		Onlyid:    onlyid,
-		Token:     RandString(24),
+		Token:     RandString(32),
 		Cmd:       strings.TrimSpace(cmd),
 		StartTime: uint32(time.Now().Unix()),
 	}
-	result := db.Table("hi_cmd_record").Create(&cmdRecord)
+	result := db.Table("hi_cmdr").Create(&cmdr)
 	if result.Error != nil {
 		return nil, result.Error
 	}
-	return cmdRecord, nil
+	return cmdr, nil
 }

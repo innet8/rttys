@@ -85,35 +85,35 @@ func hiSynchShuntConf(br *broker, devid, callback string) string {
 // 执行之前
 func hiExecBefore(br *broker, db *gorm.DB, devid, cmd, callback string) string {
 	onlyid := devidGetOnlyid(br, devid)
-	cmdRecord, err := hi.CreateCmdRecord(db, devid, onlyid, cmd)
+	cmdr, err := hi.CreateCmdr(db, devid, onlyid, cmd)
 	if err != nil {
 		return ""
 	}
-	return hiExecCommand(br, cmdRecord, callback)
+	return hiExecCommand(br, cmdr, callback)
 }
 
 // 发送执行命令
-func hiExecCommand(br *broker, cmdRecord *hi.CmdRecordModel, callurl string) string {
+func hiExecCommand(br *broker, cmdr *hi.CmdrModel, callurl string) string {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	req := &commandReq{
 		cancel: cancel,
-		devid:  cmdRecord.Devid,
+		devid:  cmdr.Devid,
 		c:      nil,
 		h: &hiReq{
 			db:    br.cfg.DB,
-			token: cmdRecord.Token,
+			token: cmdr.Token,
 		},
 	}
 
-	_, ok := br.devices[cmdRecord.Devid]
+	_, ok := br.devices[cmdr.Devid]
 	if !ok {
 		return ""
 	}
 
 	token := utils.GenUniqueID("cmd")
 
-	cmd := fmt.Sprintf("curl -sSL -4 %s/hi/cmd/record/%s | bash", br.cfg.HiApiUrl, cmdRecord.Token)
+	cmd := fmt.Sprintf("curl -sSL -4 %s/hi/cmdr/%s | bash", br.cfg.HiApiUrl, cmdr.Token)
 	params := []string{"-c", cmd}
 
 	data := make([]string, 5)
@@ -150,20 +150,20 @@ func hiExecCommand(br *broker, cmdRecord *hi.CmdRecordModel, callurl string) str
 }
 
 // 请求执行命令
-func hiExecRequest(br *broker, c *gin.Context, cmdRecord *hi.CmdRecordModel) {
+func hiExecRequest(br *broker, c *gin.Context, cmdr *hi.CmdrModel) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	req := &commandReq{
 		cancel: cancel,
 		c:      c,
-		devid:  cmdRecord.Devid,
+		devid:  cmdr.Devid,
 		h: &hiReq{
 			db:    br.cfg.DB,
-			token: cmdRecord.Token,
+			token: cmdr.Token,
 		},
 	}
 
-	_, ok := br.devices[cmdRecord.Devid]
+	_, ok := br.devices[cmdr.Devid]
 	if !ok {
 		cmdErrReply(rttyCmdErrOffline, req)
 		return
@@ -171,7 +171,7 @@ func hiExecRequest(br *broker, c *gin.Context, cmdRecord *hi.CmdRecordModel) {
 
 	token := utils.GenUniqueID("cmd")
 
-	cmd := fmt.Sprintf("curl -sSL -4 %s/hi/cmd/record/%s | bash", br.cfg.HiApiUrl, cmdRecord.Token)
+	cmd := fmt.Sprintf("curl -sSL -4 %s/hi/cmdr/%s | bash", br.cfg.HiApiUrl, cmdr.Token)
 	params := []string{"-c", cmd}
 
 	data := make([]string, 5)
@@ -240,7 +240,7 @@ func hiExecResult(hir *hiReq) {
 	if err != nil {
 		return
 	}
-	db.Table("hi_cmd_record").Where("token = ?", hir.token).Updates(map[string]interface{}{
+	db.Table("hi_cmdr").Where("token = ?", hir.token).Updates(map[string]interface{}{
 		"result":   hir.result,
 		"end_time": uint32(time.Now().Unix()),
 	})
