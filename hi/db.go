@@ -13,11 +13,10 @@ import (
 type Array []string
 
 type UserModel struct {
-	ID      uint32 `json:"id"`
-	Openid  string `json:"openid"`
-	Public  string `json:"public"`
-	Private string `json:"private"`
-	Time    uint32 `json:"time"`
+	ID     uint32 `json:"id"`
+	Openid string `json:"openid"`
+	Public string `json:"public"`
+	Time   uint32 `json:"time"`
 }
 
 type DeviceModel struct {

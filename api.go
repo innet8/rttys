@@ -1038,8 +1038,49 @@ func apiStart(br *broker) {
 	})
 
 	// 创建用户 action=create
-	r.GET("/hi/user/:action", func(c *gin.Context) {
+	r.POST("/hi/user/:action", func(c *gin.Context) {
+		action := c.Param("action")
 
+		if action == "create" {
+			db, err := hi.InstanceDB(cfg.DB)
+			if err != nil {
+				log.Error().Msg(err.Error())
+				c.Status(http.StatusInternalServerError)
+				return
+			}
+
+			content, err := ioutil.ReadAll(c.Request.Body)
+			if err != nil {
+				c.Status(http.StatusBadRequest)
+				return
+			}
+
+			data := &hi.UserModel{
+				Openid: hi.RandString(32),
+				Public: strings.TrimSpace(jsoniter.Get(content, "public").ToString()),
+				Time:   uint32(time.Now().Unix()),
+			}
+			result := db.Table("hi_user").Create(&data)
+			if result.Error != nil {
+				c.JSON(http.StatusOK, gin.H{
+					"ret": 0,
+					"msg": "创建失败",
+					"data": gin.H{
+						"error": result.Error.Error(),
+					},
+				})
+			} else {
+				c.JSON(http.StatusOK, gin.H{
+					"ret": 1,
+					"msg": "success",
+					"data": gin.H{
+						"openid": data.Openid,
+						"time":   data.Time,
+					},
+				})
+			}
+		}
+		c.Status(http.StatusForbidden)
 	})
 
 	r.NoRoute(func(c *gin.Context) {
