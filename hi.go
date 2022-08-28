@@ -11,6 +11,7 @@ import (
 	"rttys/hi/xrsa"
 	"rttys/version"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -79,6 +80,12 @@ func userAuth(c *gin.Context, db *gorm.DB, devid string) (*hi.UserModel, error) 
 	for _, key := range []string{"openid", "ver", "ts", "nonce"} {
 		if len(data[key]) == 0 {
 			return nil, errors.New(fmt.Sprintf("%s empty", key))
+		}
+		if key == "ts" {
+			ts, _ := strconv.ParseInt(data[key], 10, 64)
+			if ts+300 < time.Now().Unix() {
+				return nil, errors.New("ts expired")
+			}
 		}
 	}
 	//
