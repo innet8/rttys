@@ -783,7 +783,7 @@ func apiStart(br *broker) {
 					"ret": 0,
 					"msg": "配置格式错误，请参考示例",
 					"data": gin.H{
-						"example": hi.WireguardConfExampleContent,
+						"example": hi.WireguardConfExample,
 					},
 				})
 				return

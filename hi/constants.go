@@ -8,8 +8,44 @@ import (
 	"text/template"
 )
 
-const ShuntDomainContent = string(`
-for D in ` + "`cat ${DOMAINFILE} 2>/dev/null`" + `; do
+const CommonUtilsContent = string(`
+#!/bin/bash
+. /lib/functions/gl_util.sh
+
+_base64e() {
+    echo -n "$1" | base64 | tr -d "\n"
+}
+
+_base64d() {
+    echo -n "$1" | base64 -d | sed 's/\\n//g'
+}
+
+_random() {
+    echo -n $(date +%s) | md5sum | md5sum | cut -d ' ' -f 1
+}
+
+_filemd5() {
+    if [ -f "$1" ];then
+        echo -n $(md5sum $1 | cut -d ' ' -f1)
+    else
+        echo ""
+    fi
+}
+
+_localtoken() {
+    token=$(ls /tmp/gl_token_* 2>/dev/null | awk 'END {print}' | awk -F '_' '{print $3}')
+    [ -z "$token" ] && {
+        token=$(_random)
+    }
+    [ ! -f "/tmp/gl_token_$token" ] && {
+        echo "$token" >/tmp/gl_token_$token
+    }
+    echo -n "$token"
+}
+`)
+
+const ShuntDomainPartial = string(`
+for D in $(cat ${DOMAINFILE} 2>/dev/null); do
     echo "server=/${D}/{{.dnsIp}} #{{.th}}#" >> /etc/dnsmasq.conf
     #
     charA="$(cat $DNSFILE | grep -n "ipset=/${D}/")"
@@ -26,7 +62,7 @@ for D in ` + "`cat ${DOMAINFILE} 2>/dev/null`" + `; do
     fi
 done
 /etc/init.d/dnsmasq restart
-for D in ` + "`cat ${DOMAINFILE} 2>/dev/null`" + `; do (nslookup $D > /dev/null 2>&1 &); done
+for D in $(cat ${DOMAINFILE} 2>/dev/null); do (nslookup $D > /dev/null 2>&1 &); done
 `)
 
 const ShuntContent = string(`
@@ -67,8 +103,8 @@ sed -i '/\/{{.th}}$/d' ${DNSFILE}
 
 if [ -z "${ACTION}" ]; then
     echo "install" >> ${LOGFILE}
-    if [[ -z ` + "`iptables -L shunt-1 -t mangle 2>/dev/null | grep shunt-1`" + ` ]]; then
-        for i in ` + "`seq 1 80`" + `; do
+    if [[ -z "$(iptables -L shunt-1 -t mangle 2>/dev/null | grep shunt-1)" ]]; then
+        for i in $(seq 1 80); do
             iptables -t mangle -N shunt-${i}
             iptables -t mangle -A PREROUTING -j shunt-${i}
         done
@@ -80,21 +116,7 @@ echo "end" >> ${LOGFILE}
 exit 0
 `)
 
-const ShuntBatchContent = string(`
-mkdir -p /tmp/hicloud/shunt
-
-array=(
-:{{.ths}}
-)
-
-for file in ` + "`ls /tmp/hicloud/shunt 2>/dev/null`" + `; do
-    if [[ "${file}" =~ .*\.sh$ ]] && [[ ! "${array[@]}" =~ ":${file}" ]]; then
-        bash +x /tmp/hicloud/shunt/${file} remove
-        pathname="$(echo ${file} | sed 's/\.sh$//')"
-        rm -f /tmp/hicloud/shunt/${pathname}.* &> /dev/null
-    fi
-done
-
+const ShuntBatchAdded = string(`
 exec_shunt_url() {
     local url=$1
     local save=$2
@@ -121,46 +143,24 @@ exec_shunt_url() {
     fi
 }
 
+mkdir -p /tmp/hicloud/shunt
+
+array=(
+:{{.ths}}
+)
+
+for file in $(ls /tmp/hicloud/shunt 2>/dev/null); do
+    if [[ "${file}" =~ .*\.sh$ ]] && [[ ! "${array[@]}" =~ ":${file}" ]]; then
+        bash +x /tmp/hicloud/shunt/${file} remove
+        pathname="$(echo ${file} | sed 's/\.sh$//')"
+        rm -f /tmp/hicloud/shunt/${pathname}.* &> /dev/null
+    fi
+done
+
 {{.cmds}}
 `)
 
-const CommonUtilsContent = string(`
-#!/bin/bash
-. /lib/functions/gl_util.sh
-
-_base64e() {
-    echo -n "$1" | base64 | tr -d "\n"
-}
-
-_base64d() {
-    echo -n "$1" | base64 -d | sed 's/\\n//g'
-}
-
-_random() {
-    echo -n $(date +%s) | md5sum | md5sum | cut -d ' ' -f 1
-}
-
-_filemd5() {
-    if [ -f "$1" ];then
-        echo -n $(md5sum $1 | cut -d ' ' -f1)
-    else
-        echo ""
-    fi
-}
-
-_localtoken() {
-    token=$(ls /tmp/gl_token_* 2>/dev/null | awk 'END {print}' | awk -F '_' '{print $3}')
-    [ -z "$token" ] && {
-        token=$(_random)
-    }
-    [ ! -f "/tmp/gl_token_$token" ] && {
-        echo "$token" >/tmp/gl_token_$token
-    }
-    echo -n "$token"
-}
-`)
-
-const WireguardContent = string(`
+const WireguardAdded = string(`
 wireguard_start() {
     model=$(get_model)
     if [ "$model" = "x300b" ]; then
@@ -300,13 +300,13 @@ set_lanip() {
     if [ "$(uci get network.lan.ipaddr)" != "{{.lan_ip}}" ]; then
         (
             sleep 2
-			curl -X POST "http://127.0.0.1/cgi-bin/api/router/setlanip" -H "Authorization: $(_localtoken)" -d "newip={{.lan_ip}}&start=20&end=240"
+            curl -X POST "http://127.0.0.1/cgi-bin/api/router/setlanip" -H "Authorization: $(_localtoken)" -d "newip={{.lan_ip}}&start=20&end=240"
         ) >/dev/null 2>&1 &
     fi
 }
 `)
 
-const WireguardConfExampleContent = string(`
+const WireguardConfExample = string(`
 config proxy
     option enable '1'
     option access 'ACCEPT'
@@ -358,12 +358,12 @@ fi
 /etc/init.d/hi-static-leases &
 `)
 
-const ApiReportContent = string(`
+const ApiReportAdded = string(`
 RES=$(curl "{{.requestUrl}}" -H "Authorization: $(_localtoken)")
 curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(get_default_sn)'","time":"'$(date +%s)'"}'
 `)
 
-const StaticLeasesReportContent = string(`
+const StaticLeasesReportAdded = string(`
 get_static_leases() {
     local list=""
     for mac_str in $(cat /etc/config/dhcp | grep '\<host\>' | awk '{print $3}' | sed -r "s/'//g"); do
@@ -426,7 +426,7 @@ func FromTemplateContent(templateContent string, envMap map[string]interface{}) 
 
 func ShuntDomainTemplate(envMap map[string]interface{}) string {
 	var sb strings.Builder
-	sb.Write([]byte(ShuntDomainContent))
+	sb.Write([]byte(ShuntDomainPartial))
 	return FromTemplateContent(sb.String(), envMap)
 }
 
@@ -437,14 +437,14 @@ func ShuntTemplate(envMap map[string]interface{}) string {
 }
 
 func ShuntBatchTemplate(envMap map[string]interface{}) string {
-	text := fmt.Sprintf("%s\n%s", CommonUtilsContent, ShuntBatchContent)
+	text := fmt.Sprintf("%s\n%s", CommonUtilsContent, ShuntBatchAdded)
 	var sb strings.Builder
 	sb.Write([]byte(text))
 	return FromTemplateContent(sb.String(), envMap)
 }
 
 func WireguardTemplate(envMap map[string]interface{}) string {
-	text := fmt.Sprintf("%s\n%s", CommonUtilsContent, WireguardContent)
+	text := fmt.Sprintf("%s\n%s", CommonUtilsContent, WireguardAdded)
 	var sb strings.Builder
 	sb.Write([]byte(text))
 	return FromTemplateContent(sb.String(), envMap)
@@ -459,9 +459,9 @@ func InitTemplate(envMap map[string]interface{}) string {
 func ApiReportTemplate(envMap map[string]interface{}) string {
 	var text string
 	if envMap["requestUrl"] == "static_leases" {
-		text = fmt.Sprintf("%s\n%s", CommonUtilsContent, StaticLeasesReportContent)
+		text = fmt.Sprintf("%s\n%s", CommonUtilsContent, StaticLeasesReportAdded)
 	} else {
-		text = fmt.Sprintf("%s\n%s", CommonUtilsContent, ApiReportContent)
+		text = fmt.Sprintf("%s\n%s", CommonUtilsContent, ApiReportAdded)
 	}
 	var sb strings.Builder
 	sb.Write([]byte(text))
