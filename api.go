@@ -660,18 +660,6 @@ func apiStart(br *broker) {
 
 	// 查询信息 action=dhcp|wifi|static_leases	devid=设备id
 	r.GET("/hi/base/get/:action/:devid", func(c *gin.Context) {
-		_, authErr := userAuth(br, c)
-		if authErr != nil {
-			c.JSON(http.StatusOK, gin.H{
-				"ret": 0,
-				"msg": "Authentication failed",
-				"data": gin.H{
-					"error": authErr.Error(),
-				},
-			})
-			return
-		}
-
 		action := c.Param("action")
 		devid := c.Param("devid")
 
@@ -680,6 +668,18 @@ func apiStart(br *broker) {
 			if err != nil {
 				log.Error().Msg(err.Error())
 				c.Status(http.StatusInternalServerError)
+				return
+			}
+
+			_, authErr := userAuth(c, db, devid)
+			if authErr != nil {
+				c.JSON(http.StatusOK, gin.H{
+					"ret": 0,
+					"msg": "Authentication failed",
+					"data": gin.H{
+						"error": authErr.Error(),
+					},
+				})
 				return
 			}
 
@@ -708,19 +708,31 @@ func apiStart(br *broker) {
 		devid := c.Param("devid")
 		onlyid := devidGetOnlyid(br, devid)
 
+		db, err := hi.InstanceDB(cfg.DB)
+		if err != nil {
+			log.Error().Msg(err.Error())
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+
+		_, authErr := userAuth(c, db, devid)
+		if authErr != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"ret": 0,
+				"msg": "Authentication failed",
+				"data": gin.H{
+					"error": authErr.Error(),
+				},
+			})
+			return
+		}
+
 		if len(onlyid) == 0 {
 			c.JSON(http.StatusOK, gin.H{
 				"ret":  0,
 				"msg":  "设备不在线",
 				"data": nil,
 			})
-			return
-		}
-
-		db, err := hi.InstanceDB(cfg.DB)
-		if err != nil {
-			log.Error().Msg(err.Error())
-			c.Status(http.StatusInternalServerError)
 			return
 		}
 
@@ -772,6 +784,18 @@ func apiStart(br *broker) {
 		if err != nil {
 			log.Error().Msg(err.Error())
 			c.Status(http.StatusInternalServerError)
+			return
+		}
+
+		_, authErr := userAuth(c, db, devid)
+		if authErr != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"ret": 0,
+				"msg": "Authentication failed",
+				"data": gin.H{
+					"error": authErr.Error(),
+				},
+			})
 			return
 		}
 
@@ -869,6 +893,18 @@ func apiStart(br *broker) {
 			return
 		}
 
+		_, authErr := userAuth(c, db, devid)
+		if authErr != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"ret": 0,
+				"msg": "Authentication failed",
+				"data": gin.H{
+					"error": authErr.Error(),
+				},
+			})
+			return
+		}
+
 		var shunts []hi.ShuntModel
 
 		result := db.Table("hi_shunt").Select([]string{"id", "devid", "onlyid", "source", "prio", "out"}).Where("devid = ?", devid).Find(&shunts)
@@ -899,6 +935,18 @@ func apiStart(br *broker) {
 		if err != nil {
 			log.Error().Msg(err.Error())
 			c.Status(http.StatusInternalServerError)
+			return
+		}
+
+		_, authErr := userAuth(c, db, devid)
+		if authErr != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"ret": 0,
+				"msg": "Authentication failed",
+				"data": gin.H{
+					"error": authErr.Error(),
+				},
+			})
 			return
 		}
 
@@ -981,15 +1029,23 @@ func apiStart(br *broker) {
 		var shunt hi.ShuntModel
 		db.Table("hi_shunt").Where("id = ?", shuntId).Last(&shunt)
 
-		if err != nil {
-			log.Error().Msg(err.Error())
-			c.Status(http.StatusInternalServerError)
-			return
-		}
-
 		if shunt.ID == 0 {
 			c.Status(http.StatusNotFound)
 			return
+		}
+
+		if hi.InArray(action, []string{"info", "delete"}) {
+			_, authErr := userAuth(c, db, shunt.Devid)
+			if authErr != nil {
+				c.JSON(http.StatusOK, gin.H{
+					"ret": 0,
+					"msg": "Authentication failed",
+					"data": gin.H{
+						"error": authErr.Error(),
+					},
+				})
+				return
+			}
 		}
 
 		if action == "info" {
@@ -1026,26 +1082,6 @@ func apiStart(br *broker) {
 			c.String(http.StatusOK, hi.GetDomain(shunt))
 		} else {
 			c.Status(http.StatusForbidden)
-		}
-	})
-
-	// 查询命令执行记录 token=命令token
-	r.GET("/hi/cmdr/:token", func(c *gin.Context) {
-		token := c.Param("token")
-
-		db, err := hi.InstanceDB(cfg.DB)
-		if err != nil {
-			log.Error().Msg(err.Error())
-			c.Status(http.StatusInternalServerError)
-			return
-		}
-
-		var cmdr hi.CmdrModel
-		db.Table("hi_cmdr").Where("token = ?", token).Last(&cmdr)
-		if cmdr.ID > 0 {
-			c.String(http.StatusOK, cmdr.Cmd)
-		} else {
-			c.Status(http.StatusBadRequest)
 		}
 	})
 
@@ -1093,6 +1129,26 @@ func apiStart(br *broker) {
 			}
 		}
 		c.Status(http.StatusForbidden)
+	})
+
+	// 查询执行命令 token=命令token
+	r.GET("/hi/other/cmdr/:token", func(c *gin.Context) {
+		token := c.Param("token")
+
+		db, err := hi.InstanceDB(cfg.DB)
+		if err != nil {
+			log.Error().Msg(err.Error())
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+
+		var cmdr hi.CmdrModel
+		db.Table("hi_cmdr").Where("token = ?", token).Last(&cmdr)
+		if cmdr.ID > 0 {
+			c.String(http.StatusOK, cmdr.Cmd)
+		} else {
+			c.Status(http.StatusBadRequest)
+		}
 	})
 
 	r.NoRoute(func(c *gin.Context) {

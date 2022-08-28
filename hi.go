@@ -63,10 +63,10 @@ func deviceOnline(br *broker, devid string) {
 }
 
 // 验证用户（验证签名）
-func userAuth(br *broker, c *gin.Context) (*hi.UserModel, error) {
+func userAuth(c *gin.Context, db *gorm.DB, devid string) (*hi.UserModel, error) {
 	query := c.Request.URL.Query()
 	data := make(map[string]string)
-	sign := ""
+	sign := c.GetHeader("sign")
 	for key, value := range query {
 		if len(value) > 0 && len(value[0]) > 0 {
 			if key == "sign" {
@@ -82,10 +82,6 @@ func userAuth(br *broker, c *gin.Context) (*hi.UserModel, error) {
 		}
 	}
 	//
-	db, err := hi.InstanceDB(br.cfg.DB)
-	if err != nil {
-		return nil, err
-	}
 	var userData *hi.UserModel
 	db.Table("hi_user").Where("openid = ?", data["openid"]).Last(&userData)
 	if userData.ID == 0 {
@@ -101,11 +97,21 @@ func userAuth(br *broker, c *gin.Context) (*hi.UserModel, error) {
 	for _, k := range keys {
 		array = append(array, fmt.Sprintf("%s=%s", k, data[k]))
 	}
-	err = xrsa.VerifySign(strings.Join(array, "&"), sign, userData.Public)
+	err := xrsa.VerifySign(strings.Join(array, "&"), sign, userData.Public)
 	if err != nil {
 		return nil, err
 	}
 	//
+	if len(devid) > 0 {
+		var deviceData hi.DeviceModel
+		db.Table("hi_device").Where("devid = ?", devid).Order("bind_time desc").Last(&deviceData)
+		if deviceData.ID == 0 {
+			return nil, errors.New("device not exist")
+		}
+		if deviceData.BindOpenid != userData.Openid {
+			return nil, errors.New("device is not your binding")
+		}
+	}
 	return userData, nil
 }
 
@@ -194,7 +200,7 @@ func hiExecCommand(br *broker, cmdr *hi.CmdrModel, callurl string) string {
 
 	token := utils.GenUniqueID("cmd")
 
-	cmd := fmt.Sprintf("curl -sSL -4 %s/hi/cmdr/%s | bash", br.cfg.HiApiUrl, cmdr.Token)
+	cmd := fmt.Sprintf("curl -sSL -4 %s/hi/other/cmdr/%s | bash", br.cfg.HiApiUrl, cmdr.Token)
 	params := []string{"-c", cmd}
 
 	data := make([]string, 5)
@@ -253,7 +259,7 @@ func hiExecRequest(br *broker, c *gin.Context, cmdr *hi.CmdrModel) {
 
 	token := utils.GenUniqueID("cmd")
 
-	cmd := fmt.Sprintf("curl -sSL -4 %s/hi/cmdr/%s | bash", br.cfg.HiApiUrl, cmdr.Token)
+	cmd := fmt.Sprintf("curl -sSL -4 %s/hi/other/cmdr/%s | bash", br.cfg.HiApiUrl, cmdr.Token)
 	params := []string{"-c", cmd}
 
 	data := make([]string, 5)
