@@ -1,23 +1,23 @@
 package version
 
-const version = "4.0.2-1"
+const version = "4.0.2-2"
 
 var (
-    gitCommit = ""
-    buildTime = ""
+	gitCommit = ""
+	buildTime = ""
 )
 
 // Version return the version string
 func Version() string {
-    return version
+	return version
 }
 
 // GitCommit return git commit on build
 func GitCommit() string {
-    return gitCommit
+	return gitCommit
 }
 
 // BuildTime return build time
 func BuildTime() string {
-    return buildTime
+	return buildTime
 }
