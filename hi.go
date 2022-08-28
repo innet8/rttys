@@ -56,10 +56,7 @@ func hiSynchWireguardConf(br *broker, devid, callback string) string {
 	}
 	//
 	var wg hi.WgModel
-	db.Table("hi_wg").Where("devid = ? AND onlyid = ? AND status = ?", devid, devidGetOnlyid(br, devid), "use").Order("id desc").First(&wg)
-	if wg.ID == 0 {
-		return ""
-	}
+	db.Table("hi_wg").Where("devid = ? AND onlyid = ? AND status = ?", devid, devidGetOnlyid(br, devid), "use").Last(&wg)
 	return hiExecBefore(br, db, devid, hi.WireguardCmd(wg), callback)
 }
 

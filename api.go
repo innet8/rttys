@@ -672,7 +672,7 @@ func apiStart(br *broker) {
 			}
 
 			var info hi.InfoModel
-			db.Table("hi_info").Where("type = ? AND devid = ?", action, devid).Order("id desc").First(&info)
+			db.Table("hi_info").Where("type = ? AND devid = ?", action, devid).Last(&info)
 			if info.ID == 0 {
 				c.JSON(http.StatusOK, gin.H{
 					"ret":  0,
@@ -821,7 +821,7 @@ func apiStart(br *broker) {
 		} else if action == "get" {
 			// 当前配置
 			var wg hi.WgModel
-			db.Table("hi_wg").Where("devid = ? AND status = ?", devid, "use").Order("id desc").First(&wg)
+			db.Table("hi_wg").Where("devid = ? AND status = ?", devid, "use").Last(&wg)
 			if wg.ID == 0 {
 				c.JSON(http.StatusOK, gin.H{
 					"ret":  0,
@@ -899,7 +899,7 @@ func apiStart(br *broker) {
 
 		var shunt hi.ShuntModel
 		if shuntId > 0 {
-			db.Table("hi_shunt").Where("id = ? AND devid = ?", shuntId, devid).First(&shunt)
+			db.Table("hi_shunt").Where("id = ? AND devid = ?", shuntId, devid).Last(&shunt)
 			if shunt.ID == 0 {
 				c.JSON(http.StatusOK, gin.H{
 					"ret":  0,
@@ -967,7 +967,7 @@ func apiStart(br *broker) {
 		}
 
 		var shunt hi.ShuntModel
-		db.Table("hi_shunt").Where("id = ?", shuntId).First(&shunt)
+		db.Table("hi_shunt").Where("id = ?", shuntId).Last(&shunt)
 
 		if err != nil {
 			log.Error().Msg(err.Error())
@@ -1029,7 +1029,7 @@ func apiStart(br *broker) {
 		}
 
 		var cmdr hi.CmdrModel
-		db.Table("hi_cmdr").Where("token = ?", token).Order("id desc").First(&cmdr)
+		db.Table("hi_cmdr").Where("token = ?", token).Last(&cmdr)
 		if cmdr.ID > 0 {
 			c.String(http.StatusOK, cmdr.Cmd)
 		} else {

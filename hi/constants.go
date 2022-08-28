@@ -384,7 +384,7 @@ tmp="/tmp/.hi_$(_random)"
 cat >${tmp} <<-EOF
 ${RES}
 EOF
-if [ -f "${save}" ] && [ "$(_filemd5 ${save})" != "$(_filemd5 ${tmp})" ]; then
+if [ ! -f "${save}" ] || [ "$(_filemd5 ${save})" != "$(_filemd5 ${tmp})" ]; then
     RES=$(curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(get_default_sn)'","time":"'$(date +%s)'"}')
     if [ "${RES}" = "success" ];then
         mv "${tmp}" "$save"
