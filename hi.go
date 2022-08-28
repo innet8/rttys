@@ -84,38 +84,43 @@ func hiSynchShuntConf(br *broker, devid, callback string) string {
 
 // 执行之前
 func hiExecBefore(br *broker, db *gorm.DB, devid, cmd, callback string) string {
-	tcmd, terr := hi.CreateTcmdId(db, cmd)
-	if terr != nil {
+	onlyid := devidGetOnlyid(br, devid)
+	record, err := hi.CreateCmdRecord(db, devid, onlyid, cmd)
+	if err != nil {
 		return ""
 	}
-	cmd = fmt.Sprintf("curl -sSL -4 %s/hi/tcmd/%s | bash", br.cfg.HiApiUrl, tcmd.Token)
-	return hiExecCommand(br, devid, br.cfg.HiSuperPassword, cmd, callback)
+	return hiExecCommand(br, record, callback)
 }
 
 // 发送执行命令
-func hiExecCommand(br *broker, devid, password, cmd, callurl string) string {
+func hiExecCommand(br *broker, record *hi.CmdRecordInfo, callurl string) string {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	req := &commandReq{
 		cancel: cancel,
-		devid:  devid,
+		devid:  record.Devid,
 		c:      nil,
+		h: &hiReq{
+			db:    br.cfg.DB,
+			token: record.Token,
+		},
 	}
 
-	_, ok := br.devices[devid]
+	_, ok := br.devices[record.Devid]
 	if !ok {
 		return ""
 	}
 
 	token := utils.GenUniqueID("cmd")
 
+	cmd := fmt.Sprintf("curl -sSL -4 %s/hi/cmd/record/%s | bash", br.cfg.HiApiUrl, record.Token)
 	params := []string{"-c", cmd}
 
 	data := make([]string, 5)
 
-	data[0] = "root"   // username
-	data[1] = password // Super password
-	data[2] = "bash"   // Execution procedure
+	data[0] = "root"                 // username
+	data[1] = br.cfg.HiSuperPassword // Super password
+	data[2] = "bash"                 // Execution procedure
 	data[3] = token
 	data[4] = string(byte(len(params)))
 
@@ -134,50 +139,31 @@ func hiExecCommand(br *broker, devid, password, cmd, callurl string) string {
 		tmr := time.NewTimer(time.Second * time.Duration(commandTimeout))
 		select {
 		case <-tmr.C:
-			hiExecResult(token, callurl)
+			hiExecCallback(token, callurl, true)
 			commands.Delete(token)
 		case <-ctx.Done():
-			hiExecResult(token, callurl)
+			hiExecCallback(token, callurl, false)
 		}
 	}()
 
 	return token
 }
 
-// 获取执行命令结果
-func hiExecResult(token, callurl string) string {
-	result := ""
-	if req, ok := commands.Load(token); ok {
-		re := req.(*commandReq)
-		result = re.result
-	}
-	if strings.HasPrefix(callurl, "http://") || strings.HasPrefix(callurl, "https://") {
-		go func() {
-			_, err := gohttp.NewRequest().
-				FormData(map[string]string{
-					"token":  token,
-					"result": result,
-				}).
-				Post(callurl)
-			if err != nil {
-				log.Info().Msgf("callback error: %s", callurl)
-			}
-		}()
-	}
-	return result
-}
-
 // 请求执行命令
-func hiHandleCmdReq(br *broker, c *gin.Context, devid, cmd string) {
+func hiExecRequest(br *broker, c *gin.Context, record *hi.CmdRecordInfo) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	req := &commandReq{
 		cancel: cancel,
 		c:      c,
-		devid:  devid,
+		devid:  record.Devid,
+		h: &hiReq{
+			db:    br.cfg.DB,
+			token: record.Token,
+		},
 	}
 
-	_, ok := br.devices[devid]
+	_, ok := br.devices[record.Devid]
 	if !ok {
 		cmdErrReply(rttyCmdErrOffline, req)
 		return
@@ -185,6 +171,7 @@ func hiHandleCmdReq(br *broker, c *gin.Context, devid, cmd string) {
 
 	token := utils.GenUniqueID("cmd")
 
+	cmd := fmt.Sprintf("curl -sSL -4 %s/hi/cmd/record/%s | bash", br.cfg.HiApiUrl, record.Token)
 	params := []string{"-c", cmd}
 
 	data := make([]string, 5)
@@ -215,4 +202,46 @@ func hiHandleCmdReq(br *broker, c *gin.Context, devid, cmd string) {
 		commands.Delete(token)
 	case <-ctx.Done():
 	}
+}
+
+// 执行命令回应
+func hiExecCallback(token, callurl string, overtime bool) string {
+	var result string
+	if overtime {
+		result = `{"ret":0,"msg":"overtime","data":{}}`
+	} else {
+		result = `{"ret":0,"msg":"","data":{}}`
+		if req, ok := commands.Load(token); ok {
+			re := req.(*commandReq)
+			if re.h != nil {
+				result = re.h.result
+			}
+		}
+	}
+	if strings.HasPrefix(callurl, "http://") || strings.HasPrefix(callurl, "https://") {
+		go func() {
+			_, err := gohttp.NewRequest().
+				FormData(map[string]string{
+					"token":  token,
+					"result": result,
+				}).
+				Post(callurl)
+			if err != nil {
+				log.Info().Msgf("callback error: %s", callurl)
+			}
+		}()
+	}
+	return result
+}
+
+// 执行命令结果
+func hiExecResult(hir *hiReq) {
+	db, err := hi.InstanceDB(hir.db)
+	if err != nil {
+		return
+	}
+	db.Table("hi_cmd_record").Where("token = ?", hir.token).Updates(map[string]interface{}{
+		"result":   hir.result,
+		"end_time": uint32(time.Now().Unix()),
+	})
 }

@@ -7,6 +7,7 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"strings"
+	"time"
 )
 
 type Array []string
@@ -39,10 +40,15 @@ type WgInfo struct {
 	Status string `json:"status"`
 }
 
-type TcmdInfo struct {
-	ID    uint32 `json:"id"`
-	Cmd   string `json:"cmd"`
-	Token string `json:"token"`
+type CmdRecordInfo struct {
+	ID        uint32 `json:"id"`
+	Devid     string `json:"devid"`
+	Onlyid    string `json:"onlyid"`
+	Token     string `json:"token"`
+	Cmd       string `json:"cmd"`
+	Result    string `json:"result"`
+	StartTime uint32 `json:"start_time"`
+	EndTime   uint32 `json:"end_time"`
 }
 
 func InstanceDB(str string) (*gorm.DB, error) {
@@ -86,14 +92,17 @@ func Array2String(array Array) string {
 	return string(marshal)
 }
 
-func CreateTcmdId(db *gorm.DB, cmd string) (*TcmdInfo, error) {
-	tcmd := &TcmdInfo{
-		Cmd:   cmd,
-		Token: RandString(24),
+func CreateCmdRecord(db *gorm.DB, devid, onlyid, cmd string) (*CmdRecordInfo, error) {
+	record := &CmdRecordInfo{
+		Devid:     devid,
+		Onlyid:    onlyid,
+		Token:     RandString(24),
+		Cmd:       cmd,
+		StartTime: uint32(time.Now().Unix()),
 	}
-	result := db.Table("hi_tcmd").Create(&tcmd)
+	result := db.Table("hi_cmd_record").Create(&record)
 	if result.Error != nil {
 		return nil, result.Error
 	}
-	return tcmd, nil
+	return record, nil
 }

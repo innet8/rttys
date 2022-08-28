@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strconv"
@@ -40,6 +41,12 @@ type commandReq struct {
 	c      *gin.Context
 	devid  string
 	data   []byte
+	h      *hiReq
+}
+
+type hiReq struct {
+	db     string
+	token  string
 	result string
 }
 
@@ -50,9 +57,13 @@ func handleCmdResp(data []byte) {
 
 	if req, ok := commands.Load(token); ok {
 		res := req.(*commandReq)
-		res.result = jsoniter.Get(data, "attrs").ToString()
+		attrs := jsoniter.Get(data, "attrs").ToString()
+		if res.h != nil && len(res.h.token) > 0 {
+			res.h.result = fmt.Sprintf(`{"ret":1,"msg":"", "data": %s}`, attrs)
+			go hiExecResult(res.h)
+		}
 		if res.c != nil {
-			res.c.String(http.StatusOK, res.result)
+			res.c.String(http.StatusOK, attrs)
 		}
 		res.cancel()
 	}
