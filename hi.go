@@ -248,10 +248,10 @@ func hiExecResult(hir *hiReq) {
 // 执行命令结果（超时）
 func hiExecOvertime(token string) {
 	if req, ok := commands.Load(token); ok {
-		re := req.(*commandReq)
-		if re.h != nil {
-			re.h.result = `{"ret":0,"msg":"overtime","data":{}}`
-			go hiExecResult(re.h)
+		res := req.(*commandReq)
+		if res.h != nil {
+			res.h.result = `{"ret":0,"msg":"overtime","data":{}}`
+			go hiExecResult(res.h)
 		}
 	}
 }
