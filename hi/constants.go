@@ -361,6 +361,7 @@ fi
 /etc/init.d/hi-static-leases &
 `)
 
+// ApiReportAdded todo 上报终端列表时处理一下同个ip只保留最新的mac地址
 const ApiReportAdded = string(`
 RES=$(curl "{{.requestUrl}}" -H "Authorization: $(_localtoken)")
 curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(get_default_sn)'","time":"'$(date +%s)'"}'
