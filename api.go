@@ -591,6 +591,56 @@ func apiStart(br *broker) {
 		}
 	})
 
+	/**************************************************************************************************/
+	/***********************************************HI*************************************************/
+	/**************************************************************************************************/
+
+	// 创建用户 action=create
+	r.POST("/hi/user/:action", func(c *gin.Context) {
+		action := c.Param("action")
+
+		if action == "create" {
+			db, err := hi.InstanceDB(cfg.DB)
+			if err != nil {
+				log.Error().Msg(err.Error())
+				c.Status(http.StatusInternalServerError)
+				return
+			}
+
+			content, err := ioutil.ReadAll(c.Request.Body)
+			if err != nil {
+				c.Status(http.StatusBadRequest)
+				return
+			}
+
+			data := &hi.UserModel{
+				Openid: hi.RandString(32),
+				Public: strings.TrimSpace(jsoniter.Get(content, "public").ToString()),
+				Time:   uint32(time.Now().Unix()),
+			}
+			result := db.Table("hi_user").Create(&data)
+			if result.Error != nil {
+				c.JSON(http.StatusOK, gin.H{
+					"ret": 0,
+					"msg": "创建失败",
+					"data": gin.H{
+						"error": result.Error.Error(),
+					},
+				})
+			} else {
+				c.JSON(http.StatusOK, gin.H{
+					"ret": 1,
+					"msg": "success",
+					"data": gin.H{
+						"openid": data.Openid,
+						"time":   data.Time,
+					},
+				})
+			}
+		}
+		c.Status(http.StatusForbidden)
+	})
+
 	// 基础命令 action=dhcp|wifi|static_leases
 	r.GET("/hi/base/cmd/:action", func(c *gin.Context) {
 		action := c.Param("action")
@@ -659,126 +709,6 @@ func apiStart(br *broker) {
 			return
 		}
 		c.Status(http.StatusBadRequest)
-	})
-
-	// 设备
-	r.GET("/hi/device/list", func(c *gin.Context) {
-		db, err := hi.InstanceDB(cfg.DB)
-		if err != nil {
-			log.Error().Msg(err.Error())
-			c.Status(http.StatusInternalServerError)
-			return
-		}
-
-		authUser, authErr := userAuth(c, db, "")
-		if authErr != nil {
-			c.JSON(http.StatusOK, gin.H{
-				"ret": 0,
-				"msg": "Authentication failed",
-				"data": gin.H{
-					"error": authErr.Error(),
-				},
-			})
-			return
-		}
-
-		var devicds []hi.DeviceModel
-
-		result := db.Table("hi_device").Where(map[string]interface{}{
-			"bind_openid": authUser.Openid,
-		}).Order("bind_time desc").Find(&devicds)
-		if result.Error != nil {
-			c.JSON(http.StatusOK, gin.H{
-				"ret": 0,
-				"msg": "获取失败",
-				"data": gin.H{
-					"error": result.Error.Error(),
-				},
-			})
-			return
-		}
-
-		c.JSON(http.StatusOK, gin.H{
-			"ret":  1,
-			"msg":  "success",
-			"data": devicds,
-		})
-	})
-
-	// 设备 action=bind|unbind  devid=设备id
-	r.GET("/hi/device/:action/:devid", func(c *gin.Context) {
-		action := c.Param("action")
-		devid := c.Param("devid")
-
-		db, err := hi.InstanceDB(cfg.DB)
-		if err != nil {
-			log.Error().Msg(err.Error())
-			c.Status(http.StatusInternalServerError)
-			return
-		}
-
-		authUser, authErr := userAuth(c, db, "")
-		if authErr != nil {
-			c.JSON(http.StatusOK, gin.H{
-				"ret": 0,
-				"msg": "Authentication failed",
-				"data": gin.H{
-					"error": authErr.Error(),
-				},
-			})
-			return
-		}
-
-		var deviceData hi.DeviceModel
-		db.Table("hi_device").Where(map[string]interface{}{
-			"devid": devid,
-		}).Last(&deviceData)
-
-		if action == "bind" {
-			if deviceData.ID == 0 {
-				// 添加
-				deviceData.Devid = devid
-				deviceData.BindOpenid = authUser.Openid
-				deviceData.BindTime = uint32(time.Now().Unix())
-				db.Table("hi_device").Create(&deviceData)
-			} else if len(deviceData.BindOpenid) == 0 {
-				// 绑定
-				deviceData.Devid = devid
-				deviceData.BindOpenid = authUser.Openid
-				deviceData.BindTime = uint32(time.Now().Unix())
-				db.Table("hi_device").Save(deviceData)
-			} else {
-				// 已被绑定
-				c.JSON(http.StatusOK, gin.H{
-					"ret":  0,
-					"msg":  "设备已被绑定",
-					"data": nil,
-				})
-				return
-			}
-		} else if action == "unbind" {
-			// 取消绑定
-			if deviceData.BindOpenid != authUser.Openid {
-				c.JSON(http.StatusOK, gin.H{
-					"ret":  0,
-					"msg":  "设备未绑定",
-					"data": nil,
-				})
-				return
-			}
-			db.Table("hi_device").Where(map[string]interface{}{
-				"devid": devid,
-			}).Update("bind_openid", "")
-		}
-
-		c.JSON(http.StatusOK, gin.H{
-			"ret":  1,
-			"msg":  "操作成功",
-			"data": deviceData,
-		})
-
-		go hiSynchWireguardConf(br, devid, "")
-		go hiSynchShuntConf(br, devid, "")
 	})
 
 	// 查询信息 action=dhcp|wifi|static_leases	devid=设备id
@@ -901,6 +831,127 @@ func apiStart(br *broker) {
 		})
 	})
 
+	// 设备
+	r.GET("/hi/device/list", func(c *gin.Context) {
+		db, err := hi.InstanceDB(cfg.DB)
+		if err != nil {
+			log.Error().Msg(err.Error())
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+
+		authUser, authErr := userAuth(c, db, "")
+		if authErr != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"ret": 0,
+				"msg": "Authentication failed",
+				"data": gin.H{
+					"error": authErr.Error(),
+				},
+			})
+			return
+		}
+
+		var devicds []hi.DeviceModel
+
+		result := db.Table("hi_device").Where(map[string]interface{}{
+			"bind_openid": authUser.Openid,
+		}).Order("bind_time desc").Find(&devicds)
+		if result.Error != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"ret": 0,
+				"msg": "获取失败",
+				"data": gin.H{
+					"error": result.Error.Error(),
+				},
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"ret":  1,
+			"msg":  "success",
+			"data": devicds,
+		})
+	})
+
+	// 设备 action=bind|unbind  devid=设备id
+	r.GET("/hi/device/:action/:devid", func(c *gin.Context) {
+		action := c.Param("action")
+		devid := c.Param("devid")
+
+		db, err := hi.InstanceDB(cfg.DB)
+		if err != nil {
+			log.Error().Msg(err.Error())
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+
+		authUser, authErr := userAuth(c, db, "")
+		if authErr != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"ret": 0,
+				"msg": "Authentication failed",
+				"data": gin.H{
+					"error": authErr.Error(),
+				},
+			})
+			return
+		}
+
+		var deviceData hi.DeviceModel
+		db.Table("hi_device").Where(map[string]interface{}{
+			"devid": devid,
+		}).Last(&deviceData)
+
+		if action == "bind" {
+			if deviceData.ID == 0 {
+				// 添加
+				deviceData.Devid = devid
+				deviceData.BindOpenid = authUser.Openid
+				deviceData.BindTime = uint32(time.Now().Unix())
+				db.Table("hi_device").Create(&deviceData)
+			} else if len(deviceData.BindOpenid) == 0 {
+				// 绑定
+				deviceData.Devid = devid
+				deviceData.BindOpenid = authUser.Openid
+				deviceData.BindTime = uint32(time.Now().Unix())
+				db.Table("hi_device").Save(&deviceData)
+			} else {
+				// 已被绑定
+				c.JSON(http.StatusOK, gin.H{
+					"ret":  0,
+					"msg":  "设备已被绑定",
+					"data": nil,
+				})
+				return
+			}
+		} else if action == "unbind" {
+			// 取消绑定
+			if deviceData.BindOpenid != authUser.Openid {
+				c.JSON(http.StatusOK, gin.H{
+					"ret":  0,
+					"msg":  "设备未绑定",
+					"data": nil,
+				})
+				return
+			}
+			db.Table("hi_wg").Where(map[string]interface{}{"devid": devid}).Update("status", "unbind")
+			db.Table("hi_shunt").Where(map[string]interface{}{"devid": devid}).Update("status", "unbind")
+			deviceData.BindOpenid = ""
+			db.Table("hi_device").Save(&deviceData)
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"ret":  1,
+			"msg":  "操作成功",
+			"data": deviceData,
+		})
+
+		go hiSynchWireguardConf(br, devid, "")
+		go hiSynchShuntConf(br, devid, "")
+	})
+
 	// WG action=set|cancel|get  devid=设备id
 	r.POST("/hi/wg/:action/:devid", func(c *gin.Context) {
 		action := c.Param("action")
@@ -976,8 +1027,8 @@ func apiStart(br *broker) {
 		} else if action == "cancel" {
 			// 取消
 			db.Table("hi_wg").Where(map[string]interface{}{
-				"devid":  devid,
 				"status": "use",
+				"devid":  devid,
 			}).Update("status", "cancel")
 			c.JSON(http.StatusOK, gin.H{
 				"ret": 1,
@@ -990,8 +1041,8 @@ func apiStart(br *broker) {
 			// 当前配置
 			var wg hi.WgModel
 			db.Table("hi_wg").Where(map[string]interface{}{
-				"devid":  devid,
 				"status": "use",
+				"devid":  devid,
 			}).Last(&wg)
 			if wg.ID == 0 {
 				c.JSON(http.StatusOK, gin.H{
@@ -1236,52 +1287,6 @@ func apiStart(br *broker) {
 		}
 	})
 
-	// 创建用户 action=create
-	r.POST("/hi/user/:action", func(c *gin.Context) {
-		action := c.Param("action")
-
-		if action == "create" {
-			db, err := hi.InstanceDB(cfg.DB)
-			if err != nil {
-				log.Error().Msg(err.Error())
-				c.Status(http.StatusInternalServerError)
-				return
-			}
-
-			content, err := ioutil.ReadAll(c.Request.Body)
-			if err != nil {
-				c.Status(http.StatusBadRequest)
-				return
-			}
-
-			data := &hi.UserModel{
-				Openid: hi.RandString(32),
-				Public: strings.TrimSpace(jsoniter.Get(content, "public").ToString()),
-				Time:   uint32(time.Now().Unix()),
-			}
-			result := db.Table("hi_user").Create(&data)
-			if result.Error != nil {
-				c.JSON(http.StatusOK, gin.H{
-					"ret": 0,
-					"msg": "创建失败",
-					"data": gin.H{
-						"error": result.Error.Error(),
-					},
-				})
-			} else {
-				c.JSON(http.StatusOK, gin.H{
-					"ret": 1,
-					"msg": "success",
-					"data": gin.H{
-						"openid": data.Openid,
-						"time":   data.Time,
-					},
-				})
-			}
-		}
-		c.Status(http.StatusForbidden)
-	})
-
 	// 查询执行命令 token=命令token
 	r.GET("/hi/other/cmdr/:token", func(c *gin.Context) {
 		token := c.Param("token")
@@ -1303,6 +1308,10 @@ func apiStart(br *broker) {
 			c.Status(http.StatusBadRequest)
 		}
 	})
+
+	/**************************************************************************************************/
+	/***********************************************HI*************************************************/
+	/**************************************************************************************************/
 
 	r.NoRoute(func(c *gin.Context) {
 		fs, _ := fs.Sub(staticFs, "ui/dist")

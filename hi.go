@@ -49,21 +49,34 @@ func deviceOnline(br *broker, devid string) {
 		return
 	}
 	//
-	var data hi.DeviceModel
+	var deviceData hi.DeviceModel
 	db.Table("hi_device").Where(map[string]interface{}{
-		"devid":  devid,
-		"onlyid": devInfo.onlyid,
-	}).Last(&data)
-	if data.ID > 0 {
-		data.Online = uint32(time.Now().Unix())
-		db.Table("hi_device").Save(data)
+		"devid": devid,
+	}).Last(&deviceData)
+	//
+	deviceData.Online = uint32(time.Now().Unix())
+	if deviceData.ID == 0 {
+		// 新设备
+		deviceData.Devid = devInfo.id
+		deviceData.Onlyid = devInfo.onlyid
+		deviceData.Description = devInfo.desc
+		db.Table("hi_device").Create(&deviceData)
 	} else {
-		data.Devid = devInfo.id
-		data.Onlyid = devInfo.onlyid
-		data.Description = devInfo.desc
-		data.Online = uint32(time.Now().Unix())
-		db.Table("hi_device").Create(&data)
+		// 更新设备
+		if devInfo.onlyid != deviceData.Onlyid {
+			if len(deviceData.Onlyid) > 0 {
+				// 取消绑定
+				db.Table("hi_wg").Where(map[string]interface{}{"devid": devid}).Update("status", "unbind")
+				db.Table("hi_shunt").Where(map[string]interface{}{"devid": devid}).Update("status", "unbind")
+				deviceData.BindOpenid = ""
+			}
+			deviceData.Onlyid = devInfo.onlyid
+		}
+		db.Table("hi_device").Save(&deviceData)
 	}
+	go hiInitCommand(br, devid, "")
+	go hiSynchWireguardConf(br, devid, "")
+	go hiSynchShuntConf(br, devid, "")
 }
 
 // 验证用户（验证签名）
@@ -161,9 +174,9 @@ func hiSynchWireguardConf(br *broker, devid, callback string) string {
 	//
 	var wg hi.WgModel
 	db.Table("hi_wg").Where(map[string]interface{}{
+		"status": "use",
 		"devid":  devid,
 		"onlyid": devidGetOnlyid(br, devid),
-		"status": "use",
 	}).Last(&wg)
 	return hiExecBefore(br, db, devid, hi.WireguardCmd(wg), callback)
 }
