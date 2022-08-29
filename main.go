@@ -48,27 +48,27 @@ func initDb(cfg *config.Config) error {
 		return err
 	}
 
-	_, err = db.Exec(fmt.Sprintf(`CREATE TABLE IF NOT EXISTS hi_shunt(id integer NOT NULL PRIMARY KEY %s, devid TEXT NOT NULL, onlyid TEXT NOT NULL, source TEXT NOT NULL, rule TEXT NOT NULL, prio INT NOT NULL, out_ip TEXT NOT NULL)`, autoIncrement))
+	_, err = db.Exec(fmt.Sprintf(`CREATE TABLE IF NOT EXISTS hi_shunt(id integer NOT NULL PRIMARY KEY %s, devid VARCHAR(100) NOT NULL, onlyid VARCHAR(100) NOT NULL, source TEXT NOT NULL, rule TEXT NOT NULL, prio INT NOT NULL, out_ip VARCHAR(100) NOT NULL, status VARCHAR(20) NOT NULL)`, autoIncrement))
 	if err != nil {
 		return err
 	}
 
-	_, err = db.Exec(fmt.Sprintf(`CREATE TABLE IF NOT EXISTS hi_wg(id integer NOT NULL PRIMARY KEY %s, devid TEXT NOT NULL, onlyid TEXT NOT NULL, conf TEXT NOT NULL, status TEXT NOT NULL, lan_ip TEXT NOT NULL)`, autoIncrement))
+	_, err = db.Exec(fmt.Sprintf(`CREATE TABLE IF NOT EXISTS hi_wg(id integer NOT NULL PRIMARY KEY %s, devid VARCHAR(100) NOT NULL, onlyid VARCHAR(100) NOT NULL, conf TEXT NOT NULL, lan_ip VARCHAR(100) NOT NULL, status VARCHAR(20) NOT NULL)`, autoIncrement))
 	if err != nil {
 		return err
 	}
 
-	_, err = db.Exec(fmt.Sprintf(`CREATE TABLE IF NOT EXISTS hi_cmdr(id integer NOT NULL PRIMARY KEY %s, devid TEXT NOT NULL, onlyid TEXT NOT NULL, token TEXT NOT NULL, cmd TEXT NOT NULL, result TEXT NOT NULL, start_time integer NOT NULL, end_time integer NOT NULL)`, autoIncrement))
+	_, err = db.Exec(fmt.Sprintf(`CREATE TABLE IF NOT EXISTS hi_cmdr(id integer NOT NULL PRIMARY KEY %s, devid VARCHAR(100) NOT NULL, onlyid VARCHAR(100) NOT NULL, token VARCHAR(100) NOT NULL, cmd TEXT NOT NULL, result TEXT NOT NULL, start_time integer NOT NULL, end_time integer NOT NULL)`, autoIncrement))
 	if err != nil {
 		return err
 	}
 
-	_, err = db.Exec(fmt.Sprintf(`CREATE TABLE IF NOT EXISTS hi_user(id integer NOT NULL PRIMARY KEY %s, openid TEXT NOT NULL, public TEXT NOT NULL, time integer NOT NULL)`, autoIncrement))
+	_, err = db.Exec(fmt.Sprintf(`CREATE TABLE IF NOT EXISTS hi_user(id integer NOT NULL PRIMARY KEY %s, openid VARCHAR(100) NOT NULL, public TEXT NOT NULL, time integer NOT NULL)`, autoIncrement))
 	if err != nil {
 		return err
 	}
 
-	_, err = db.Exec(fmt.Sprintf(`CREATE TABLE IF NOT EXISTS hi_device(id integer NOT NULL PRIMARY KEY %s, devid TEXT NOT NULL, onlyid TEXT NOT NULL, description TEXT NOT NULL, online integer NOT NULL, bind_openid TEXT NOT NULL, bind_time integer NOT NULL)`, autoIncrement))
+	_, err = db.Exec(fmt.Sprintf(`CREATE TABLE IF NOT EXISTS hi_device(id integer NOT NULL PRIMARY KEY %s, devid VARCHAR(100) NOT NULL, onlyid VARCHAR(100) NOT NULL, description VARCHAR(255) NOT NULL, online integer NOT NULL, bind_openid VARCHAR(100) NOT NULL, bind_time integer NOT NULL)`, autoIncrement))
 	if err != nil {
 		return err
 	}

@@ -50,7 +50,10 @@ func deviceOnline(br *broker, devid string) {
 	}
 	//
 	var data hi.DeviceModel
-	db.Table("hi_device").Where("devid = ? AND onlyid = ?", devid, devInfo.onlyid).Last(&data)
+	db.Table("hi_device").Where(map[string]interface{}{
+		"devid":  devid,
+		"onlyid": devInfo.onlyid,
+	}).Last(&data)
 	if data.ID > 0 {
 		data.Online = uint32(time.Now().Unix())
 		db.Table("hi_device").Save(data)
@@ -90,7 +93,9 @@ func userAuth(c *gin.Context, db *gorm.DB, devid string) (*hi.UserModel, error) 
 	}
 	//
 	var userData *hi.UserModel
-	db.Table("hi_user").Where("openid = ?", data["openid"]).Last(&userData)
+	db.Table("hi_user").Where(map[string]interface{}{
+		"openid": data["openid"],
+	}).Last(&userData)
 	if userData.ID == 0 {
 		return nil, errors.New("openid error")
 	}
@@ -111,7 +116,9 @@ func userAuth(c *gin.Context, db *gorm.DB, devid string) (*hi.UserModel, error) 
 	//
 	if len(devid) > 0 {
 		var deviceData hi.DeviceModel
-		db.Table("hi_device").Where("devid = ?", devid).Order("bind_time desc").Last(&deviceData)
+		db.Table("hi_device").Where(map[string]interface{}{
+			"devid": devid,
+		}).Order("bind_time desc").Last(&deviceData)
 		if deviceData.ID == 0 {
 			return nil, errors.New("device not exist")
 		}
@@ -153,7 +160,11 @@ func hiSynchWireguardConf(br *broker, devid, callback string) string {
 	}
 	//
 	var wg hi.WgModel
-	db.Table("hi_wg").Where("devid = ? AND onlyid = ? AND status = ?", devid, devidGetOnlyid(br, devid), "use").Last(&wg)
+	db.Table("hi_wg").Where(map[string]interface{}{
+		"devid":  devid,
+		"onlyid": devidGetOnlyid(br, devid),
+		"status": "use",
+	}).Last(&wg)
 	return hiExecBefore(br, db, devid, hi.WireguardCmd(wg), callback)
 }
 
@@ -169,7 +180,11 @@ func hiSynchShuntConf(br *broker, devid, callback string) string {
 	}
 	//
 	var shunts []hi.ShuntModel
-	result := db.Table("hi_shunt").Where("devid = ? AND onlyid = ?", devid, devidGetOnlyid(br, devid)).Order("prio asc").Find(&shunts)
+	result := db.Table("hi_shunt").Where(map[string]interface{}{
+		"status": "use",
+		"devid":  devid,
+		"onlyid": devidGetOnlyid(br, devid),
+	}).Order("prio asc").Find(&shunts)
 	if result.Error != nil {
 		return ""
 	}
@@ -336,7 +351,9 @@ func hiExecResult(hir *hiReq) {
 	if err != nil {
 		return
 	}
-	db.Table("hi_cmdr").Where("token = ?", hir.token).Updates(map[string]interface{}{
+	db.Table("hi_cmdr").Where(map[string]interface{}{
+		"token": hir.token,
+	}).Updates(map[string]interface{}{
 		"result":   hir.result,
 		"end_time": uint32(time.Now().Unix()),
 	})

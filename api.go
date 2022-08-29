@@ -641,7 +641,10 @@ func apiStart(br *broker) {
 			rtime := jsoniter.Get(content, "time").ToUint32()
 			if len(result) > 0 {
 				var count int64
-				db.Table("hi_info").Where("type = ? AND devid = ? AND time > ?", action, devid, rtime).Count(&count)
+				db.Table("hi_info").Where(map[string]interface{}{
+					"type":  action,
+					"devid": devid,
+				}).Where("time > ?", rtime).Count(&count)
 				if count == 0 {
 					db.Table("hi_info").Create(&hi.InfoModel{
 						Devid:  devid,
@@ -684,7 +687,10 @@ func apiStart(br *broker) {
 			}
 
 			var info hi.InfoModel
-			db.Table("hi_info").Where("type = ? AND devid = ?", action, devid).Last(&info)
+			db.Table("hi_info").Where(map[string]interface{}{
+				"type":  action,
+				"devid": devid,
+			}).Last(&info)
 			if info.ID == 0 {
 				c.JSON(http.StatusOK, gin.H{
 					"ret":  0,
@@ -834,7 +840,10 @@ func apiStart(br *broker) {
 					},
 				})
 			} else {
-				db.Table("hi_wg").Where("id != ? AND status = ?", wg.ID, "use").Update("status", "cancel")
+				db.Table("hi_wg").Where(map[string]interface{}{
+					"id":     wg.ID,
+					"status": "use",
+				}).Update("status", "cancel")
 				c.JSON(http.StatusOK, gin.H{
 					"ret": 1,
 					"msg": "success",
@@ -846,7 +855,10 @@ func apiStart(br *broker) {
 			}
 		} else if action == "cancel" {
 			// 取消
-			db.Table("hi_wg").Where("devid = ? AND status = ?", devid, "use").Update("status", "cancel")
+			db.Table("hi_wg").Where(map[string]interface{}{
+				"devid":  devid,
+				"status": "use",
+			}).Update("status", "cancel")
 			c.JSON(http.StatusOK, gin.H{
 				"ret": 1,
 				"msg": "success",
@@ -857,7 +869,10 @@ func apiStart(br *broker) {
 		} else if action == "get" {
 			// 当前配置
 			var wg hi.WgModel
-			db.Table("hi_wg").Where("devid = ? AND status = ?", devid, "use").Last(&wg)
+			db.Table("hi_wg").Where(map[string]interface{}{
+				"devid":  devid,
+				"status": "use",
+			}).Last(&wg)
 			if wg.ID == 0 {
 				c.JSON(http.StatusOK, gin.H{
 					"ret":  0,
@@ -907,7 +922,17 @@ func apiStart(br *broker) {
 
 		var shunts []hi.ShuntModel
 
-		result := db.Table("hi_shunt").Select([]string{"id", "devid", "onlyid", "source", "prio", "out"}).Where("devid = ?", devid).Find(&shunts)
+		result := db.Table("hi_shunt").Select([]string{
+			"id",
+			"devid",
+			"onlyid",
+			"source",
+			"prio",
+			"out",
+		}).Where(map[string]interface{}{
+			"status": "use",
+			"devid":  devid,
+		}).Find(&shunts)
 		if result.Error != nil {
 			c.JSON(http.StatusOK, gin.H{
 				"ret": 0,
@@ -959,7 +984,11 @@ func apiStart(br *broker) {
 
 		var shunt hi.ShuntModel
 		if shuntId > 0 {
-			db.Table("hi_shunt").Where("id = ? AND devid = ?", shuntId, devid).Last(&shunt)
+			db.Table("hi_shunt").Where(map[string]interface{}{
+				"id":     shuntId,
+				"status": "use",
+				"devid":  devid,
+			}).Last(&shunt)
 			if shunt.ID == 0 {
 				c.JSON(http.StatusOK, gin.H{
 					"ret":  0,
@@ -973,6 +1002,7 @@ func apiStart(br *broker) {
 			shunt.Rule = jsoniter.Get(content, "rule").ToString()
 			shunt.Prio = jsoniter.Get(content, "prio").ToUint32()
 			shunt.OutIp = jsoniter.Get(content, "out_ip").ToString()
+			shunt.Status = "use"
 			result := db.Table("hi_shunt").Save(&shunt)
 			if result.Error != nil {
 				c.JSON(http.StatusOK, gin.H{
@@ -991,6 +1021,7 @@ func apiStart(br *broker) {
 			shunt.Rule = jsoniter.Get(content, "rule").ToString()
 			shunt.Prio = jsoniter.Get(content, "prio").ToUint32()
 			shunt.OutIp = jsoniter.Get(content, "out_ip").ToString()
+			shunt.Status = "use"
 			result := db.Table("hi_shunt").Create(&shunt)
 			if result.Error != nil {
 				c.JSON(http.StatusOK, gin.H{
@@ -1027,7 +1058,10 @@ func apiStart(br *broker) {
 		}
 
 		var shunt hi.ShuntModel
-		db.Table("hi_shunt").Where("id = ?", shuntId).Last(&shunt)
+		db.Table("hi_shunt").Where(map[string]interface{}{
+			"id":     shuntId,
+			"status": "use",
+		}).Last(&shunt)
 
 		if shunt.ID == 0 {
 			c.Status(http.StatusNotFound)
@@ -1057,12 +1091,11 @@ func apiStart(br *broker) {
 					"shunt": shunt,
 				},
 			})
-			return
-		}
-
-		if action == "delete" {
+		} else if action == "delete" {
 			// 删除
-			db.Table("hi_shunt").Delete(&shunt, shuntId)
+			db.Table("hi_shunt").Where(map[string]interface{}{
+				"id": shunt.ID,
+			}).Update("status", "delete")
 			c.JSON(http.StatusOK, gin.H{
 				"ret": 1,
 				"msg": "success",
@@ -1071,16 +1104,14 @@ func apiStart(br *broker) {
 					"shunt": shunt,
 				},
 			})
-			return
-		}
-
-		if action == "cmd" {
+		} else if action == "cmd" {
 			// 命令
 			c.String(http.StatusOK, hi.GetCmd(cfg.HiApiUrl, shunt))
 		} else if action == "domain" {
 			// 域名命令
 			c.String(http.StatusOK, hi.GetDomain(shunt))
 		} else {
+			// 参数错误
 			c.Status(http.StatusForbidden)
 		}
 	})
@@ -1143,7 +1174,9 @@ func apiStart(br *broker) {
 		}
 
 		var cmdr hi.CmdrModel
-		db.Table("hi_cmdr").Where("token = ?", token).Last(&cmdr)
+		db.Table("hi_cmdr").Where(map[string]interface{}{
+			"token": token,
+		}).Last(&cmdr)
 		if cmdr.ID > 0 {
 			c.String(http.StatusOK, cmdr.Cmd)
 		} else {

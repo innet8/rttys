@@ -46,6 +46,7 @@ type ShuntModel struct {
 	Rule   string `json:"rule"`
 	Prio   uint32 `json:"prio"`
 	OutIp  string `json:"out_ip"`
+	Status string `json:"status"`
 }
 
 type WgModel struct {
