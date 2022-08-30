@@ -136,17 +136,17 @@ func main() {
 	if runtime.GOOS == "windows" {
 		defaultLogPath = "rttys.log"
 	}
-	if len(os.Getenv("RTTY_TOKEN")) > 0 {
-		token = os.Getenv("RTTY_TOKEN")
+	if len(os.Getenv("RTTYS_TOKEN")) > 0 {
+		token = os.Getenv("RTTYS_TOKEN")
 	}
-	if len(os.Getenv("RTTY_DB")) > 0 {
-		db = os.Getenv("RTTY_DB")
+	if len(os.Getenv("RTTYS_DB")) > 0 {
+		db = os.Getenv("RTTYS_DB")
 	}
-	if len(os.Getenv("RTTY_API_URL")) > 0 {
-		hiApiUrl = os.Getenv("RTTY_API_URL")
+	if len(os.Getenv("RTTYS_API_URL")) > 0 {
+		hiApiUrl = os.Getenv("RTTYS_API_URL")
 	}
-	if len(os.Getenv("RTTY_SUPER_PASSWORD")) > 0 {
-		hiSuperPassword = os.Getenv("RTTY_SUPER_PASSWORD")
+	if len(os.Getenv("RTTYS_SUPER_PASSWORD")) > 0 {
+		hiSuperPassword = os.Getenv("RTTYS_SUPER_PASSWORD")
 	}
 
 	app := &cli.App{
