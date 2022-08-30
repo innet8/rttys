@@ -126,9 +126,27 @@ func runRttys(c *cli.Context) {
 }
 
 func main() {
-	defaultLogPath := "/var/log/rttys.log"
+	var (
+		defaultLogPath  = "/var/log/rttys.log"
+		token           = ""
+		db              = "sqlite://rttys.db"
+		hiApiUrl        = ""
+		hiSuperPassword = ""
+	)
 	if runtime.GOOS == "windows" {
 		defaultLogPath = "rttys.log"
+	}
+	if len(os.Getenv("RTTY_TOKEN")) > 0 {
+		token = os.Getenv("RTTY_TOKEN")
+	}
+	if len(os.Getenv("RTTY_DB")) > 0 {
+		db = os.Getenv("RTTY_DB")
+	}
+	if len(os.Getenv("RTTY_API_URL")) > 0 {
+		hiApiUrl = os.Getenv("RTTY_API_URL")
+	}
+	if len(os.Getenv("RTTY_SUPER_PASSWORD")) > 0 {
+		hiSuperPassword = os.Getenv("RTTY_SUPER_PASSWORD")
 	}
 
 	app := &cli.App{
@@ -189,7 +207,7 @@ func main() {
 					&cli.StringFlag{
 						Name:    "token",
 						Aliases: []string{"t"},
-						Value:   "",
+						Value:   token,
 						Usage:   "token to use",
 					},
 					&cli.StringFlag{
@@ -199,7 +217,7 @@ func main() {
 					},
 					&cli.StringFlag{
 						Name:  "db",
-						Value: "sqlite://rttys.db",
+						Value: db,
 						Usage: "database source",
 					},
 					&cli.BoolFlag{
@@ -213,12 +231,12 @@ func main() {
 					},
 					&cli.StringFlag{
 						Name:  "hi-api-url",
-						Value: os.Getenv("API_URL"),
+						Value: hiApiUrl,
 						Usage: "Api Url",
 					},
 					&cli.StringFlag{
 						Name:  "hi-super-password",
-						Value: os.Getenv("ROUTER_SUPER_PASSWORD"),
+						Value: hiSuperPassword,
 						Usage: "Super password",
 					},
 				},
