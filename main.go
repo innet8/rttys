@@ -130,6 +130,8 @@ func main() {
 		defaultLogPath  = "/var/log/rttys.log"
 		token           = ""
 		db              = "sqlite://rttys.db"
+		sslCert         = ""
+		sslKey          = ""
 		hiApiUrl        = ""
 		hiSuperPassword = ""
 	)
@@ -141,6 +143,12 @@ func main() {
 	}
 	if len(os.Getenv("RTTYS_DB")) > 0 {
 		db = os.Getenv("RTTYS_DB")
+	}
+	if len(os.Getenv("RTTYS_SSL_CERT")) > 0 {
+		sslCert = os.Getenv("RTTYS_SSL_CERT")
+	}
+	if len(os.Getenv("RTTYS_SSL_KEY")) > 0 {
+		sslKey = os.Getenv("RTTYS_SSL_KEY")
 	}
 	if len(os.Getenv("RTTYS_API_URL")) > 0 {
 		hiApiUrl = os.Getenv("RTTYS_API_URL")
@@ -191,12 +199,12 @@ func main() {
 					},
 					&cli.StringFlag{
 						Name:  "ssl-cert",
-						Value: "",
+						Value: sslCert,
 						Usage: "ssl cert file Path",
 					},
 					&cli.StringFlag{
 						Name:  "ssl-key",
-						Value: "",
+						Value: sslKey,
 						Usage: "ssl key file Path",
 					},
 					&cli.StringFlag{
