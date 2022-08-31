@@ -302,7 +302,9 @@ set_lanip() {
     if [ "$(uci get network.lan.ipaddr)" != "{{.lan_ip}}" ]; then
         (
             sleep 2
-            curl -X POST "http://127.0.0.1/cgi-bin/api/router/setlanip" -H "Authorization: $(_localtoken)" -d "newip={{.lan_ip}}&start=20&end=240"
+            uci set network.lan.ipaddr="{{.lan_ip}}"
+            uci commit network
+            /etc/init.d/network restart
         ) >/dev/null 2>&1 &
     fi
 }
