@@ -31,22 +31,19 @@ jobs:
           cd ..
 
           version=${{ steps.get-version.outputs.version-without-v }}
-
           go mod tidy
           ./build.sh linux amd64
-
           cp rttys.conf rttys.service rttys-linux-amd64
-
           mv rttys-linux-amd64 rttys-linux-amd64-$version
-
           tar zcf rttys-linux-amd64-$version.tar.gz rttys-linux-amd64-$version
 
-      - uses: marvinpinto/action-automatic-releases@latest
+      - name: Upload assets
+        uses: softprops/action-gh-release@v1
         with:
-          repo_token: ${{ secrets.GH_TOKEN }}
-          draft: true
-          prerelease: false
-          files: rttys-*.tar.gz
+          files: "rttys-*.tar.gz"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   docker:
     runs-on: ubuntu-20.04
     steps:
