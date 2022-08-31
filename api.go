@@ -1011,10 +1011,7 @@ func apiStart(br *broker) {
 					},
 				})
 			} else {
-				db.Table("hi_wg").Where(map[string]interface{}{
-					"id":     wg.ID,
-					"status": "use",
-				}).Update("status", "cancel")
+				db.Table("hi_wg").Where("id != ? AND status = ?", wg.ID, "use").Update("status", "cancel")
 				c.JSON(http.StatusOK, gin.H{
 					"ret": 1,
 					"msg": "success",
