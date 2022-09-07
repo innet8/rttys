@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"net/url"
 	"os/exec"
 	"regexp"
 	"strconv"
@@ -100,4 +101,13 @@ func InArray(item string, items []string) bool {
 		}
 	}
 	return false
+}
+
+// UrlDomain 获取网址中的域名
+func UrlDomain(v string) string {
+	u, err := url.Parse(v)
+	if err != nil {
+		return ""
+	}
+	return u.Hostname()
 }

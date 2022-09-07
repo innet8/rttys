@@ -332,6 +332,55 @@ config peers 'wg_peer_01'
 const InitContent = string(`
 #!/bin/bash
 
+add_bypass_hosts() {
+    local hosts="$1"
+    local dnsFile="/etc/dnsmasq.d/domain_hicloud.conf"
+    local thName="hi-th-host"
+    local tableId=99999
+    local markId=0x33a
+    local gatewayIP=$(ip route show 1/0 | head -n1 | sed -e 's/^default//' | awk '{print $2}' | awk -F. '$1<=255&&$2<=255&&$3<=255&&$4<=255{print $1"."$2"."$3"."$4}')
+    if [ -z "$gatewayIP" ]; then
+        echo "no gateway ip"
+        exit 1
+    fi
+    if [ ! -f "${dnsFile}" ]; then
+        echo "dns file does not exist"
+        exit 2
+    fi
+
+    cat > /etc/hotplug.d/iface/99-hi-dnsmasq <<-EOF
+#!/bin/bash
+gatewayIP=\$(ip route show 1/0 | head -n1 | sed -e 's/^default//' | awk '{print \$2}' | awk -F. '\$1<=255&&\$2<=255&&\$3<=255&&\$4<=255{print \$1"."\$2"."\$3"."\$4}')
+if [ -n "\${gatewayIP}" ]; then
+    sed -i "s/server=\/\([^/]*\)\/.*#${thName}#/server=\/\1\/\${gatewayIP} #${thName}#/g" /etc/dnsmasq.conf
+fi
+EOF
+    chmod +x /etc/hotplug.d/iface/99-hi-dnsmasq
+
+    if [ -n "$hosts" ]; then
+        for host in $hosts; do 
+            sed -i "/server=\/${host}\/.*#${thName}#/d" /etc/dnsmasq.conf
+            echo "server=/${host}/${gatewayIP} #${thName}#" >> /etc/dnsmasq.conf
+            charA="$(cat ${dnsFile} | grep -n "ipset=/${host}/")"
+            if [ -n "$charA" ]; then
+                charB="$(echo "$charA" | grep -E "(/|,)${thName}(,|$)")"
+                if [ -z "$charB" ]; then
+                    charC="$(echo "$charA" | awk -F ":" '{print $1}')"
+                    charD="$(echo "$charA" | awk -F ":" '{print $2}')"
+                    sed -i "${charC}d" ${dnsFile}
+                    echo "${charD},${thName}" >> ${dnsFile}
+                fi
+            else
+                echo "ipset=/${host}/${thName}" >> ${dnsFile}
+            fi
+        done
+        /etc/init.d/dnsmasq restart
+        for host in $hosts; do (nslookup "${host}" "127.0.0.1" > /dev/null 2>&1 &); done
+    fi
+}
+
+add_bypass_hosts "{{.bypassHost}}"
+
 git_commit=$(uci get rtty.general.git_commit 2>/dev/null)
 if [ "${git_commit}" != "{{.gitCommit}}" ]; then
     uci set rtty.general.git_commit="{{.gitCommit}}"
