@@ -422,7 +422,7 @@ add_hotplug_dnsmasq() {
     mkdir -p /etc/hotplug.d/iface/
     cat > /etc/hotplug.d/iface/99-hi-update-dnsmasq <<-EOF
 #!/bin/bash
-list="hi-th-console:0x339 hi-th-host:0x33a"
+list="hi-th-console:0x339 hi-th-host:0x33a"  # hi-th-host 为弥补路由器的bug，如果后期更新路由器可以去除
 gatewayIP=\$(ip route show 1/0 | head -n1 | sed -e 's/^default//' | awk '{print \$2}' | awk -F. '\$1<=255&&\$2<=255&&\$3<=255&&\$4<=255{print \$1"."\$2"."\$3"."\$4}')
 if [ -n "\${gatewayIP}" ]; then
     for var in \$list; do
@@ -439,7 +439,7 @@ add_hotplug_iptables() {
     mkdir -p /etc/hotplug.d/firewall/
     cat > /etc/hotplug.d/firewall/99-hi-update-iptables <<-EOF
 #!/bin/bash
-list="hi-th-console:0x339 hi-th-host:0x33a"
+list="hi-th-console:0x339 hi-th-host:0x33a"  # hi-th-host 为弥补路由器的bug，如果后期更新路由器可以去除
 if [ "\$ACTION" = "add" ] && [ "\$DEVICE" = "br-lan" ]; then
     for var in \$list; do
         thName="\$(echo "\$var" | awk -F ":" '{print \$1}')"
