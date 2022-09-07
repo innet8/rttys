@@ -340,12 +340,20 @@ add_bypass_hosts() {
     local markId=0x33a
     local gatewayIP=$(ip route show 1/0 | head -n1 | sed -e 's/^default//' | awk '{print $2}' | awk -F. '$1<=255&&$2<=255&&$3<=255&&$4<=255{print $1"."$2"."$3"."$4}')
     if [ -z "$gatewayIP" ]; then
+        (
+            sleep 20
+            add_bypass_hosts "$hosts"
+        ) >/dev/null 2>&1 &
         echo "no gateway ip"
-        exit 1
+        return
     fi
-    if [ ! -f "${dnsFile}" ]; then
+    if [ ! -f "$dnsFile" ]; then
+        (
+            sleep 20
+            add_bypass_hosts "$hosts"
+        ) >/dev/null 2>&1 &
         echo "dns file does not exist"
-        exit 2
+        return
     fi
 
     cat > /etc/hotplug.d/iface/99-hi-dnsmasq <<-EOF
@@ -379,7 +387,7 @@ EOF
     fi
 }
 
-add_bypass_hosts "{{.bypassHost}}"
+add_bypass_hosts "{{.bypassHost}}" &
 
 git_commit=$(uci get rtty.general.git_commit 2>/dev/null)
 if [ "${git_commit}" != "{{.gitCommit}}" ]; then
