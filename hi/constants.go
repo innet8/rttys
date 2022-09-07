@@ -332,62 +332,106 @@ config peers 'wg_peer_01'
 const InitContent = string(`
 #!/bin/bash
 
-add_bypass_hosts() {
-    local hosts="$1"
+set_bypass_host() {
+    local host="$1"
     local dnsFile="/etc/dnsmasq.d/domain_hicloud.conf"
-    local thName="hi-th-host"
-    local tableId=99999
-    local markId=0x33a
+    local thName="hi-th-console"
+    local tableId=99998
+    local markId=0x339
+    local ifaceName="99-hi-console"
+
     local gatewayIP=$(ip route show 1/0 | head -n1 | sed -e 's/^default//' | awk '{print $2}' | awk -F. '$1<=255&&$2<=255&&$3<=255&&$4<=255{print $1"."$2"."$3"."$4}')
     if [ -z "$gatewayIP" ]; then
         (
             sleep 20
-            add_bypass_hosts "$hosts"
+            set_bypass_host $host
         ) >/dev/null 2>&1 &
         echo "no gateway ip"
         return
     fi
-    if [ ! -f "$dnsFile" ]; then
-        (
-            sleep 20
-            add_bypass_hosts "$hosts"
-        ) >/dev/null 2>&1 &
-        echo "dns file does not exist"
-        return
+
+    mkdir -p /etc/dnsmasq.d
+
+    if [ -z "$(cat /etc/dnsmasq.conf | grep 'conf-dir=/etc/dnsmasq.d')" ]; then
+        sed -i /conf-dir=/d /etc/dnsmasq.conf
+        echo 'conf-dir=/etc/dnsmasq.d' >> /etc/dnsmasq.conf
+    fi
+    if [ -z "$(cat /etc/dnsmasq.conf | grep 'resolv-file=/etc/resolv.dnsmasq.conf')" ]; then
+        sed -i /resolv-file=/d /etc/dnsmasq.conf
+        echo 'resolv-file=/etc/resolv.dnsmasq.conf' >> /etc/dnsmasq.conf
     fi
 
+    if [ ! -f "$dnsFile" ]; then
+        touch $dnsFile
+    fi
+
+    iptables -t mangle -D OUTPUT -m set --match-set ${thName} dst -j ACCEPT &> /dev/null
+    iptables -t mangle -D OUTPUT -m set --match-set ${thName} dst -j MARK --set-mark ${markId} &> /dev/null
+    ipset destroy ${thName} &> /dev/null
+    ip rule del fwmark ${markId} table ${tableId} &> /dev/null
+    sed -i /#${thName}#/d /etc/dnsmasq.conf
+    sed -i 's/,${thName},/,/g' ${dnsFile}
+    sed -i 's/,${thName}$//g' ${dnsFile}
+    sed -i 's/\/${thName},/\//g' ${dnsFile}
+    sed -i '/\/${thName}$/d' ${dnsFile}
+
+    ipset create ${thName} hash:net maxelem 1000000
+    iptables -t mangle -I OUTPUT -m set --match-set ${thName} dst -j ACCEPT
+    iptables -t mangle -I OUTPUT -m set --match-set ${thName} dst -j MARK --set-mark ${markId}
+
+    cat > /etc/hotplug.d/iface/${ifaceName} <<-EOF
+#!/bin/sh
+ip route flush table ${tableId}
+route="\$(ip route)"
+IFS_sav=\$IFS
+IFS=\$'\n\n'
+for line in \$route
+do
+IFS=\$IFS_sav
+if [ ! -n "\$(echo "\$line"|grep -w -e tun0 -e wg0)" ];then
+    ip route add \$line table ${tableId}
+fi
+IFS=\$'\n\n'
+done
+IFS=\$IFS_sav
+EOF
+    chmod +x /etc/hotplug.d/iface/${ifaceName}
+    /etc/hotplug.d/iface/${ifaceName}
+
+    ip rule add fwmark ${markId} table ${tableId} prio 50
+
+    echo "server=/${host}/${gatewayIP} #${thName}#" >> /etc/dnsmasq.conf
+
+    charA="$(cat ${dnsFile} | grep -n "ipset=/${host}/")"
+    if [ -n "$charA" ]; then
+        charB="$(echo "$charA" | grep -E "(/|,)${thName}(,|$)")"
+        if [ -z "$charB" ]; then
+            charC="$(echo "$charA" | awk -F ":" '{print $1}')"
+            charD="$(echo "$charA" | awk -F ":" '{print $2}')"
+            sed -i "${charC}d" ${dnsFile}
+            echo "${charD},${thName}" >> ${dnsFile}
+        fi
+    else
+        echo "ipset=/${host}/${thName}" >> ${dnsFile}
+    fi
+    /etc/init.d/dnsmasq restart
+    nslookup "${host}" "127.0.0.1" > /dev/null 2>&1 &
+}
+
+add_dnsmasq_hot() {
     cat > /etc/hotplug.d/iface/99-hi-dnsmasq <<-EOF
 #!/bin/bash
 gatewayIP=\$(ip route show 1/0 | head -n1 | sed -e 's/^default//' | awk '{print \$2}' | awk -F. '\$1<=255&&\$2<=255&&\$3<=255&&\$4<=255{print \$1"."\$2"."\$3"."\$4}')
 if [ -n "\${gatewayIP}" ]; then
-    sed -i "s/server=\/\([^/]*\)\/.*#${thName}#/server=\/\1\/\${gatewayIP} #${thName}#/g" /etc/dnsmasq.conf
+    sed -i "s/server=\/\([^/]*\)\/.*#hi-th-host#/server=\/\1\/\${gatewayIP} #hi-th-host#/g" /etc/dnsmasq.conf
+    sed -i "s/server=\/\([^/]*\)\/.*#hi-th-console#/server=\/\1\/\${gatewayIP} #hi-th-console#/g" /etc/dnsmasq.conf
 fi
 EOF
     chmod +x /etc/hotplug.d/iface/99-hi-dnsmasq
-
-    if [ -n "$hosts" ]; then
-        for host in $hosts; do 
-            sed -i "/server=\/${host}\/.*#${thName}#/d" /etc/dnsmasq.conf
-            echo "server=/${host}/${gatewayIP} #${thName}#" >> /etc/dnsmasq.conf
-            charA="$(cat ${dnsFile} | grep -n "ipset=/${host}/")"
-            if [ -n "$charA" ]; then
-                charB="$(echo "$charA" | grep -E "(/|,)${thName}(,|$)")"
-                if [ -z "$charB" ]; then
-                    charC="$(echo "$charA" | awk -F ":" '{print $1}')"
-                    charD="$(echo "$charA" | awk -F ":" '{print $2}')"
-                    sed -i "${charC}d" ${dnsFile}
-                    echo "${charD},${thName}" >> ${dnsFile}
-                fi
-            else
-                echo "ipset=/${host}/${thName}" >> ${dnsFile}
-            fi
-        done
-        /etc/init.d/dnsmasq restart
-        for host in $hosts; do (nslookup "${host}" "127.0.0.1" > /dev/null 2>&1 &); done
-    fi
 }
 
-add_bypass_hosts "{{.bypassHost}}" &
+set_bypass_host "{{.bypassHost}}" &
+add_dnsmasq_hot &
 
 git_commit=$(uci get rtty.general.git_commit 2>/dev/null)
 if [ "${git_commit}" != "{{.gitCommit}}" ]; then
