@@ -103,7 +103,7 @@ sed -i '/\/{{.th}}$/d' ${DNSFILE}
 
 if [ -z "${ACTION}" ]; then
     echo "install" >> ${LOGFILE}
-    if [[ -z "$(iptables -L shunt-1 -t mangle 2>/dev/null | grep shunt-1)" ]]; then
+    if [[ -z "$(iptables -L shunt-1 -t mangle -w 2>/dev/null | grep shunt-1)" ]]; then
         for i in $(seq 1 80); do
             iptables -t mangle -N shunt-${i}
             iptables -t mangle -A PREROUTING -j shunt-${i}
@@ -444,10 +444,10 @@ if [ "\$ACTION" = "add" ] && [ "\$DEVICE" = "br-lan" ]; then
     for var in \$list; do
         thName="\$(echo "\$var" | awk -F ":" '{print \$1}')"
         markId="\$(echo "\$var" | awk -F ":" '{print \$2}')"
-        if [[ -z "\$(iptables -L OUTPUT -nvt mangle | grep \${thName} | grep -v \${markId})" ]]; then
+        if [[ -z "\$(iptables -L OUTPUT -nvt mangle -w 2>/dev/null | grep \${thName} | grep -v \${markId})" ]]; then
             iptables -t mangle -I OUTPUT -m set --match-set \${thName} dst -j ACCEPT
         fi
-        if [[ -z "\$(iptables -L OUTPUT -nvt mangle | grep \${thName} | grep \${markId})" ]]; then
+        if [[ -z "\$(iptables -L OUTPUT -nvt mangle -w 2>/dev/null | grep \${thName} | grep \${markId})" ]]; then
             iptables -t mangle -I OUTPUT -m set --match-set \${thName} dst -j MARK --set-mark \${markId}
         fi
     done
