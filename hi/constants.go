@@ -418,25 +418,53 @@ EOF
     nslookup "${host}" "127.0.0.1" > /dev/null 2>&1 &
 }
 
-add_dnsmasq_hot() {
-    cat > /etc/hotplug.d/iface/99-hi-dnsmasq <<-EOF
+add_hotplug_dnsmasq() {
+    mkdir -p /etc/hotplug.d/iface/
+    cat > /etc/hotplug.d/iface/99-hi-update-dnsmasq <<-EOF
 #!/bin/bash
+list="hi-th-console:0x339 hi-th-host:0x33a"
 gatewayIP=\$(ip route show 1/0 | head -n1 | sed -e 's/^default//' | awk '{print \$2}' | awk -F. '\$1<=255&&\$2<=255&&\$3<=255&&\$4<=255{print \$1"."\$2"."\$3"."\$4}')
 if [ -n "\${gatewayIP}" ]; then
-    sed -i "s/server=\/\([^/]*\)\/.*#hi-th-host#/server=\/\1\/\${gatewayIP} #hi-th-host#/g" /etc/dnsmasq.conf
-    sed -i "s/server=\/\([^/]*\)\/.*#hi-th-console#/server=\/\1\/\${gatewayIP} #hi-th-console#/g" /etc/dnsmasq.conf
+    for var in \$list; do
+        thName="\$(echo "\$var" | awk -F ":" '{print \$1}')"
+        markId="\$(echo "\$var" | awk -F ":" '{print \$2}')"
+        sed -i "s/server=\/\([^/]*\)\/.*#\${thName}#/server=\/\1\/\${gatewayIP} #\${thName}#/g" /etc/dnsmasq.conf
+    done
 fi
 EOF
-    chmod +x /etc/hotplug.d/iface/99-hi-dnsmasq
+    chmod +x /etc/hotplug.d/iface/99-hi-update-dnsmasq
+}
+
+add_hotplug_iptables() {
+    mkdir -p /etc/hotplug.d/firewall/
+    cat > /etc/hotplug.d/firewall/99-hi-update-iptables <<-EOF
+#!/bin/bash
+list="hi-th-console:0x339 hi-th-host:0x33a"
+if [ "\$ACTION" = "add" ] && [ "\$DEVICE" = "br-lan" ]; then
+    for var in \$list; do
+        thName="\$(echo "\$var" | awk -F ":" '{print \$1}')"
+        markId="\$(echo "\$var" | awk -F ":" '{print \$2}')"
+        if [[ -z "\$(iptables -L OUTPUT -nvt mangle | grep \${thName} | grep -v \${markId})" ]]; then
+            iptables -t mangle -I OUTPUT -m set --match-set \${thName} dst -j ACCEPT
+        fi
+        if [[ -z "\$(iptables -L OUTPUT -nvt mangle | grep \${thName} | grep \${markId})" ]]; then
+            iptables -t mangle -I OUTPUT -m set --match-set \${thName} dst -j MARK --set-mark \${markId}
+        fi
+    done
+fi
+EOF
+    chmod +x /etc/hotplug.d/firewall/99-hi-update-iptables
 }
 
 set_bypass_host "{{.bypassHost}}" &
-add_dnsmasq_hot &
 
 git_commit=$(uci get rtty.general.git_commit 2>/dev/null)
 if [ "${git_commit}" != "{{.gitCommit}}" ]; then
     uci set rtty.general.git_commit="{{.gitCommit}}"
     uci commit rtty
+
+    add_hotplug_dnsmasq
+    add_hotplug_iptables
 
     mkdir -p /etc/hotplug.d/dhcp/
     curl -sSL -4 -o "/etc/hotplug.d/dhcp/99-hi-dhcp" "{{.dhcpCmdUrl}}"
