@@ -205,6 +205,19 @@ func hiSynchShuntConf(br *broker, devid, callback string) string {
 	return hiExecBefore(br, db, devid, hi.GetCmdBatch(br.cfg.HiApiUrl, shunts), callback)
 }
 
+// 重启设备
+func hiRebootDevice(br *broker, devid string) string {
+	if len(br.cfg.HiApiUrl) == 0 {
+		log.Info().Msgf("api url is empty")
+		return ""
+	}
+	db, err := hi.InstanceDB(br.cfg.DB)
+	if err != nil {
+		return ""
+	}
+	return hiExecBefore(br, db, devid, "#!/bin/sh\nreboot", "")
+}
+
 // 执行之前
 func hiExecBefore(br *broker, db *gorm.DB, devid, cmd, callback string) string {
 	onlyid := devidGetOnlyid(br, devid)

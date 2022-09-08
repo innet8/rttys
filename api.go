@@ -875,7 +875,7 @@ func apiStart(br *broker) {
 		})
 	})
 
-	// 设备 action=bind|unbind  devid=设备id
+	// 设备 action=bind|unbind|reboot  devid=设备id
 	r.GET("/hi/device/:action/:devid", func(c *gin.Context) {
 		action := c.Param("action")
 		devid := c.Param("devid")
@@ -887,7 +887,14 @@ func apiStart(br *broker) {
 			return
 		}
 
-		authUser, authErr := userAuth(c, db, "")
+		var authUser *hi.UserModel
+		var authErr error
+
+		if action == "unbind" || action == "reboot" {
+			authUser, authErr = userAuth(c, db, devid)
+		} else {
+			authUser, authErr = userAuth(c, db, "")
+		}
 		if authErr != nil {
 			c.JSON(http.StatusOK, gin.H{
 				"ret": 0,
@@ -928,18 +935,29 @@ func apiStart(br *broker) {
 			}
 		} else if action == "unbind" {
 			// 取消绑定
-			if deviceData.BindOpenid != authUser.Openid {
-				c.JSON(http.StatusOK, gin.H{
-					"ret":  0,
-					"msg":  "设备未绑定",
-					"data": nil,
-				})
-				return
-			}
 			db.Table("hi_wg").Where(map[string]interface{}{"devid": devid}).Update("status", "unbind")
 			db.Table("hi_shunt").Where(map[string]interface{}{"devid": devid}).Update("status", "unbind")
 			deviceData.BindOpenid = ""
 			db.Table("hi_device").Save(&deviceData)
+		} else if action == "reboot" {
+			// 重启设备
+			onlyid := devidGetOnlyid(br, devid)
+			if len(onlyid) == 0 {
+				c.JSON(http.StatusOK, gin.H{
+					"ret":  0,
+					"msg":  "设备不在线",
+					"data": nil,
+				})
+			} else {
+				c.JSON(http.StatusOK, gin.H{
+					"ret": 1,
+					"msg": "success",
+					"data": gin.H{
+						"token": hiRebootDevice(br, devid),
+					},
+				})
+			}
+			return
 		}
 
 		c.JSON(http.StatusOK, gin.H{
