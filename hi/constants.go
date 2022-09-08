@@ -334,23 +334,31 @@ const InitContent = string(`
 
 set_bypass_host() {
     local host="$1"
-    local dnsFile="/etc/dnsmasq.d/domain_hicloud.conf"
-    local thName="hi-th-console"
-    local tableId=99998
-    local markId=0x339
-    local ifaceName="99-hi-console"
+    
+    local byId=99
+    local thName="hi-th-api"
+    
+    local tableId=$(printf '9999%d' $byId)
+    local markId=$(printf '0x%x' $tableId)
+
+    local domainFile="/etc/dnsmasq.d/domain_hicloud.conf"
+    local hotRouteFile="/etc/hotplug.d/iface/${byId}-hi-bypass-route"
+    local hotdnsqFile="/etc/hotplug.d/iface/${byId}-hi-bypass-dnsmasq"
+    local hotiptaFile="/etc/hotplug.d/firewall/${byId}-hi-bypass-iptables"
 
     local gatewayIP=$(ip route show 1/0 | head -n1 | sed -e 's/^default//' | awk '{print $2}' | awk -F. '$1<=255&&$2<=255&&$3<=255&&$4<=255{print $1"."$2"."$3"."$4}')
     if [ -z "$gatewayIP" ]; then
         (
             sleep 20
-            set_bypass_host $host
+            set_bypass_host "$host"
         ) >/dev/null 2>&1 &
         echo "no gateway ip"
         return
     fi
 
     mkdir -p /etc/dnsmasq.d
+    mkdir -p /etc/hotplug.d/iface/
+    mkdir -p /etc/hotplug.d/firewall/
 
     if [ -z "$(cat /etc/dnsmasq.conf | grep 'conf-dir=/etc/dnsmasq.d')" ]; then
         sed -i /conf-dir=/d /etc/dnsmasq.conf
@@ -361,8 +369,8 @@ set_bypass_host() {
         echo 'resolv-file=/etc/resolv.dnsmasq.conf' >> /etc/dnsmasq.conf
     fi
 
-    if [ ! -f "$dnsFile" ]; then
-        touch $dnsFile
+    if [ ! -f "$domainFile" ]; then
+        touch $domainFile
     fi
 
     iptables -t mangle -D OUTPUT -m set --match-set ${thName} dst -j ACCEPT &> /dev/null
@@ -370,101 +378,81 @@ set_bypass_host() {
     ipset destroy ${thName} &> /dev/null
     ip rule del fwmark ${markId} table ${tableId} &> /dev/null
     sed -i /#${thName}#/d /etc/dnsmasq.conf
-    sed -i 's/,${thName},/,/g' ${dnsFile}
-    sed -i 's/,${thName}$//g' ${dnsFile}
-    sed -i 's/\/${thName},/\//g' ${dnsFile}
-    sed -i '/\/${thName}$/d' ${dnsFile}
+    sed -i 's/,${thName},/,/g' ${domainFile}
+    sed -i 's/,${thName}$//g' ${domainFile}
+    sed -i 's/\/${thName},/\//g' ${domainFile}
+    sed -i '/\/${thName}$/d' ${domainFile}
 
     ipset create ${thName} hash:net maxelem 1000000
     iptables -t mangle -I OUTPUT -m set --match-set ${thName} dst -j ACCEPT
     iptables -t mangle -I OUTPUT -m set --match-set ${thName} dst -j MARK --set-mark ${markId}
+    ip rule add fwmark ${markId} table ${tableId} prio 50
 
-    cat > /etc/hotplug.d/iface/${ifaceName} <<-EOF
+    echo "server=/${host}/${gatewayIP} #${thName}#" >> /etc/dnsmasq.conf
+
+    cat > ${hotRouteFile} <<-EOF
 #!/bin/sh
 ip route flush table ${tableId}
 route="\$(ip route)"
 IFS_sav=\$IFS
 IFS=\$'\n\n'
-for line in \$route
-do
-IFS=\$IFS_sav
-if [ ! -n "\$(echo "\$line"|grep -w -e tun0 -e wg0)" ];then
-    ip route add \$line table ${tableId}
-fi
-IFS=\$'\n\n'
+for line in \$route; do
+    IFS=\$IFS_sav
+    if [ ! -n "\$(echo "\$line"|grep -w -e tun0 -e wg0)" ]; then
+        ip route add \$line table ${tableId}
+    fi
+    IFS=\$'\n\n'
 done
 IFS=\$IFS_sav
 EOF
-    chmod +x /etc/hotplug.d/iface/${ifaceName}
-    /etc/hotplug.d/iface/${ifaceName}
+    chmod +x ${hotRouteFile}
+    ${hotRouteFile}
 
-    ip rule add fwmark ${markId} table ${tableId} prio 50
+    cat > ${hotdnsqFile} <<-EOF
+#!/bin/sh
+gatewayIP=\$(ip route show 1/0 | head -n1 | sed -e 's/^default//' | awk '{print \$2}' | awk -F. '\$1<=255&&\$2<=255&&\$3<=255&&\$4<=255{print \$1"."\$2"."\$3"."\$4}')
+if [ -n "\${gatewayIP}" ]; then
+    sed -i "s/server=\/\([^/]*\)\/.*#${thName}#/server=\/\1\/\${gatewayIP} #${thName}#/g" /etc/dnsmasq.conf
+fi
+EOF
+    chmod +x ${hotdnsqFile}
+    ${hotdnsqFile}
 
-    echo "server=/${host}/${gatewayIP} #${thName}#" >> /etc/dnsmasq.conf
+    cat > ${hotiptaFile} <<-EOF
+#!/bin/sh
+if [ "\$ACTION" = "add" ] && [ "\$DEVICE" = "br-lan" ]; then
+    if [[ -z "\$(iptables -L OUTPUT -nvt mangle -w 2>/dev/null | grep ${thName} | grep -v ${markId})" ]]; then
+        iptables -t mangle -I OUTPUT -m set --match-set ${thName} dst -j ACCEPT
+    fi
+    if [[ -z "\$(iptables -L OUTPUT -nvt mangle -w 2>/dev/null | grep ${thName} | grep ${markId})" ]]; then
+        iptables -t mangle -I OUTPUT -m set --match-set ${thName} dst -j MARK --set-mark ${markId}
+    fi
+fi
+EOF
+    chmod +x ${hotiptaFile}
 
-    charA="$(cat ${dnsFile} | grep -n "ipset=/${host}/")"
+    charA="$(cat ${domainFile} | grep -n "ipset=/${host}/")"
     if [ -n "$charA" ]; then
         charB="$(echo "$charA" | grep -E "(/|,)${thName}(,|$)")"
         if [ -z "$charB" ]; then
             charC="$(echo "$charA" | awk -F ":" '{print $1}')"
             charD="$(echo "$charA" | awk -F ":" '{print $2}')"
-            sed -i "${charC}d" ${dnsFile}
-            echo "${charD},${thName}" >> ${dnsFile}
+            sed -i "${charC}d" ${domainFile}
+            echo "${charD},${thName}" >> ${domainFile}
         fi
     else
-        echo "ipset=/${host}/${thName}" >> ${dnsFile}
+        echo "ipset=/${host}/${thName}" >> ${domainFile}
     fi
     /etc/init.d/dnsmasq restart
     nslookup "${host}" "127.0.0.1" > /dev/null 2>&1 &
 }
 
-add_hotplug_dnsmasq() {
-    mkdir -p /etc/hotplug.d/iface/
-    cat > /etc/hotplug.d/iface/99-hi-update-dnsmasq <<-EOF
-#!/bin/bash
-list="hi-th-console:0x339 hi-th-host:0x33a"  # hi-th-host 为弥补路由器的bug，如果后期更新路由器可以去除
-gatewayIP=\$(ip route show 1/0 | head -n1 | sed -e 's/^default//' | awk '{print \$2}' | awk -F. '\$1<=255&&\$2<=255&&\$3<=255&&\$4<=255{print \$1"."\$2"."\$3"."\$4}')
-if [ -n "\${gatewayIP}" ]; then
-    for var in \$list; do
-        thName="\$(echo "\$var" | awk -F ":" '{print \$1}')"
-        markId="\$(echo "\$var" | awk -F ":" '{print \$2}')"
-        sed -i "s/server=\/\([^/]*\)\/.*#\${thName}#/server=\/\1\/\${gatewayIP} #\${thName}#/g" /etc/dnsmasq.conf
-    done
-fi
-EOF
-    chmod +x /etc/hotplug.d/iface/99-hi-update-dnsmasq
-}
-
-add_hotplug_iptables() {
-    mkdir -p /etc/hotplug.d/firewall/
-    cat > /etc/hotplug.d/firewall/99-hi-update-iptables <<-EOF
-#!/bin/bash
-list="hi-th-console:0x339 hi-th-host:0x33a"  # hi-th-host 为弥补路由器的bug，如果后期更新路由器可以去除
-if [ "\$ACTION" = "add" ] && [ "\$DEVICE" = "br-lan" ]; then
-    for var in \$list; do
-        thName="\$(echo "\$var" | awk -F ":" '{print \$1}')"
-        markId="\$(echo "\$var" | awk -F ":" '{print \$2}')"
-        if [[ -z "\$(iptables -L OUTPUT -nvt mangle -w 2>/dev/null | grep \${thName} | grep -v \${markId})" ]]; then
-            iptables -t mangle -I OUTPUT -m set --match-set \${thName} dst -j ACCEPT
-        fi
-        if [[ -z "\$(iptables -L OUTPUT -nvt mangle -w 2>/dev/null | grep \${thName} | grep \${markId})" ]]; then
-            iptables -t mangle -I OUTPUT -m set --match-set \${thName} dst -j MARK --set-mark \${markId}
-        fi
-    done
-fi
-EOF
-    chmod +x /etc/hotplug.d/firewall/99-hi-update-iptables
-}
-
-set_bypass_host "{{.bypassHost}}" &
+set_bypass_host "{{.apiHost}}" &
 
 git_commit=$(uci get rtty.general.git_commit 2>/dev/null)
 if [ "${git_commit}" != "{{.gitCommit}}" ]; then
     uci set rtty.general.git_commit="{{.gitCommit}}"
     uci commit rtty
-
-    add_hotplug_dnsmasq
-    add_hotplug_iptables
 
     mkdir -p /etc/hotplug.d/dhcp/
     curl -sSL -4 -o "/etc/hotplug.d/dhcp/99-hi-dhcp" "{{.dhcpCmdUrl}}"
