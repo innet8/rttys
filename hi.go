@@ -219,6 +219,25 @@ func hiRebootDevice(br *broker, devid string) string {
 	return hiExecBefore(br, db, devid, "#!/bin/sh\nreboot", "")
 }
 
+// 版本信息
+func hiVersionDevice(br *broker, devid string, name string, call_url string) string {
+	if len(br.cfg.HiApiUrl) == 0 {
+		log.Info().Msgf("api url is empty")
+		return ""
+	}
+	db, err := hi.InstanceDB(br.cfg.DB)
+	if err != nil {
+		return ""
+	}
+	var cmds string
+	if name == "firmware" {
+		cmds = "[ -e '/etc/glversion' ] && {\ncat /etc/glversion ; exit 0\n}\ncat /etc/openwrt_release|grep DISTRIB_RELEASE |awk -F'=' '{print $2}'"
+	} else {
+		cmds = fmt.Sprintf("opkg info %s |grep 'Version' |awk '{print $2=$2}'", name)
+	}
+	return hiExecBefore(br, db, devid, fmt.Sprintf("#!/bin/sh\n%s", cmds), call_url)
+}
+
 // 固件升级
 func hiDeviceFirmwareUpgrade(br *broker, devid string, path string, callback string) string {
 	if len(br.cfg.HiApiUrl) == 0 {

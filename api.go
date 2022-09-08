@@ -876,7 +876,7 @@ func apiStart(br *broker) {
 		})
 	})
 
-	// 设备 action=bind|unbind|reboot  devid=设备id
+	// 设备 action=bind|unbind|reboot|version  devid=设备id
 	r.GET("/hi/device/:action/:devid", func(c *gin.Context) {
 		action := c.Param("action")
 		devid := c.Param("devid")
@@ -955,6 +955,31 @@ func apiStart(br *broker) {
 					"msg": "success",
 					"data": gin.H{
 						"token": hiRebootDevice(br, devid),
+					},
+				})
+			}
+			return
+		} else if action == "version" {
+			content, err := ioutil.ReadAll(c.Request.Body)
+			if err != nil {
+				c.Status(http.StatusBadRequest)
+				return
+			}
+			name := jsoniter.Get(content, "name").ToString()
+			call_url := jsoniter.Get(content, "call_url").ToString()
+			onlyid := devidGetOnlyid(br, devid)
+			if len(onlyid) == 0 {
+				c.JSON(http.StatusOK, gin.H{
+					"ret":  0,
+					"msg":  "设备不在线",
+					"data": nil,
+				})
+			} else {
+				c.JSON(http.StatusOK, gin.H{
+					"ret": 1,
+					"msg": "success",
+					"data": gin.H{
+						"token": hiVersionDevice(br, devid, name, call_url),
 					},
 				})
 			}
