@@ -12,6 +12,22 @@ type StaticLeasesModel struct {
 	Name string `json:"name"`
 }
 
+func IpkUpgradeCmd(path string) string {
+	var cmds []string
+	cmds = append(cmds, "#!/bin/sh")
+	cmds = append(cmds, fmt.Sprintf("curl -4 -s -o /tmp/speedbox.ipk '%s' >/dev/null", path))
+	cmds = append(cmds, "opkg install /tmp/speedbox.ipk")
+	return strings.Join(cmds, "\n")
+}
+
+func FirmwareUpgradeCmd(path string) string {
+	var cmds []string
+	cmds = append(cmds, "#!/bin/sh")
+	cmds = append(cmds, fmt.Sprintf("curl -4 -s -o /tmp/firmware.img '%s' >/dev/null", path))
+	cmds = append(cmds, "sysupgrade /tmp/firmware.img -y")
+	return strings.Join(cmds, "\n")
+}
+
 func WireguardCmd(wg WgModel) string {
 	var cmds []string
 	//

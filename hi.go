@@ -3,10 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"github.com/rs/zerolog/log"
-	"gopkg.in/errgo.v2/fmt/errors"
-	"gorm.io/gorm"
 	"rttys/hi"
 	"rttys/hi/xrsa"
 	"rttys/version"
@@ -14,6 +10,11 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/rs/zerolog/log"
+	"gopkg.in/errgo.v2/fmt/errors"
+	"gorm.io/gorm"
 
 	"rttys/utils"
 
@@ -216,6 +217,32 @@ func hiRebootDevice(br *broker, devid string) string {
 		return ""
 	}
 	return hiExecBefore(br, db, devid, "#!/bin/sh\nreboot", "")
+}
+
+// 固件升级
+func hiDeviceFirmwareUpgrade(br *broker, devid string, path string, callback string) string {
+	if len(br.cfg.HiApiUrl) == 0 {
+		log.Info().Msgf("api url is empty")
+		return ""
+	}
+	db, err := hi.InstanceDB(br.cfg.DB)
+	if err != nil {
+		return ""
+	}
+	return hiExecBefore(br, db, devid, hi.FirmwareUpgradeCmd(path), callback)
+}
+
+// ipk软件升级
+func hiDeviceIpkUpgrade(br *broker, devid string, path string, callback string) string {
+	if len(br.cfg.HiApiUrl) == 0 {
+		log.Info().Msgf("api url is empty")
+		return ""
+	}
+	db, err := hi.InstanceDB(br.cfg.DB)
+	if err != nil {
+		return ""
+	}
+	return hiExecBefore(br, db, devid, hi.IpkUpgradeCmd(path), callback)
 }
 
 // 执行之前

@@ -5,7 +5,6 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
-	jsoniter "github.com/json-iterator/go"
 	"io/fs"
 	"io/ioutil"
 	"net"
@@ -15,6 +14,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	jsoniter "github.com/json-iterator/go"
 
 	"rttys/cache"
 	"rttys/config"
@@ -968,6 +969,75 @@ func apiStart(br *broker) {
 
 		go hiSynchWireguardConf(br, devid, "")
 		go hiSynchShuntConf(br, devid, "")
+	})
+
+	// 设备固件/软件升级（需要设备在线） action=ipk|firmware	devid=设备id
+	r.POST("/hi/device/upgrade/:action/:devid", func(c *gin.Context) {
+		action := c.Param("action")
+		devid := c.Param("devid")
+		onlyid := devidGetOnlyid(br, devid)
+
+		db, err := hi.InstanceDB(cfg.DB)
+		if err != nil {
+			log.Error().Msg(err.Error())
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+
+		_, authErr := userAuth(c, db, devid)
+		if authErr != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"ret": 0,
+				"msg": "Authentication failed",
+				"data": gin.H{
+					"error": authErr.Error(),
+				},
+			})
+			return
+		}
+
+		if len(onlyid) == 0 {
+			c.JSON(http.StatusOK, gin.H{
+				"ret":  0,
+				"msg":  "设备不在线",
+				"data": nil,
+			})
+			return
+		}
+
+		content, err := ioutil.ReadAll(c.Request.Body)
+		if err != nil {
+			c.Status(http.StatusBadRequest)
+			return
+		}
+		callUrl := jsoniter.Get(content, "call_url").ToString()
+		path := jsoniter.Get(content, "path").ToString()
+		if action == "ipk" {
+			c.JSON(http.StatusOK, gin.H{
+				"ret": 1,
+				"msg": "success",
+				"data": gin.H{
+					"token": hiDeviceIpkUpgrade(br, devid, path, callUrl),
+				},
+			})
+			return
+		}
+		if action == "firmware" {
+			c.JSON(http.StatusOK, gin.H{
+				"ret": 1,
+				"msg": "success",
+				"data": gin.H{
+					"token": hiDeviceFirmwareUpgrade(br, devid, path, callUrl),
+				},
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"ret":  0,
+			"msg":  "action error",
+			"data": nil,
+		})
 	})
 
 	// WG action=set|cancel|get  devid=设备id
