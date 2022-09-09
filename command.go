@@ -75,7 +75,7 @@ func handleCmdResp(data []byte) {
 			}
 			go hiExecResult(res.h)
 			if res.c != nil {
-				res.c.JSON(http.StatusOK, res.h.result)
+				res.c.String(http.StatusOK, res.h.result)
 			}
 		} else {
 			if res.c != nil {

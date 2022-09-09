@@ -965,12 +965,7 @@ func apiStart(br *broker) {
 			}
 			return
 		} else if action == "version" {
-			content, err := ioutil.ReadAll(c.Request.Body)
-			if err != nil {
-				c.Status(http.StatusBadRequest)
-				return
-			}
-			name := jsoniter.Get(content, "name").ToString()
+			name := c.Query("name")
 			onlyid := devidGetOnlyid(br, devid)
 			if len(onlyid) == 0 {
 				c.JSON(http.StatusOK, gin.H{
