@@ -27,6 +27,7 @@ type DeviceModel struct {
 	Online      uint32 `json:"online"`
 	BindOpenid  string `json:"bind_openid"`
 	BindTime    uint32 `json:"bind_time"`
+	IsOnline    bool   `json:"is_online"`
 }
 
 type InfoModel struct {

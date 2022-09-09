@@ -869,6 +869,11 @@ func apiStart(br *broker) {
 			return
 		}
 
+		for k, v := range devicds {
+			if _, ok := br.devices[v.Devid]; ok {
+				devicds[k].IsOnline = true
+			}
+		}
 		c.JSON(http.StatusOK, gin.H{
 			"ret":  1,
 			"msg":  "success",
