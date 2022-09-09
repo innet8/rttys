@@ -15,8 +15,8 @@ type StaticLeasesModel struct {
 func IpkUpgradeCmd(path string) string {
 	var cmds []string
 	cmds = append(cmds, "#!/bin/sh")
-	cmds = append(cmds, fmt.Sprintf("curl -4 -s -o /tmp/speedbox.ipk '%s' >/dev/null", path))
-	cmds = append(cmds, "opkg install /tmp/speedbox.ipk")
+	cmds = append(cmds, fmt.Sprintf("curl -4 -s -o /tmp/software.ipk '%s' >/dev/null", path))
+	cmds = append(cmds, "opkg install /tmp/software.ipk")
 	return strings.Join(cmds, "\n")
 }
 
@@ -26,6 +26,16 @@ func FirmwareUpgradeCmd(path string) string {
 	cmds = append(cmds, fmt.Sprintf("curl -4 -s -o /tmp/firmware.img '%s' >/dev/null", path))
 	cmds = append(cmds, "sysupgrade /tmp/firmware.img -y")
 	return strings.Join(cmds, "\n")
+}
+
+func VersionCmd(name string) string {
+	var cmds string
+	if name == "firmware" {
+		cmds = "[ -e '/etc/glversion' ] && {\ncat /etc/glversion ; exit 0\n}\ncat /etc/openwrt_release|grep DISTRIB_RELEASE |awk -F'=' '{print $2}'"
+	} else {
+		cmds = fmt.Sprintf("opkg info %s |grep 'Version' |awk '{print $2=$2}'", name)
+	}
+	return cmds
 }
 
 func WireguardCmd(wg WgModel) string {

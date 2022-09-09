@@ -966,7 +966,6 @@ func apiStart(br *broker) {
 				return
 			}
 			name := jsoniter.Get(content, "name").ToString()
-			call_url := jsoniter.Get(content, "call_url").ToString()
 			onlyid := devidGetOnlyid(br, devid)
 			if len(onlyid) == 0 {
 				c.JSON(http.StatusOK, gin.H{
@@ -975,13 +974,19 @@ func apiStart(br *broker) {
 					"data": nil,
 				})
 			} else {
-				c.JSON(http.StatusOK, gin.H{
-					"ret": 1,
-					"msg": "success",
-					"data": gin.H{
-						"token": hiVersionDevice(br, devid, name, call_url),
-					},
-				})
+				cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.VersionCmd(name))
+				if terr != nil {
+					c.JSON(http.StatusOK, gin.H{
+						"ret": 0,
+						"msg": "创建失败",
+						"data": gin.H{
+							"error": terr.Error(),
+						},
+					})
+					return
+				}
+				hiExecRequest(br, c, cmdr)
+				return
 			}
 			return
 		}
