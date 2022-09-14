@@ -853,7 +853,7 @@ func apiStart(br *broker) {
 			return
 		}
 
-		var devicds []hi.DeviceModel
+		var devicds []hi.DeviceApiModel
 
 		result := db.Table("hi_device").Where(map[string]interface{}{
 			"bind_openid": authUser.Openid,
