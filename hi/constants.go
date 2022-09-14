@@ -538,7 +538,7 @@ const EditWifiContent = string(`
 handle_wifi(){
     config_get device $1 "device"
     config_get network $1 "network"
-	if [ "$device" != {{.device}} -a "$network" != "lan" ]; then
+	if [ "$device" != {{.device}} -a "$network" != {{.network}} ]; then
 		continue
 	fi
     {{.addString}}
