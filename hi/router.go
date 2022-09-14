@@ -49,7 +49,7 @@ func VersionCmd(name string) string {
 		cmds = append(cmds, "version=$(cat /etc/openwrt_release|grep DISTRIB_RELEASE |awk -F'=' '{gsub(/\\047/,\"\"); print $2}')")
 		cmds = append(cmds, "fi")
 		cmds = append(cmds, "model=$(cat /etc/board.json |grep id|awk '{gsub(/[\",]+/,\"\"); print $2}')")
-		cmds = append(cmds, "echo \"{\"version\":\"$version\",\"model\":\"$model\"}\"")
+		cmds = append(cmds, "echo -e '{\"version\":\"'$version'\",\"model\":\"'$model'\"}'")
 	} else {
 		cmds = append(cmds, fmt.Sprintf("opkg info %s |grep 'Version' |awk '{print $2=$2}'", name))
 	}
