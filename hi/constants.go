@@ -538,7 +538,7 @@ const EditWifiContent = string(`
 handle_wifi(){
     config_get device $1 "device"
     config_get network $1 "network"
-	if [ "$device" != {{.device}} -a "$network" != {{.network}} ]; then
+	if [ "$device" != {{.device}} -o "$network" != {{.network}} ]; then
 		continue
 	fi
     {{.addString}}
@@ -546,6 +546,7 @@ handle_wifi(){
 config_load wireless
 config_foreach handle_wifi wifi-iface
 {{.ex}}
+uci commit wireless
 /sbin/wifi reload
 `)
 

@@ -114,24 +114,23 @@ func EditWifiCmd(wifi WifiModel) string {
 	var cmds []string
 	var ex []string
 	if wifi.Ssid != "" {
-		cmds = append(cmds, fmt.Sprintf("config_set $1 ssid %s", wifi.Ssid))
+		cmds = append(cmds, fmt.Sprintf("uci set wireless.$1.ssid=%s", wifi.Ssid))
 	}
 	if wifi.Key != "" {
-		cmds = append(cmds, fmt.Sprintf("config_set $1 key %s", wifi.Key))
+		cmds = append(cmds, fmt.Sprintf("uci set wireless.$1.key=%s", wifi.Key))
 	}
 	if wifi.Encryption != "" {
-		cmds = append(cmds, fmt.Sprintf("config_set $1 encryption %s", wifi.Encryption))
+		cmds = append(cmds, fmt.Sprintf("uci set wireless.$1.encryption=%s", wifi.Encryption))
 	}
 	if wifi.Hidden != "" {
-		cmds = append(cmds, fmt.Sprintf("config_set $1 hidden %s", wifi.Hidden))
+		cmds = append(cmds, fmt.Sprintf("uci set wireless.$1.hidden=%s", wifi.Hidden))
 	}
 	if wifi.Channel != "" {
 		ex = append(ex, fmt.Sprintf("uci set wireless.%s.channel=%s", wifi.Device, wifi.Channel))
 	}
 	if wifi.Disabled != "" {
-		cmds = append(cmds, fmt.Sprintf("config_set $1 disabled %s", wifi.Disabled))
+		cmds = append(cmds, fmt.Sprintf("uci set wireless.$1.disabled=%s", wifi.Disabled))
 		ex = append(ex, fmt.Sprintf("uci set wireless.%s.disabled=%s", wifi.Device, wifi.Disabled))
-		ex = append(ex, "uci commit wireless")
 	}
 
 	var envMap = make(map[string]interface{})
