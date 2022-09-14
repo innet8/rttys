@@ -17,9 +17,10 @@ type WifiModel struct {
 	Ssid       string `json:"ssid"`
 	Key        string `json:"key"`
 	Channel    string `json:"channel"`
-	Encryption string `json:"encryption"`
-	Disabled   string `json:"disabled"`
+	Encryption string `json:"encrypt"`
+	Disabled   string `json:"disabled"` // 1-关；0-开
 	Hidden     string `json:"hidden"`
+	Network    string `json:"network"`
 }
 
 func IpkUpgradeCmd(path string) string {
@@ -108,8 +109,8 @@ func ApiResultCheck(result string) string {
 	return ""
 }
 
-// wifi修改
-func editWifiCmd(wifi WifiModel) string {
+// EditWifiCmd wifi修改
+func EditWifiCmd(wifi WifiModel) string {
 	var cmds []string
 	var ex []string
 	if wifi.Ssid != "" {
