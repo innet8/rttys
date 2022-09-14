@@ -29,7 +29,6 @@ module.exports = {
       enableInSFC: false
     }
   },
-  assetsDir: 'rttys/assets',
   devServer: {
     proxy: {
       '/devs': {

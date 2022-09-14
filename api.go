@@ -813,14 +813,14 @@ func apiStart(br *broker) {
 				if terr != nil {
 					c.JSON(http.StatusOK, gin.H{
 						"ret": 0,
-						"msg": "创建失败",
+						"msg": "创建执行任务失败",
 						"data": gin.H{
 							"error": terr.Error(),
 						},
 					})
-					return
+				} else {
+					hiExecRequest(br, c, cmdr)
 				}
-				hiExecRequest(br, c, cmdr)
 				return
 			}
 		}
@@ -881,7 +881,7 @@ func apiStart(br *broker) {
 		})
 	})
 
-	// 设备 action=bind|unbind|reboot|version  devid=设备id
+	// 设备 action=bind|unbind|reboot|version|connect  devid=设备id
 	r.GET("/hi/device/:action/:devid", func(c *gin.Context) {
 		action := c.Param("action")
 		devid := c.Param("devid")
@@ -895,11 +895,10 @@ func apiStart(br *broker) {
 
 		var authUser *hi.UserModel
 		var authErr error
-
-		if action == "unbind" || action == "reboot" {
-			authUser, authErr = userAuth(c, db, devid)
-		} else {
+		if action == "bind" {
 			authUser, authErr = userAuth(c, db, "")
+		} else {
+			authUser, authErr = userAuth(c, db, devid)
 		}
 		if authErr != nil {
 			c.JSON(http.StatusOK, gin.H{
@@ -965,6 +964,7 @@ func apiStart(br *broker) {
 			}
 			return
 		} else if action == "version" {
+			// 获取版本
 			name := c.Query("name")
 			onlyid := devidGetOnlyid(br, devid)
 			if len(onlyid) == 0 {
@@ -978,15 +978,22 @@ func apiStart(br *broker) {
 				if terr != nil {
 					c.JSON(http.StatusOK, gin.H{
 						"ret": 0,
-						"msg": "创建失败",
+						"msg": "创建执行任务失败",
 						"data": gin.H{
 							"error": terr.Error(),
 						},
 					})
-					return
+				} else {
+					hiExecRequest(br, c, cmdr)
 				}
-				hiExecRequest(br, c, cmdr)
-				return
+			}
+			return
+		} else if action == "connect" {
+			// 连接设备
+			if c.GetHeader("Upgrade") != "websocket" {
+				c.Status(http.StatusForbidden)
+			} else {
+				serveUser(br, c)
 			}
 			return
 		}
