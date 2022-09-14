@@ -532,6 +532,23 @@ if [ -f "/etc/init.d/hi-static-leases" ]; then
 fi
 `)
 
+const EditWifiContent = string(`
+#!/bin/sh
+. /lib/functions.sh
+handle_wifi(){
+    config_get device $1 "device"
+    config_get network $1 "network"
+	if [ "$device" != {{.device}} -a "$network" != "lan" ]; then
+		continue
+	fi
+    {{.addString}}
+}
+config_load wireless
+config_foreach handle_wifi wifi-iface
+{{.ex}}
+/sbin/wifi reload
+`)
+
 func FromTemplateContent(templateContent string, envMap map[string]interface{}) string {
 	tmpl, err := template.New("text").Parse(templateContent)
 	defer func() {
@@ -594,5 +611,11 @@ func ApiReportTemplate(envMap map[string]interface{}) string {
 func SetStaticLeasesTemplate(envMap map[string]interface{}) string {
 	var sb strings.Builder
 	sb.Write([]byte(SetStaticLeasesContent))
+	return FromTemplateContent(sb.String(), envMap)
+}
+
+func EditWifiTemplate(envMap map[string]interface{}) string {
+	var sb strings.Builder
+	sb.Write([]byte(EditWifiContent))
 	return FromTemplateContent(sb.String(), envMap)
 }

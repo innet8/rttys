@@ -803,7 +803,19 @@ func apiStart(br *broker) {
 			// todo
 		}
 		if action == "wifi" {
-			// todo
+			// cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.EditWifiTemplate(content))
+			// if terr != nil {
+			// 	c.JSON(http.StatusOK, gin.H{
+			// 		"ret": 0,
+			// 		"msg": "创建失败",
+			// 		"data": gin.H{
+			// 			"error": terr.Error(),
+			// 		},
+			// 	})
+			// 	return
+			// }
+			// hiExecRequest(br, c, cmdr)
+			// return
 		}
 		if action == "static_leases" {
 			list := jsoniter.Get(content, "list").ToString()
