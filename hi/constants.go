@@ -538,10 +538,9 @@ const EditWifiContent = string(`
 handle_wifi(){
     config_get device $1 "device"
     config_get network $1 "network"
-	if [ "$device" != {{.device}} -o "$network" != {{.network}} ]; then
-		continue
+	if [ "$device" = {{.device}} -a "$network" = {{.network}} ]; then
+		{{.addString}}
 	fi
-    {{.addString}}
 }
 config_load wireless
 config_foreach handle_wifi wifi-iface
