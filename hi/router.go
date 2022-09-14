@@ -12,6 +12,16 @@ type StaticLeasesModel struct {
 	Name string `json:"name"`
 }
 
+type WifiModel struct {
+	Device     string `json:"device"`
+	Ssid       string `json:"ssid"`
+	Key        string `json:"key"`
+	Channel    string `json:"channel"`
+	Encryption string `json:"encryption"`
+	Disabled   string `json:"disabled"`
+	Hidden     string `json:"hidden"`
+}
+
 func IpkUpgradeCmd(path string) string {
 	var cmds []string
 	cmds = append(cmds, "#!/bin/sh")
@@ -89,4 +99,36 @@ func ApiResultCheck(result string) string {
 		}
 	}
 	return ""
+}
+
+// wifi修改
+func editWifiCmd(wifi WifiModel) string {
+	var cmds []string
+	var ex []string
+	if wifi.Ssid != "" {
+		cmds = append(cmds, fmt.Sprintf("config_set $1 ssid %s", wifi.Ssid))
+	}
+	if wifi.Key != "" {
+		cmds = append(cmds, fmt.Sprintf("config_set $1 key %s", wifi.Key))
+	}
+	if wifi.Encryption != "" {
+		cmds = append(cmds, fmt.Sprintf("config_set $1 encryption %s", wifi.Encryption))
+	}
+	if wifi.Hidden != "" {
+		cmds = append(cmds, fmt.Sprintf("config_set $1 hidden %s", wifi.Hidden))
+	}
+	if wifi.Channel != "" {
+		ex = append(ex, fmt.Sprintf("uci set wireless.%s.channel=%s", wifi.Device, wifi.Channel))
+	}
+	if wifi.Disabled != "" {
+		cmds = append(cmds, fmt.Sprintf("config_set $1 disabled %s", wifi.Disabled))
+		ex = append(ex, fmt.Sprintf("uci set wireless.%s.disabled=%s", wifi.Device, wifi.Disabled))
+		ex = append(ex, "uci commit wireless")
+	}
+
+	var envMap = make(map[string]interface{})
+	envMap["addString"] = strings.Join(cmds, "\n")
+	envMap["ex"] = strings.Join(ex, "\n")
+	envMap["device"] = wifi.Device
+	return EditWifiTemplate(envMap)
 }

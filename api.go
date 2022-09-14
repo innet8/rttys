@@ -803,7 +803,19 @@ func apiStart(br *broker) {
 			// todo
 		}
 		if action == "wifi" {
-			// todo
+			// cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.EditWifiTemplate(content))
+			// if terr != nil {
+			// 	c.JSON(http.StatusOK, gin.H{
+			// 		"ret": 0,
+			// 		"msg": "创建失败",
+			// 		"data": gin.H{
+			// 			"error": terr.Error(),
+			// 		},
+			// 	})
+			// 	return
+			// }
+			// hiExecRequest(br, c, cmdr)
+			// return
 		}
 		if action == "static_leases" {
 			list := jsoniter.Get(content, "list").ToString()
@@ -916,6 +928,7 @@ func apiStart(br *broker) {
 			"devid": devid,
 		}).Last(&deviceData)
 
+		msg := "操作成功"
 		if action == "bind" {
 			if deviceData.ID == 0 {
 				// 添加
@@ -923,12 +936,14 @@ func apiStart(br *broker) {
 				deviceData.BindOpenid = authUser.Openid
 				deviceData.BindTime = uint32(time.Now().Unix())
 				db.Table("hi_device").Create(&deviceData)
+				msg = "添加绑定成功"
 			} else if len(deviceData.BindOpenid) == 0 {
 				// 绑定
 				deviceData.Devid = devid
 				deviceData.BindOpenid = authUser.Openid
 				deviceData.BindTime = uint32(time.Now().Unix())
 				db.Table("hi_device").Save(&deviceData)
+				msg = "绑定成功"
 			} else {
 				// 已被绑定
 				c.JSON(http.StatusOK, gin.H{
@@ -944,6 +959,7 @@ func apiStart(br *broker) {
 			db.Table("hi_shunt").Where(map[string]interface{}{"devid": devid}).Update("status", "unbind")
 			deviceData.BindOpenid = ""
 			db.Table("hi_device").Save(&deviceData)
+			msg = "取消绑定成功"
 		} else if action == "reboot" {
 			// 重启设备
 			onlyid := devidGetOnlyid(br, devid)
@@ -1000,7 +1016,7 @@ func apiStart(br *broker) {
 
 		c.JSON(http.StatusOK, gin.H{
 			"ret":  1,
-			"msg":  "操作成功",
+			"msg":  msg,
 			"data": deviceData,
 		})
 
