@@ -119,6 +119,7 @@ func serveUser(br *broker, c *gin.Context) {
 	devid := c.Param("devid")
 	if devid == "" {
 		c.Status(http.StatusBadRequest)
+		log.Debug().Msgf("Device id is empty", devid)
 		return
 	}
 
