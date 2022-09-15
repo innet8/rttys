@@ -1011,7 +1011,7 @@ func apiStart(br *broker) {
 			// 连接设备
 			if c.GetHeader("Upgrade") != "websocket" {
 				c.Status(http.StatusForbidden)
-				log.Debug().Msgf("Device '%s' header no websocket", devid)
+				log.Debug().Msgf("Device '%s' header is '%s' not websocket", devid, c.GetHeader("Upgrade"))
 			} else {
 				serveUser(br, c)
 			}
