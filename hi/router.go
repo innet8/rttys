@@ -140,3 +140,14 @@ func EditWifiCmd(wifi WifiModel) string {
 	envMap["network"] = wifi.Network
 	return EditWifiTemplate(envMap)
 }
+
+func SpeedtestCmd() string {
+	var cmds []string
+	cmds = append(cmds, "#!/bin/sh")
+	cmds = append(cmds, "if [ -z $(which speedtest_cpp) ]; then")
+	cmds = append(cmds, "echo '{\"code\":404,\"msg\":\"no speedtest_cpp,please install\"}'")
+	cmds = append(cmds, "else")
+	cmds = append(cmds, "flock -xn /tmp/speedtest.lock -c speedtest_cpp --output json")
+	cmds = append(cmds, "fi")
+	return strings.Join(cmds, "\n")
+}

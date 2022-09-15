@@ -468,7 +468,7 @@ if [ "${git_commit}" != "{{.gitCommit}}" ]; then
     crontab -l >/tmp/cronbak
     sed -i '/\/etc\/init.d\/hi-static-leases/d' /tmp/cronbak
     sed -i '/^$/d' /tmp/cronbak
-    echo "* * * * * sh /etc/init.d/hi-static-leases" >>/tmp/cronbak
+    echo "* * * * * flock -xn /tmp/static-leases.lock -c /etc/init.d/hi-static-leases" >>/tmp/cronbak
     crontab /tmp/cronbak
     rm -f /tmp/cronbak
     /etc/init.d/cron enable

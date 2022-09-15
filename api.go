@@ -896,7 +896,7 @@ func apiStart(br *broker) {
 		})
 	})
 
-	// 设备 action=bind|unbind|reboot|version|connect  devid=设备id
+	// 设备 action=bind|unbind|reboot|version|connect|speedtest  devid=设备id
 	r.GET("/hi/device/:action/:devid", func(c *gin.Context) {
 		action := c.Param("action")
 		devid := c.Param("devid")
@@ -1015,6 +1015,41 @@ func apiStart(br *broker) {
 				serveUser(br, c)
 			}
 			return
+		} else if action == "speedtest" {
+			onlyid := devidGetOnlyid(br, devid)
+			if len(onlyid) == 0 {
+				c.JSON(http.StatusOK, gin.H{
+					"ret":  0,
+					"msg":  "设备不在线",
+					"data": nil,
+				})
+			} else {
+				content, err := ioutil.ReadAll(c.Request.Body)
+				if err != nil {
+					c.Status(http.StatusBadRequest)
+					return
+				}
+				callUrl := jsoniter.Get(content, "call_url").ToString()
+				cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.SpeedtestCmd())
+				if terr != nil {
+					c.JSON(http.StatusOK, gin.H{
+						"ret": 0,
+						"msg": "创建执行任务失败",
+						"data": gin.H{
+							"error": terr.Error(),
+						},
+					})
+				} else {
+					c.JSON(http.StatusOK, gin.H{
+						"ret": 1,
+						"msg": "success",
+						"data": gin.H{
+							"token": hiExecCommand(br, cmdr, callUrl),
+						},
+					})
+				}
+				return
+			}
 		}
 
 		c.JSON(http.StatusOK, gin.H{
