@@ -29,6 +29,7 @@ module.exports = {
       enableInSFC: false
     }
   },
+  assetsDir: 'hi/assets',
   devServer: {
     proxy: {
       '/devs': {

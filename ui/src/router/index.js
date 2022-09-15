@@ -3,6 +3,7 @@ import VueRouter from 'vue-router'
 import Login from '../views/Login.vue'
 import Home from '../views/Home.vue'
 import Rtty from '../views/Rtty.vue'
+import HiConnect from '../views/HiConnect.vue'
 
 Vue.use(VueRouter)
 
@@ -21,6 +22,12 @@ const routes = [
     path: '/rtty/:devid',
     name: 'Rtty',
     component: Rtty,
+    props: true
+  },
+  {
+    path: '/hi/page/connect/:devid',
+    name: 'HiConnect',
+    component: HiConnect,
     props: true
   }
 ];
@@ -43,7 +50,7 @@ router.beforeEach((to, from, next) => {
     return;
   }
 
-  if (to.path !== '/login') {
+  if (to.path !== '/login' && to.name !== 'HiConnect') {
     Vue.axios.get('/alive').then(() => {
       next();
     }).catch(() => {
