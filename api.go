@@ -1010,7 +1010,11 @@ func apiStart(br *broker) {
 		} else if action == "connect" {
 			// 连接设备
 			if c.GetHeader("Upgrade") != "websocket" {
-				c.Status(http.StatusForbidden)
+				c.JSON(http.StatusOK, gin.H{
+					"ret":  1,
+					"msg":  "success",
+					"data": nil,
+				})
 			} else {
 				serveUser(br, c)
 			}
