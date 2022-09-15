@@ -31,7 +31,7 @@ const ReadFileBlkSize = 16 * 1024;
 const AckBlkSize = 4 * 1024;
 
 export default {
-    name: 'Home',
+    name: 'HiConnect',
     components: {
         'Contextmenu': Contextmenu
     },
@@ -100,7 +100,6 @@ export default {
         updateFontSize(size) {
             this.term.setOption('fontSize', size);
             this.fitAddon.fit();
-            // this.axios.post('/fontsize', {size});
         },
         onUploadDialogClosed() {
             this.term.focus();
@@ -219,65 +218,60 @@ export default {
     },
     mounted() {
         const protocol = (location.protocol === 'https:') ? 'wss://' : 'ws://';
-
         const queryString = new URLSearchParams(this.$route.query).toString();
-        const socket = new WebSocket(protocol + location.host + `/hi/device/connect/${this.devid}?${queryString}`);
-        socket.binaryType = 'arraybuffer';
-        this.socket = socket;
-
-        socket.addEventListener('message', ev => {
-            const data = ev.data;
-
-            if (typeof data === 'string') {
-                const msg = JSON.parse(data);
-                if (msg.type === 'login') {
-                    if (msg.err === LoginErrorOffline) {
-                        this.$Message.error(this.$t('Device offline').toString());
-                        this.$router.push('/');
-                        return;
-                    } else if (msg.err === LoginErrorBusy) {
-                        this.$Message.error(this.$t('Sessions is full').toString());
-                        this.$router.push('/');
-                        return;
+        const urlPath = `/hi/device/connect/${this.devid}?${queryString}`;
+        this.axios.get(urlPath).then(r => {
+            if (r.data.ret === 1) {
+                const socket = new WebSocket(protocol + location.host + urlPath);
+                socket.binaryType = 'arraybuffer';
+                this.socket = socket;
+                socket.addEventListener('message', ev => {
+                    const data = ev.data;
+                    if (typeof data === 'string') {
+                        const msg = JSON.parse(data);
+                        if (msg.type === 'login') {
+                            if (msg.err === LoginErrorOffline) {
+                                this.$Message.error(this.$t('Device offline').toString());
+                                return;
+                            } else if (msg.err === LoginErrorBusy) {
+                                this.$Message.error(this.$t('Sessions is full').toString());
+                                return;
+                            }
+                            this.sid = msg.sid;
+                            this.openTerm();
+                            socket.addEventListener('close', () => this.closed());
+                            socket.addEventListener('error', () => this.closed());
+                        } else if (msg.type === 'sendfile') {
+                            const el = document.createElement('a');
+                            el.style.display = 'none';
+                            el.href = '/file/' + this.sid;
+                            el.download = msg.name;
+                            el.click();
+                        } else if (msg.type === 'recvfile') {
+                            this.file.modal = true;
+                            this.file.file = null;
+                            this.file.accepted = false;
+                            this.term.blur();
+                        } else if (msg.type === 'fileAck') {
+                            if (this.file.file && this.file.offset < this.file.file.size) {
+                                this.readFileBlob(this.file.fr, this.file.file, this.file.offset, ReadFileBlkSize);
+                            }
+                        }
+                    } else {
+                        const data = Buffer.from(ev.data);
+                        this.unack += data.length;
+                        this.term.write(typeof (data) === 'string' ? data : new Uint8Array(data));
+                        if (this.unack > AckBlkSize) {
+                            const msg = {type: 'ack', ack: this.unack};
+                            socket.send(JSON.stringify(msg));
+                            this.unack = 0;
+                        }
                     }
-
-                    this.sid = msg.sid;
-
-                    this.openTerm();
-
-                    /*this.axios.get('/fontsize').then(r => {
-                        this.term.setOption('fontSize', r.data.size);
-                        this.fitTerm();
-                    });*/
-
-                    socket.addEventListener('close', () => this.closed());
-                    socket.addEventListener('error', () => this.closed());
-                } else if (msg.type === 'sendfile') {
-                    const el = document.createElement('a');
-                    el.style.display = 'none';
-                    el.href = '/file/' + this.sid;
-                    el.download = msg.name;
-                    el.click();
-                } else if (msg.type === 'recvfile') {
-                    this.file.modal = true;
-                    this.file.file = null;
-                    this.file.accepted = false;
-                    this.term.blur();
-                } else if (msg.type === 'fileAck') {
-                    if (this.file.file && this.file.offset < this.file.file.size)
-                        this.readFileBlob(this.file.fr, this.file.file, this.file.offset, ReadFileBlkSize);
-                }
+                });
             } else {
-                const data = Buffer.from(ev.data);
-
-                this.unack += data.length;
-                this.term.write(typeof (data) === 'string' ? data : new Uint8Array(data));
-
-                if (this.unack > AckBlkSize) {
-                    const msg = {type: 'ack', ack: this.unack};
-                    socket.send(JSON.stringify(msg));
-                    this.unack = 0;
-                }
+                this.$Modal.error({
+                    content: this.$t(r.data.msg)
+                });
             }
         });
     },
