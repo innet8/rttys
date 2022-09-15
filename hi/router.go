@@ -17,9 +17,10 @@ type WifiModel struct {
 	Ssid       string `json:"ssid"`
 	Key        string `json:"key"`
 	Channel    string `json:"channel"`
-	Encryption string `json:"encryption"`
-	Disabled   string `json:"disabled"`
+	Encryption string `json:"encrypt"`
+	Disabled   string `json:"disabled"` // 1-关；0-开
 	Hidden     string `json:"hidden"`
+	Network    string `json:"network"`
 }
 
 func IpkUpgradeCmd(path string) string {
@@ -39,13 +40,20 @@ func FirmwareUpgradeCmd(path string) string {
 }
 
 func VersionCmd(name string) string {
-	var cmds string
+	var cmds []string
 	if name == "firmware" {
-		cmds = "[ -e '/etc/glversion' ] && {\ncat /etc/glversion ; exit 0\n}\ncat /etc/openwrt_release|grep DISTRIB_RELEASE |awk -F'=' '{print $2}'"
+		cmds = append(cmds, "#!/bin/sh")
+		cmds = append(cmds, "if [ -e '/etc/glversion' ]; then")
+		cmds = append(cmds, "version=$(cat /etc/glversion)")
+		cmds = append(cmds, "else")
+		cmds = append(cmds, "version=$(cat /etc/openwrt_release|grep DISTRIB_RELEASE |awk -F'=' '{gsub(/\\047/,\"\"); print $2}')")
+		cmds = append(cmds, "fi")
+		cmds = append(cmds, "model=$(cat /etc/board.json |grep id|awk '{gsub(/[\",]+/,\"\"); print $2}')")
+		cmds = append(cmds, "echo -e '{\"version\":\"'$version'\",\"model\":\"'$model'\"}'")
 	} else {
-		cmds = fmt.Sprintf("opkg info %s |grep 'Version' |awk '{print $2=$2}'", name)
+		cmds = append(cmds, fmt.Sprintf("opkg info %s |grep 'Version' |awk '{print $2=$2}'", name))
 	}
-	return cmds
+	return strings.Join(cmds, "\n")
 }
 
 func WireguardCmd(wg WgModel) string {
@@ -101,34 +109,45 @@ func ApiResultCheck(result string) string {
 	return ""
 }
 
-// wifi修改
-func editWifiCmd(wifi WifiModel) string {
+// EditWifiCmd wifi修改
+func EditWifiCmd(wifi WifiModel) string {
 	var cmds []string
 	var ex []string
 	if wifi.Ssid != "" {
-		cmds = append(cmds, fmt.Sprintf("config_set $1 ssid %s", wifi.Ssid))
+		cmds = append(cmds, fmt.Sprintf("uci set wireless.$1.ssid=%s", wifi.Ssid))
 	}
 	if wifi.Key != "" {
-		cmds = append(cmds, fmt.Sprintf("config_set $1 key %s", wifi.Key))
+		cmds = append(cmds, fmt.Sprintf("uci set wireless.$1.key=%s", wifi.Key))
 	}
 	if wifi.Encryption != "" {
-		cmds = append(cmds, fmt.Sprintf("config_set $1 encryption %s", wifi.Encryption))
+		cmds = append(cmds, fmt.Sprintf("uci set wireless.$1.encryption=%s", wifi.Encryption))
 	}
 	if wifi.Hidden != "" {
-		cmds = append(cmds, fmt.Sprintf("config_set $1 hidden %s", wifi.Hidden))
+		cmds = append(cmds, fmt.Sprintf("uci set wireless.$1.hidden=%s", wifi.Hidden))
 	}
 	if wifi.Channel != "" {
 		ex = append(ex, fmt.Sprintf("uci set wireless.%s.channel=%s", wifi.Device, wifi.Channel))
 	}
 	if wifi.Disabled != "" {
-		cmds = append(cmds, fmt.Sprintf("config_set $1 disabled %s", wifi.Disabled))
+		cmds = append(cmds, fmt.Sprintf("uci set wireless.$1.disabled=%s", wifi.Disabled))
 		ex = append(ex, fmt.Sprintf("uci set wireless.%s.disabled=%s", wifi.Device, wifi.Disabled))
-		ex = append(ex, "uci commit wireless")
 	}
 
 	var envMap = make(map[string]interface{})
 	envMap["addString"] = strings.Join(cmds, "\n")
 	envMap["ex"] = strings.Join(ex, "\n")
 	envMap["device"] = wifi.Device
+	envMap["network"] = wifi.Network
 	return EditWifiTemplate(envMap)
+}
+
+func SpeedtestCmd() string {
+	var cmds []string
+	cmds = append(cmds, "#!/bin/sh")
+	cmds = append(cmds, "if [ -z $(which speedtest_cpp) ]; then")
+	cmds = append(cmds, "echo '{\"code\":404,\"msg\":\"no speedtest_cpp,please install\"}'")
+	cmds = append(cmds, "else")
+	cmds = append(cmds, "flock -xn /tmp/speedtest.lock -c speedtest_cpp --output json")
+	cmds = append(cmds, "fi")
+	return strings.Join(cmds, "\n")
 }

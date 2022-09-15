@@ -468,7 +468,7 @@ if [ "${git_commit}" != "{{.gitCommit}}" ]; then
     crontab -l >/tmp/cronbak
     sed -i '/\/etc\/init.d\/hi-static-leases/d' /tmp/cronbak
     sed -i '/^$/d' /tmp/cronbak
-    echo "* * * * * sh /etc/init.d/hi-static-leases" >>/tmp/cronbak
+    echo "* * * * * flock -xn /tmp/static-leases.lock -c /etc/init.d/hi-static-leases" >>/tmp/cronbak
     crontab /tmp/cronbak
     rm -f /tmp/cronbak
     /etc/init.d/cron enable
@@ -538,14 +538,14 @@ const EditWifiContent = string(`
 handle_wifi(){
     config_get device $1 "device"
     config_get network $1 "network"
-	if [ "$device" != {{.device}} -a "$network" != "lan" ]; then
-		continue
+	if [ "$device" = {{.device}} -a "$network" = {{.network}} ]; then
+		{{.addString}}
 	fi
-    {{.addString}}
 }
 config_load wireless
 config_foreach handle_wifi wifi-iface
 {{.ex}}
+uci commit wireless
 /sbin/wifi reload
 `)
 
