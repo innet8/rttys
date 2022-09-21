@@ -42,6 +42,11 @@ func devidGetOnlyid(br *broker, devid string) string {
 // 保存设备信息（设备上线）
 func deviceOnline(br *broker, devid string) {
 	db, err := hi.InstanceDB(br.cfg.DB)
+	defer func() {
+		if sqlDB, err := db.DB(); err == nil {
+			sqlDB.Close()
+		}
+	}()
 	if err != nil {
 		return
 	}
@@ -150,6 +155,11 @@ func hiInitCommand(br *broker, devid, callback string) string {
 		return ""
 	}
 	db, err := hi.InstanceDB(br.cfg.DB)
+	defer func() {
+		if sqlDB, err := db.DB(); err == nil {
+			sqlDB.Close()
+		}
+	}()
 	if err != nil {
 		return ""
 	}
@@ -170,6 +180,11 @@ func hiSynchWireguardConf(br *broker, devid, callback string) string {
 		return ""
 	}
 	db, err := hi.InstanceDB(br.cfg.DB)
+	defer func() {
+		if sqlDB, err := db.DB(); err == nil {
+			sqlDB.Close()
+		}
+	}()
 	if err != nil {
 		return ""
 	}
@@ -190,6 +205,11 @@ func hiSynchShuntConf(br *broker, devid, callback string) string {
 		return ""
 	}
 	db, err := hi.InstanceDB(br.cfg.DB)
+	defer func() {
+		if sqlDB, err := db.DB(); err == nil {
+			sqlDB.Close()
+		}
+	}()
 	if err != nil {
 		return ""
 	}
@@ -213,6 +233,11 @@ func hiRebootDevice(br *broker, devid string) string {
 		return ""
 	}
 	db, err := hi.InstanceDB(br.cfg.DB)
+	defer func() {
+		if sqlDB, err := db.DB(); err == nil {
+			sqlDB.Close()
+		}
+	}()
 	if err != nil {
 		return ""
 	}
@@ -226,6 +251,11 @@ func hiDeviceFirmwareUpgrade(br *broker, devid string, path string, callback str
 		return ""
 	}
 	db, err := hi.InstanceDB(br.cfg.DB)
+	defer func() {
+		if sqlDB, err := db.DB(); err == nil {
+			sqlDB.Close()
+		}
+	}()
 	if err != nil {
 		return ""
 	}
@@ -239,6 +269,11 @@ func hiDeviceIpkUpgrade(br *broker, devid string, path string, callback string) 
 		return ""
 	}
 	db, err := hi.InstanceDB(br.cfg.DB)
+	defer func() {
+		if sqlDB, err := db.DB(); err == nil {
+			sqlDB.Close()
+		}
+	}()
 	if err != nil {
 		return ""
 	}
@@ -402,6 +437,11 @@ func hiExecCallback(token, callurl string, overtime bool) string {
 // 执行命令结果
 func hiExecResult(hir *hiReq) {
 	db, err := hi.InstanceDB(hir.db)
+	defer func() {
+		if sqlDB, err := db.DB(); err == nil {
+			sqlDB.Close()
+		}
+	}()
 	if err != nil {
 		return
 	}
