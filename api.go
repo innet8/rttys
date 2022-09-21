@@ -5,6 +5,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"gorm.io/gorm"
 	"io/fs"
 	"io/ioutil"
 	"net"
@@ -122,6 +123,11 @@ func getLoginUsername(c *gin.Context) string {
 	}
 
 	return ""
+}
+func closeDB(db *gorm.DB) {
+	if sqlDB, err := db.DB(); err == nil {
+		_ = sqlDB.Close()
+	}
 }
 
 func apiStart(br *broker) {
@@ -602,11 +608,7 @@ func apiStart(br *broker) {
 
 		if action == "create" {
 			db, err := hi.InstanceDB(cfg.DB)
-			defer func() {
-				if sqlDB, err := db.DB(); err == nil {
-					sqlDB.Close()
-				}
-			}()
+			defer closeDB(db)
 			if err != nil {
 				log.Error().Msg(err.Error())
 				c.Status(http.StatusInternalServerError)
@@ -680,11 +682,7 @@ func apiStart(br *broker) {
 
 		if action == "dhcp" || action == "wifi" || action == "static_leases" {
 			db, err := hi.InstanceDB(cfg.DB)
-			defer func() {
-				if sqlDB, err := db.DB(); err == nil {
-					sqlDB.Close()
-				}
-			}()
+			defer closeDB(db)
 			if err != nil {
 				log.Error().Msg(err.Error())
 				c.Status(http.StatusInternalServerError)
@@ -729,11 +727,7 @@ func apiStart(br *broker) {
 
 		if action == "dhcp" || action == "wifi" || action == "static_leases" {
 			db, err := hi.InstanceDB(cfg.DB)
-			defer func() {
-				if sqlDB, err := db.DB(); err == nil {
-					sqlDB.Close()
-				}
-			}()
+			defer closeDB(db)
 			if err != nil {
 				log.Error().Msg(err.Error())
 				c.Status(http.StatusInternalServerError)
@@ -781,11 +775,7 @@ func apiStart(br *broker) {
 		onlyid := devidGetOnlyid(br, devid)
 
 		db, err := hi.InstanceDB(cfg.DB)
-		defer func() {
-			if sqlDB, err := db.DB(); err == nil {
-				sqlDB.Close()
-			}
-		}()
+		defer closeDB(db)
 		if err != nil {
 			log.Error().Msg(err.Error())
 			c.Status(http.StatusInternalServerError)
@@ -870,11 +860,7 @@ func apiStart(br *broker) {
 	// 设备
 	r.GET("/hi/device/list", func(c *gin.Context) {
 		db, err := hi.InstanceDB(cfg.DB)
-		defer func() {
-			if sqlDB, err := db.DB(); err == nil {
-				sqlDB.Close()
-			}
-		}()
+		defer closeDB(db)
 		if err != nil {
 			log.Error().Msg(err.Error())
 			c.Status(http.StatusInternalServerError)
@@ -927,11 +913,7 @@ func apiStart(br *broker) {
 		devid := c.Param("devid")
 
 		db, err := hi.InstanceDB(cfg.DB)
-		defer func() {
-			if sqlDB, err := db.DB(); err == nil {
-				sqlDB.Close()
-			}
-		}()
+		defer closeDB(db)
 		if err != nil {
 			log.Error().Msg(err.Error())
 			c.Status(http.StatusInternalServerError)
@@ -1103,11 +1085,7 @@ func apiStart(br *broker) {
 		onlyid := devidGetOnlyid(br, devid)
 
 		db, err := hi.InstanceDB(cfg.DB)
-		defer func() {
-			if sqlDB, err := db.DB(); err == nil {
-				sqlDB.Close()
-			}
-		}()
+		defer closeDB(db)
 		if err != nil {
 			log.Error().Msg(err.Error())
 			c.Status(http.StatusInternalServerError)
@@ -1176,11 +1154,7 @@ func apiStart(br *broker) {
 		devid := c.Param("devid")
 
 		db, err := hi.InstanceDB(cfg.DB)
-		defer func() {
-			if sqlDB, err := db.DB(); err == nil {
-				sqlDB.Close()
-			}
-		}()
+		defer closeDB(db)
 		if err != nil {
 			log.Error().Msg(err.Error())
 			c.Status(http.StatusInternalServerError)
@@ -1293,11 +1267,7 @@ func apiStart(br *broker) {
 		devid := c.Param("devid")
 
 		db, err := hi.InstanceDB(cfg.DB)
-		defer func() {
-			if sqlDB, err := db.DB(); err == nil {
-				sqlDB.Close()
-			}
-		}()
+		defer closeDB(db)
 		if err != nil {
 			log.Error().Msg(err.Error())
 			c.Status(http.StatusInternalServerError)
@@ -1353,11 +1323,7 @@ func apiStart(br *broker) {
 		shuntId, _ := strconv.Atoi(c.Param("sid"))
 
 		db, err := hi.InstanceDB(cfg.DB)
-		defer func() {
-			if sqlDB, err := db.DB(); err == nil {
-				sqlDB.Close()
-			}
-		}()
+		defer closeDB(db)
 		if err != nil {
 			log.Error().Msg(err.Error())
 			c.Status(http.StatusInternalServerError)
@@ -1452,11 +1418,7 @@ func apiStart(br *broker) {
 		callUrl := c.Query("call_url")
 
 		db, err := hi.InstanceDB(cfg.DB)
-		defer func() {
-			if sqlDB, err := db.DB(); err == nil {
-				sqlDB.Close()
-			}
-		}()
+		defer closeDB(db)
 		if err != nil {
 			log.Error().Msg(err.Error())
 			c.Status(http.StatusInternalServerError)
@@ -1527,11 +1489,7 @@ func apiStart(br *broker) {
 		token := c.Param("token")
 
 		db, err := hi.InstanceDB(cfg.DB)
-		defer func() {
-			if sqlDB, err := db.DB(); err == nil {
-				sqlDB.Close()
-			}
-		}()
+		defer closeDB(db)
 		if err != nil {
 			log.Error().Msg(err.Error())
 			c.Status(http.StatusInternalServerError)
