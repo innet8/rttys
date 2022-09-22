@@ -546,6 +546,7 @@ config_load wireless
 config_foreach handle_wifi wifi-iface
 {{.ex}}
 uci commit wireless
+echo '{"code":0}'
 /sbin/wifi reload
 `)
 
