@@ -147,7 +147,7 @@ func SpeedtestCmd() string {
 	cmds = append(cmds, "if [ -z $(which speedtest_cpp) ]; then")
 	cmds = append(cmds, "echo '{\"code\":404,\"msg\":\"no speedtest_cpp,please install\"}'")
 	cmds = append(cmds, "else")
-	cmds = append(cmds, "flock -xn /tmp/speedtest.lock -c speedtest_cpp --output json")
+	cmds = append(cmds, "[ -z $(ps | grep '[s]peedtest_cpp' | awk '{print $1}') ] && speedtest_cpp --output json")
 	cmds = append(cmds, "fi")
 	return strings.Join(cmds, "\n")
 }
