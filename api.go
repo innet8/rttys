@@ -1041,12 +1041,7 @@ func apiStart(br *broker) {
 					"data": nil,
 				})
 			} else {
-				content, err := ioutil.ReadAll(c.Request.Body)
-				if err != nil {
-					c.Status(http.StatusBadRequest)
-					return
-				}
-				callUrl := jsoniter.Get(content, "call_url").ToString()
+				callUrl := c.Query("call_url")
 				cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.SpeedtestCmd())
 				if terr != nil {
 					c.JSON(http.StatusOK, gin.H{
