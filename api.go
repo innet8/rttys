@@ -5,7 +5,6 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
-	"gorm.io/gorm"
 	"io/fs"
 	"io/ioutil"
 	"net"
@@ -15,6 +14,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"gorm.io/gorm"
 
 	jsoniter "github.com/json-iterator/go"
 
@@ -1066,6 +1067,7 @@ func apiStart(br *broker) {
 				}
 				return
 			}
+			return
 		}
 
 		c.JSON(http.StatusOK, gin.H{
