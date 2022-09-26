@@ -656,6 +656,7 @@ func apiStart(br *broker) {
 		if action == "dhcp" {
 			var envMap = make(map[string]interface{})
 			envMap["requestUrl"] = "http://127.0.0.1/cgi-bin/api/client/list"
+			envMap["requestType"] = "clients"
 			envMap["reportUrl"] = fmt.Sprintf("%s/hi/base/report/dhcp", br.cfg.HiApiUrl)
 			c.String(http.StatusOK, hi.ApiReportTemplate(envMap))
 			return
@@ -663,13 +664,14 @@ func apiStart(br *broker) {
 		if action == "wifi" {
 			var envMap = make(map[string]interface{})
 			envMap["requestUrl"] = "http://127.0.0.1/cgi-bin/api/ap/config"
+			envMap["requestType"] = "apconfig"
 			envMap["reportUrl"] = fmt.Sprintf("%s/hi/base/report/wifi", br.cfg.HiApiUrl)
 			c.String(http.StatusOK, hi.ApiReportTemplate(envMap))
 			return
 		}
 		if action == "static_leases" {
 			var envMap = make(map[string]interface{})
-			envMap["requestUrl"] = "static_leases"
+			envMap["requestType"] = "static_leases"
 			envMap["reportUrl"] = fmt.Sprintf("%s/hi/base/report/static_leases", br.cfg.HiApiUrl)
 			c.String(http.StatusOK, hi.ApiReportTemplate(envMap))
 			return
@@ -769,7 +771,7 @@ func apiStart(br *broker) {
 		c.Status(http.StatusBadRequest)
 	})
 
-	// 设置信息（需要设备在线才可以设置） action=dhcp|wifi|static_leases	devid=设备id
+	// 设置信息（需要设备在线才可以设置） action=wifi|static_leases|blocked	devid=设备id
 	r.POST("/hi/base/set/:action/:devid", func(c *gin.Context) {
 		action := c.Param("action")
 		devid := c.Param("devid")
@@ -810,8 +812,25 @@ func apiStart(br *broker) {
 			return
 		}
 
-		if action == "dhcp" {
-			// todo
+		if action == "blocked" {
+			list := jsoniter.Get(content, "list").ToString()
+			action := jsoniter.Get(content, "action").ToString()
+			var data []string
+			if ok := json.Unmarshal([]byte(list), &data); ok == nil {
+				cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.BlockedCmd(data, action))
+				if terr != nil {
+					c.JSON(http.StatusOK, gin.H{
+						"ret": 0,
+						"msg": "创建执行任务失败",
+						"data": gin.H{
+							"error": terr.Error(),
+						},
+					})
+				} else {
+					hiExecRequest(br, c, cmdr)
+				}
+				return
+			}
 		}
 		if action == "wifi" {
 			var wifi hi.WifiModel

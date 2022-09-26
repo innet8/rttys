@@ -95,6 +95,17 @@ func StaticLeasesCmd(list []StaticLeasesModel) string {
 	return SetStaticLeasesTemplate(envMap)
 }
 
+func BlockedCmd(list []string, action string) string {
+	var cmds, err = json.Marshal(list)
+	if err != nil {
+		return ""
+	}
+	var envMap = make(map[string]interface{})
+	envMap["macs"] = string(cmds)
+	envMap["action"] = action
+	return BlockedTemplate(envMap)
+}
+
 // ApiResultCheck 验证路由器接口返回内容是否正确（不正确返回空）
 func ApiResultCheck(result string) string {
 	type RouterClientsModel struct {

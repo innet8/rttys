@@ -486,6 +486,42 @@ RES=$(curl "{{.requestUrl}}" -H "Authorization: $(_localtoken)")
 curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(get_default_sn)'","time":"'$(date +%s)'"}'
 `)
 
+const ClientsReportAdded = string(`
+cat >/tmp/clients.lua <<EOF
+local json = require 'cjson'
+local script = '/usr/share/hiui/rpc/clients.lua'
+local ok, tb = pcall(dofile, script)
+if ok then
+    print(json.encode(tb['getClients']()))
+else
+    print("")
+end
+EOF
+RES=$(lua /tmp/apconfig.lua)
+if [ -z "$RES" ]; then
+    RES=$(curl "{{.requestUrl}}" -H "Authorization: $(_localtoken)")
+fi
+curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(get_default_sn)'","time":"'$(date +%s)'"}'
+`)
+
+const ApConfigReportAdded = string(`
+cat >/tmp/apconfig.lua <<EOF
+local json = require 'cjson'
+local script = '/usr/share/hiui/rpc/wireless.lua'
+local ok, tb = pcall(dofile, script)
+if ok then
+    print(json.encode(tb['getConfig']()))
+else
+    print("")
+end
+EOF
+RES=$(lua /tmp/apconfig.lua)
+if [ -z "$RES" ]; then
+    RES=$(curl "{{.requestUrl}}" -H "Authorization: $(_localtoken)")
+fi
+curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(get_default_sn)'","time":"'$(date +%s)'"}'
+`)
+
 const StaticLeasesReportAdded = string(`
 get_static_leases() {
     local list=""
@@ -550,6 +586,22 @@ echo '{"code":0}'
 /sbin/wifi reload
 `)
 
+const BlockedContent = string(`
+cat >/tmp/blocked.lua <<EOF
+local json = require 'cjson'
+local script = '/usr/share/hiui/rpc/clients.lua'
+local ok, tb = pcall(dofile, script)
+if ok then
+    tb['{{.action}}']({{.macs}})
+    print(json.encode(tb['getConfig']()))
+else
+    print("")
+end
+EOF
+RES=$(lua /tmp/blocked.lua)
+curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(get_default_sn)'","time":"'$(date +%s)'"}'
+`)
+
 func FromTemplateContent(templateContent string, envMap map[string]interface{}) string {
 	tmpl, err := template.New("text").Parse(templateContent)
 	defer func() {
@@ -599,10 +651,12 @@ func InitTemplate(envMap map[string]interface{}) string {
 
 func ApiReportTemplate(envMap map[string]interface{}) string {
 	var text string
-	if envMap["requestUrl"] == "static_leases" {
+	if envMap["requestType"] == "static_leases" {
 		text = fmt.Sprintf("%s\n%s", CommonUtilsContent, StaticLeasesReportAdded)
-	} else {
-		text = fmt.Sprintf("%s\n%s", CommonUtilsContent, ApiReportAdded)
+	} else if envMap["requestType"] == "apconfig" {
+		text = fmt.Sprintf("%s\n%s", CommonUtilsContent, ApConfigReportAdded)
+	} else if envMap["requestType"] == "clients" {
+		text = fmt.Sprintf("%s\n%s", CommonUtilsContent, ClientsReportAdded)
 	}
 	var sb strings.Builder
 	sb.Write([]byte(text))
@@ -618,5 +672,11 @@ func SetStaticLeasesTemplate(envMap map[string]interface{}) string {
 func EditWifiTemplate(envMap map[string]interface{}) string {
 	var sb strings.Builder
 	sb.Write([]byte(EditWifiContent))
+	return FromTemplateContent(sb.String(), envMap)
+}
+
+func BlockedTemplate(envMap map[string]interface{}) string {
+	var sb strings.Builder
+	sb.Write([]byte(BlockedContent))
 	return FromTemplateContent(sb.String(), envMap)
 }
