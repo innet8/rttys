@@ -1061,7 +1061,7 @@ func apiStart(br *broker) {
 				})
 			} else {
 				callUrl := c.Query("call_url")
-				cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.SpeedtestCmd())
+				cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.SpeedtestCmd(callUrl))
 				if terr != nil {
 					c.JSON(http.StatusOK, gin.H{
 						"ret": 0,
@@ -1071,13 +1071,7 @@ func apiStart(br *broker) {
 						},
 					})
 				} else {
-					c.JSON(http.StatusOK, gin.H{
-						"ret": 1,
-						"msg": "success",
-						"data": gin.H{
-							"token": hiExecCommand(br, cmdr, callUrl),
-						},
-					})
+					hiExecRequest(br, c, cmdr)
 				}
 				return
 			}

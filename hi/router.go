@@ -152,13 +152,12 @@ func EditWifiCmd(wifi WifiModel) string {
 	return EditWifiTemplate(envMap)
 }
 
-func SpeedtestCmd() string {
+func SpeedtestCmd(callurl string) string {
 	var cmds []string
 	cmds = append(cmds, "#!/bin/sh")
-	cmds = append(cmds, "if [ -z $(which speedtest_cpp) ]; then")
-	cmds = append(cmds, "echo '{\"code\":404,\"msg\":\"no speedtest_cpp,please install\"}'")
-	cmds = append(cmds, "else")
-	cmds = append(cmds, "[ -z $(ps | grep '[s]peedtest_cpp' | awk '{print $1}') ] && speedtest_cpp --output text")
+	cmds = append(cmds, "if [ -z $(ps | grep '[s]peedtest_cpp' | awk '{print $1}') ]; then")
+	cmds = append(cmds, "speedtest_cpp --output json >/tmp/speedtest")
+	cmds = append(cmds, fmt.Sprintf("curl -4 -X POST %s -H 'Content-Type: application/json' -d $(cat /tmp/speedtest)", callurl))
 	cmds = append(cmds, "fi")
 	return strings.Join(cmds, "\n")
 }
