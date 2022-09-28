@@ -141,7 +141,6 @@ func EditWifiCmd(wifi WifiModel) string {
 	}
 	if wifi.Disabled != "" {
 		cmds = append(cmds, fmt.Sprintf("uci set wireless.$1.disabled=%s", wifi.Disabled))
-		ex = append(ex, fmt.Sprintf("uci set wireless.%s.disabled=%s", wifi.Device, wifi.Disabled))
 	}
 
 	var envMap = make(map[string]interface{})
