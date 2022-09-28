@@ -304,7 +304,7 @@ set_lanip() {
             sleep 2
             uci set network.lan.ipaddr="{{.lan_ip}}"
             uci commit network
-            /etc/init.d/network restart
+            /etc/init.d/network reload
         ) >/dev/null 2>&1 &
     fi
 }
