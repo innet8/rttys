@@ -497,7 +497,7 @@ else
     print("")
 end
 EOF
-RES=$(lua /tmp/apconfig.lua)
+RES=$(lua /tmp/clients.lua)
 if [ -z "$RES" ]; then
     RES=$(curl "{{.requestUrl}}" -H "Authorization: $(_localtoken)")
 fi
