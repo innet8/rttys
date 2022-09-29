@@ -817,7 +817,7 @@ func apiStart(br *broker) {
 			action := jsoniter.Get(content, "action").ToString()
 			var data []string
 			if ok := json.Unmarshal([]byte(list), &data); ok == nil {
-				cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.BlockedCmd(data, action))
+				cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.BlockedCmd(data, action, br.cfg.HiApiUrl))
 				if terr != nil {
 					c.JSON(http.StatusOK, gin.H{
 						"ret": 0,

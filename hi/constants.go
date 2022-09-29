@@ -600,8 +600,13 @@ else
     print("")
 end
 EOF
+_base64e() {
+    echo -n "$1" | base64 | tr -d "\n"
+}
+
 RES=$(lua /tmp/blocked.lua)
-curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(get_default_sn)'","time":"'$(date +%s)'"}'
+sn=$(uci get rtty.general.id)
+curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$sn'","time":"'$(date +%s)'"}'
 `)
 
 func FromTemplateContent(templateContent string, envMap map[string]interface{}) string {

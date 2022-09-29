@@ -95,7 +95,7 @@ func StaticLeasesCmd(list []StaticLeasesModel) string {
 	return SetStaticLeasesTemplate(envMap)
 }
 
-func BlockedCmd(list []string, action string) string {
+func BlockedCmd(list []string, action string, url string) string {
 	newList := map[string]interface{}{
 		"macs": list,
 	}
@@ -106,6 +106,7 @@ func BlockedCmd(list []string, action string) string {
 	var envMap = make(map[string]interface{})
 	envMap["macs"] = string(cmds)
 	envMap["action"] = action
+	envMap["reportUrl"] = fmt.Sprintf("%s/hi/base/report/dhcp", url)
 	return BlockedTemplate(envMap)
 }
 
