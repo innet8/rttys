@@ -96,7 +96,10 @@ func StaticLeasesCmd(list []StaticLeasesModel) string {
 }
 
 func BlockedCmd(list []string, action string) string {
-	var cmds, err = json.Marshal(list)
+	newList := map[string]interface{}{
+		"macs": list,
+	}
+	var cmds, err = json.Marshal(newList)
 	if err != nil {
 		return ""
 	}
