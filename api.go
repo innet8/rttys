@@ -1275,6 +1275,7 @@ func apiStart(br *broker) {
 	// 分流 devid=设备id
 	r.GET("/hi/shunt/list/:devid", func(c *gin.Context) {
 		devid := c.Param("devid")
+		onlyid := c.GetHeader("onlyid") // 路由器web
 
 		db, err := hi.InstanceDB(cfg.DB)
 		defer closeDB(db)
@@ -1284,16 +1285,34 @@ func apiStart(br *broker) {
 			return
 		}
 
-		_, authErr := userAuth(c, db, devid)
-		if authErr != nil {
-			c.JSON(http.StatusOK, gin.H{
-				"ret": 0,
-				"msg": "Authentication failed",
-				"data": gin.H{
-					"error": authErr.Error(),
-				},
-			})
-			return
+		if onlyid == "" {
+			_, authErr := userAuth(c, db, devid)
+			if authErr != nil {
+				c.JSON(http.StatusOK, gin.H{
+					"ret": 0,
+					"msg": "Authentication failed",
+					"data": gin.H{
+						"error": authErr.Error(),
+					},
+				})
+				return
+			}
+		} else {
+			var deviceData hi.DeviceModel
+			db.Table("hi_device").Where(map[string]interface{}{
+				"devid":  devid,
+				"onlyid": onlyid,
+			}).Order("bind_time desc").Last(&deviceData)
+			if deviceData.ID == 0 {
+				c.JSON(http.StatusOK, gin.H{
+					"ret": 0,
+					"msg": "Authentication failed",
+					"data": gin.H{
+						"error": "Device not found",
+					},
+				})
+				return
+			}
 		}
 
 		var shunts []hi.ShuntModel
