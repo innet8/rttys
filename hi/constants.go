@@ -595,7 +595,7 @@ local script = '/usr/share/hiui/rpc/clients.lua'
 local ok, tb = pcall(dofile, script)
 if ok then
     tb['{{.action}}']('{{.macs}}')
-    print(json.encode(tb['getConfig']()))
+    print(json.encode(tb['getClients']()))
 else
     print("")
 end
