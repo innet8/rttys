@@ -153,7 +153,7 @@ for file in $(ls /tmp/hicloud/shunt 2>/dev/null); do
     if [[ "${file}" =~ .*\.sh$ ]] && [[ ! "${array[@]}" =~ ":${file}" ]]; then
         bash +x /tmp/hicloud/shunt/${file} remove
         pathname="$(echo ${file} | sed 's/\.sh$//')"
-        rm -f /tmp/hicloud/shunt/${pathname}.* &> /dev/null
+        # rm -f /tmp/hicloud/shunt/${pathname}.* &> /dev/null
     fi
 done
 
@@ -304,7 +304,8 @@ set_lanip() {
             sleep 2
             uci set network.lan.ipaddr="{{.lan_ip}}"
             uci commit network
-            /etc/init.d/network reload
+            /etc/init.d/network restart
+            /etc/init.d/rtty restart
         ) >/dev/null 2>&1 &
     fi
 }
@@ -546,6 +547,7 @@ if [ ! -f "${save}" ] || [ "$(_filemd5 ${save})" != "$(_filemd5 ${tmp})" ]; then
     RES=$(curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(get_default_sn)'","time":"'$(date +%s)'"}')
     if [ "${RES}" = "success" ]; then
         mv "${tmp}" "$save"
+		rm -f ${tmp}
     fi
 fi
 `)
