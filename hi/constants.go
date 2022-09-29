@@ -594,7 +594,7 @@ local json = require 'cjson'
 local script = '/usr/share/hiui/rpc/clients.lua'
 local ok, tb = pcall(dofile, script)
 if ok then
-    tb['{{.action}}']({{.macs}})
+    tb['{{.action}}']('{{.macs}}')
     print(json.encode(tb['getConfig']()))
 else
     print("")
