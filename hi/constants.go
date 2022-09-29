@@ -609,6 +609,21 @@ sn=$(uci get rtty.general.id)
 curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$sn'","time":"'$(date +%s)'"}'
 `)
 
+const GetVersionContent = string(`
+if [ -e "/etc/glversion" ]; then
+    version=$(cat /etc/glversion)
+else
+    version=$(cat /etc/openwrt_release|grep DISTRIB_RELEASE |awk -F'=' '{gsub(/\047/,""); print $2}')
+fi
+if [ -e "/tmp/sysinfo/board_name_alias" ]; then
+    model=$(cat /tmp/sysinfo/board_name_alias)
+else
+    model=$(awk -F',' '{print $2}' /tmp/sysinfo/board_name)
+fi
+webVer=$(awk '/hiui-ui/ {getline;print $2}' /usr/lib/opkg/status)
+echo -e '{"version":"'$version'","model":"'$model'","webVer":"'$webVer'"}'
+`)
+
 func FromTemplateContent(templateContent string, envMap map[string]interface{}) string {
 	tmpl, err := template.New("text").Parse(templateContent)
 	defer func() {
@@ -686,4 +701,13 @@ func BlockedTemplate(envMap map[string]interface{}) string {
 	var sb strings.Builder
 	sb.Write([]byte(BlockedContent))
 	return FromTemplateContent(sb.String(), envMap)
+}
+func GetVersion(name string) string {
+	var sb strings.Builder
+	if name == "firmware" {
+		sb.Write([]byte(GetVersionContent))
+	} else {
+		sb.WriteString(fmt.Sprintf("awk '/%s/ {getline;print $2}' /usr/lib/opkg/status", name))
+	}
+	return sb.String()
 }

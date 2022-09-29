@@ -40,20 +40,7 @@ func FirmwareUpgradeCmd(path string) string {
 }
 
 func VersionCmd(name string) string {
-	var cmds []string
-	if name == "firmware" {
-		cmds = append(cmds, "#!/bin/sh")
-		cmds = append(cmds, "if [ -e '/etc/glversion' ]; then")
-		cmds = append(cmds, "version=$(cat /etc/glversion)")
-		cmds = append(cmds, "else")
-		cmds = append(cmds, "version=$(cat /etc/openwrt_release|grep DISTRIB_RELEASE |awk -F'=' '{gsub(/\\047/,\"\"); print $2}')")
-		cmds = append(cmds, "fi")
-		cmds = append(cmds, "model=$(cat /etc/board.json |grep id|awk '{gsub(/[\",]+/,\"\"); print $2}')")
-		cmds = append(cmds, "echo -e '{\"version\":\"'$version'\",\"model\":\"'$model'\"}'")
-	} else {
-		cmds = append(cmds, fmt.Sprintf("opkg info %s |grep 'Version' |awk '{print $2=$2}'", name))
-	}
-	return strings.Join(cmds, "\n")
+	return GetVersion(name)
 }
 
 func WireguardCmd(wg WgModel) string {
