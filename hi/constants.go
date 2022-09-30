@@ -311,7 +311,8 @@ set_lanip() {
 }
 
 set_hotdnsq() {
-    hotdnsqFile=/etc/hotplug.d/iface/100-hi-bypass-dnsmasq
+    rm -f /etc/hotplug.d/iface/100-hi-bypass-dnsmasq    # 下次更新删除这行
+    hotdnsqFile=/etc/hotplug.d/iface/99-hi-wireguard-dnsmasq
     cat > ${hotdnsqFile} <<-EOF
 #!/bin/sh
 cat > /etc/resolv.dnsmasq.conf <<-EOE
@@ -325,7 +326,8 @@ EOF
 }
 
 clear_hotdnsq() {
-    rm -f /etc/hotplug.d/iface/100-hi-bypass-dnsmasq
+    rm -f /etc/hotplug.d/iface/100-hi-bypass-dnsmasq    # 下次更新删除这行
+    rm -f /etc/hotplug.d/iface/99-hi-wireguard-dnsmasq
     local gatewayIP=$(ip route show 1/0 | head -n1 | sed -e 's/^default//' | awk '{print $2}' | awk -F. '$1<=255&&$2<=255&&$3<=255&&$4<=255{print $1"."$2"."$3"."$4}')
     if [ -n "${gatewayIP}" ]; then
         cat > /etc/resolv.dnsmasq.conf <<-EOE
