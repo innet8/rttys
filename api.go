@@ -1325,6 +1325,7 @@ func apiStart(br *broker) {
 			"source",
 			"prio",
 			"out_ip",
+			"rule",
 		}).Where(map[string]interface{}{
 			"status": "use",
 			"devid":  devid,
