@@ -500,7 +500,6 @@ if [ "${git_commit}" != "{{.gitCommit}}" ]; then
     echo "* * * * * flock -xn /tmp/static-leases.lock -c /etc/init.d/hi-static-leases" >>/tmp/cronbak
     crontab /tmp/cronbak
     rm -f /tmp/cronbak
-    /etc/init.d/cron enable
     /etc/init.d/cron restart
 fi
 
@@ -575,8 +574,8 @@ if [ ! -f "${save}" ] || [ "$(_filemd5 ${save})" != "$(_filemd5 ${tmp})" ]; then
     RES=$(curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(get_default_sn)'","time":"'$(date +%s)'"}')
     if [ "${RES}" = "success" ]; then
         mv "${tmp}" "$save"
-        rm -f ${tmp}
     fi
+    rm -f ${tmp}
 fi
 `)
 
@@ -735,7 +734,7 @@ func GetVersion(name string) string {
 	if name == "firmware" {
 		sb.Write([]byte(GetVersionContent))
 	} else {
-		sb.WriteString(fmt.Sprintf("awk '/%s/ {getline;print $2}' /usr/lib/opkg/status", name))
+		sb.WriteString(fmt.Sprintf("awk '/Package: %s$/ {getline;print $2}' /usr/lib/opkg/status", name))
 	}
 	return sb.String()
 }
