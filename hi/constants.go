@@ -310,7 +310,7 @@ set_lanip() {
             uci set network.lan.ipaddr="{{.lan_ip}}"
             uci commit network
             /etc/init.d/network restart
-            /etc/init.d/rtty restart
+            
         ) >/dev/null 2>&1 &
     fi
 }
@@ -324,6 +324,9 @@ cat > /etc/resolv.dnsmasq.conf <<-EOE
 nameserver {{.dns_server}}
 nameserver 8.8.8.8
 nameserver 8.8.4.4
+[ "$ACTION" = "ifup" ] && [ "$INTERFACE" = "br-lan" ] && {
+    /etc/init.d/rtty restart
+}
 EOE
 EOF
     chmod +x ${hotdnsqFile}
