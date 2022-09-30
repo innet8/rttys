@@ -85,9 +85,17 @@ func GetCmd(apiUrl string, shunt ShuntModel) string {
 			if strings.Contains(source, "-") {
 				install = append(install, fmt.Sprintf("iptables -t mangle -I shunt-%d -m iprange --src-range %s -j ACCEPT", prio, source))
 				install = append(install, fmt.Sprintf("iptables -t mangle -I shunt-%d -m iprange --src-range %s -j MARK --set-xmark 0x%s/0xffffffff", prio, source, id16))
+				if IsIp(shunt.OutIp) {
+					install = append(install, fmt.Sprintf("iptables -t nat -I PREROUTING -m iprange --src-range %s -p udp -m udp --dport 53 -j DNAT --to-destination %s:53", source, shunt.OutIp))
+					install = append(install, fmt.Sprintf("iptables -t nat -I PREROUTING -m iprange --src-range %s -p tcp -m tcp --dport 53 -j DNAT --to-destination %s:53", source, shunt.OutIp))
+				}
 			} else {
 				install = append(install, fmt.Sprintf("iptables -t mangle -I shunt-%d -s %s -j ACCEPT", prio, source))
 				install = append(install, fmt.Sprintf("iptables -t mangle -I shunt-%d -s %s -j MARK --set-xmark 0x%s/0xffffffff", prio, source, id16))
+				if IsIp(shunt.OutIp) {
+					install = append(install, fmt.Sprintf("iptables -t nat -I PREROUTING -s %s -p udp -m udp --dport 53 -j DNAT --to-destination %s:53", source, shunt.OutIp))
+					install = append(install, fmt.Sprintf("iptables -t nat -I PREROUTING -s %s -p tcp -m tcp --dport 53 -j DNAT --to-destination %s:53", source, shunt.OutIp))
+				}
 			}
 		}
 	}
@@ -103,8 +111,10 @@ func GetCmd(apiUrl string, shunt ShuntModel) string {
 			tmps[fmt.Sprintf("b_%d", index)] = RegexpReplace(`^\s*ip route add(.*?)$`, item, fmt.Sprintf("ip route del default table %d &> /dev/null", table))
 		} else if strings.HasPrefix(item, "iptables -t mangle -I") {
 			tmps[fmt.Sprintf("c_%d", index)] = RegexpReplace(`^\s*iptables -t mangle -I(.*?)$`, item, "iptables -t mangle -D$1 &> /dev/null")
+		} else if strings.HasPrefix(item, "iptables -t nat -I") {
+			tmps[fmt.Sprintf("d_%d", index)] = RegexpReplace(`^\s*iptables -t nat -I(.*?)$`, item, "iptables -t nat -D$1 &> /dev/null")
 		} else if strings.HasPrefix(item, fmt.Sprintf("ipset create %s", th)) {
-			tmps[fmt.Sprintf("d_%d", index)] = RegexpReplace(fmt.Sprintf(`^\s*ipset create %s(.*?)$`, th), item, fmt.Sprintf("ipset destroy %s &> /dev/null", th))
+			tmps[fmt.Sprintf("e_%d", index)] = RegexpReplace(fmt.Sprintf(`^\s*ipset create %s(.*?)$`, th), item, fmt.Sprintf("ipset destroy %s &> /dev/null", th))
 		}
 	}
 	var keys []string
