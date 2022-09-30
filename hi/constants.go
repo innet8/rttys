@@ -324,10 +324,10 @@ cat > /etc/resolv.dnsmasq.conf <<-EOE
 nameserver {{.dns_server}}
 nameserver 8.8.8.8
 nameserver 8.8.4.4
+EOE
 [ "\$ACTION" = "ifup" ] && [ "\$INTERFACE" = "br-lan" ] && {
     /etc/init.d/rtty restart
 }
-EOE
 EOF
     chmod +x ${hotdnsqFile}
     ${hotdnsqFile}
