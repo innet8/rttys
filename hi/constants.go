@@ -182,7 +182,7 @@ wireguard_start() {
     fi
     if [ "$enable" = "1" ]; then
         if [ "$(wireguard_hotup)" = "no" ]; then
-            /bin/sh /etc/rc.common /etc/init.d/wireguard downup
+            /etc/init.d/wireguard downup
         fi
         wireguard_confirm downup
     else
@@ -192,16 +192,21 @@ wireguard_start() {
         #
         uci set wireguard.@proxy[0].enable="1"
         uci commit wireguard
-        /bin/sh /etc/rc.common /etc/init.d/wireguard start
+        /etc/init.d/wireguard start
         wireguard_confirm start
     fi
 }
 
 wireguard_confirm() {
     (
-        sleep 3
+        sleep 5
         if [ -z "$(wg)" ]; then
-            /bin/sh /etc/rc.common /etc/init.d/wireguard $1
+            /etc/init.d/wireguard $1
+        else
+            local endpoint=$(uci get wireguard.@peers[0].end_point | awk -F':' '{print $1}')
+            if [ -z "$(route -n |grep $endpoint)" ]; then
+                /etc/init.d/wireguard downup
+            fi
         fi
     ) >/dev/null 2>&1 &
 }
@@ -491,13 +496,15 @@ if [ "${git_commit}" != "{{.gitCommit}}" ]; then
     curl -sSL -4 -o "/etc/hotplug.d/net/99-hi-wifi" "{{.wifiCmdUrl}}"
     chmod +x /etc/hotplug.d/net/99-hi-wifi
 
-    curl -sSL -4 -o "/etc/init.d/hi-static-leases" "{{.staticLeasesCmdUrl}}"
-    chmod +x /etc/init.d/hi-static-leases
+    curl -sSL -4 -o "/usr/sbin/hi-static-leases" "{{.staticLeasesCmdUrl}}"
+    chmod +x /usr/sbin/hi-static-leases
     rm -f /tmp/.hi_static_leases
+
+    curl -sSL -4 -o "/usr/sbin/hi-clients" "{{.dhcpCmdUrl}}"
+    chmod +x /usr/sbin/hi-clients
     crontab -l >/tmp/cronbak
-    sed -i '/\/etc\/init.d\/hi-static-leases/d' /tmp/cronbak
-    sed -i '/^$/d' /tmp/cronbak
-    echo "* * * * * flock -xn /tmp/static-leases.lock -c /etc/init.d/hi-static-leases" >>/tmp/cronbak
+    sed -i '/hi-clients/d' /tmp/cronbak
+    echo "* * * * * flock -xn /tmp/hi-clients.lock -c /usr/sbin/hi-clients" >>/tmp/cronbak
     crontab /tmp/cronbak
     rm -f /tmp/cronbak
     /etc/init.d/cron restart
@@ -505,7 +512,8 @@ fi
 
 /etc/hotplug.d/dhcp/99-hi-dhcp &
 /etc/hotplug.d/net/99-hi-wifi &
-/etc/init.d/hi-static-leases &
+/usr/sbin/hi-static-leases &
+/usr/sbin/hi-clients &
 `)
 
 // ApiReportAdded todo 上报终端列表时处理一下同个ip只保留最新的mac地址
@@ -551,20 +559,22 @@ curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"conte
 `)
 
 const StaticLeasesReportAdded = string(`
-get_static_leases() {
-    local list=""
-    for mac_str in $(cat /etc/config/dhcp | grep '\<host\>' | awk '{print $3}' | sed -r "s/'//g"); do
-        tmp='{"mac":"'$(uci get dhcp.$mac_str.mac 2>/dev/null)'","ip":"'$(uci get dhcp.$mac_str.ip 2>/dev/null)'","name":"'$(uci get dhcp.$mac_str.name 2>/dev/null)'"}'
-        if [ -z "$list" ]; then
-            list=$tmp
-        else
-            list="$list,$tmp"
-        fi
-    done
-    echo -e '{"code":0,"list":['"$list"']}'
+list=""
+function host_func() {
+    config_get ip $1 "ip"
+    config_get mac $1 "mac"
+    config_get name $1 "name"
+    tmp='{"mac":"'$mac'","ip":"'$ip'","name":"'$name'"}'
+    if [ -z "$list" ]; then
+        list=$tmp
+    else
+        list="$list,$tmp"
+    fi
 }
 
-RES=$(get_static_leases)
+config_load dhcp
+config_foreach host_func host
+RES=$(echo -e '{"code":0,"list":['"$list"']}')
 save="/tmp/.hi_static_leases"
 tmp="/tmp/.hi_$(_random)"
 cat >${tmp} <<-EOF
@@ -575,8 +585,8 @@ if [ ! -f "${save}" ] || [ "$(_filemd5 ${save})" != "$(_filemd5 ${tmp})" ]; then
     if [ "${RES}" = "success" ]; then
         mv "${tmp}" "$save"
     fi
-    rm -f ${tmp}
 fi
+rm -f ${tmp}
 `)
 
 const SetStaticLeasesContent = string(`
@@ -592,8 +602,8 @@ done
 uci commit dhcp
 
 # report
-if [ -f "/etc/init.d/hi-static-leases" ]; then
-    /etc/init.d/hi-static-leases &
+if [ -f "/usr/sbin/hi-static-leases" ]; then
+    /usr/sbin/hi-static-leases &
 fi
 `)
 
