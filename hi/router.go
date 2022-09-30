@@ -40,20 +40,7 @@ func FirmwareUpgradeCmd(path string) string {
 }
 
 func VersionCmd(name string) string {
-	var cmds []string
-	if name == "firmware" {
-		cmds = append(cmds, "#!/bin/sh")
-		cmds = append(cmds, "if [ -e '/etc/glversion' ]; then")
-		cmds = append(cmds, "version=$(cat /etc/glversion)")
-		cmds = append(cmds, "else")
-		cmds = append(cmds, "version=$(cat /etc/openwrt_release|grep DISTRIB_RELEASE |awk -F'=' '{gsub(/\\047/,\"\"); print $2}')")
-		cmds = append(cmds, "fi")
-		cmds = append(cmds, "model=$(cat /etc/board.json |grep id|awk '{gsub(/[\",]+/,\"\"); print $2}')")
-		cmds = append(cmds, "echo -e '{\"version\":\"'$version'\",\"model\":\"'$model'\"}'")
-	} else {
-		cmds = append(cmds, fmt.Sprintf("opkg info %s |grep 'Version' |awk '{print $2=$2}'", name))
-	}
-	return strings.Join(cmds, "\n")
+	return GetVersion(name)
 }
 
 func WireguardCmd(wg WgModel) string {
@@ -103,6 +90,21 @@ func StaticLeasesCmd(list []StaticLeasesModel) string {
 	return SetStaticLeasesTemplate(envMap)
 }
 
+func BlockedCmd(list []string, action string, url string) string {
+	newList := map[string]interface{}{
+		"macs": list,
+	}
+	var cmds, err = json.Marshal(newList)
+	if err != nil {
+		return ""
+	}
+	var envMap = make(map[string]interface{})
+	envMap["macs"] = string(cmds)
+	envMap["action"] = action
+	envMap["reportUrl"] = fmt.Sprintf("%s/hi/base/report/dhcp", url)
+	return BlockedTemplate(envMap)
+}
+
 // ApiResultCheck 验证路由器接口返回内容是否正确（不正确返回空）
 func ApiResultCheck(result string) string {
 	type RouterClientsModel struct {
@@ -138,7 +140,6 @@ func EditWifiCmd(wifi WifiModel) string {
 	}
 	if wifi.Disabled != "" {
 		cmds = append(cmds, fmt.Sprintf("uci set wireless.$1.disabled=%s", wifi.Disabled))
-		ex = append(ex, fmt.Sprintf("uci set wireless.%s.disabled=%s", wifi.Device, wifi.Disabled))
 	}
 
 	var envMap = make(map[string]interface{})
@@ -149,13 +150,12 @@ func EditWifiCmd(wifi WifiModel) string {
 	return EditWifiTemplate(envMap)
 }
 
-func SpeedtestCmd() string {
+func SpeedtestCmd(callurl string) string {
 	var cmds []string
 	cmds = append(cmds, "#!/bin/sh")
-	cmds = append(cmds, "if [ -z $(which speedtest_cpp) ]; then")
-	cmds = append(cmds, "echo '{\"code\":404,\"msg\":\"no speedtest_cpp,please install\"}'")
-	cmds = append(cmds, "else")
-	cmds = append(cmds, "flock -xn /tmp/speedtest.lock -c speedtest_cpp --output json")
+	cmds = append(cmds, "if [ -z $(ps | grep '[s]peedtest_cpp' | awk '{print $1}') ]; then")
+	cmds = append(cmds, "speedtest_cpp --output json >/tmp/speedtest")
+	cmds = append(cmds, fmt.Sprintf("curl -4 -X POST %s -H 'Content-Type: application/json' -d $(cat /tmp/speedtest)", callurl))
 	cmds = append(cmds, "fi")
 	return strings.Join(cmds, "\n")
 }

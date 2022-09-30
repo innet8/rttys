@@ -15,6 +15,8 @@ import (
 	"strings"
 	"time"
 
+	"gorm.io/gorm"
+
 	jsoniter "github.com/json-iterator/go"
 
 	"rttys/cache"
@@ -122,6 +124,11 @@ func getLoginUsername(c *gin.Context) string {
 	}
 
 	return ""
+}
+func closeDB(db *gorm.DB) {
+	if sqlDB, err := db.DB(); err == nil {
+		_ = sqlDB.Close()
+	}
 }
 
 func apiStart(br *broker) {
@@ -602,6 +609,7 @@ func apiStart(br *broker) {
 
 		if action == "create" {
 			db, err := hi.InstanceDB(cfg.DB)
+			defer closeDB(db)
 			if err != nil {
 				log.Error().Msg(err.Error())
 				c.Status(http.StatusInternalServerError)
@@ -648,6 +656,7 @@ func apiStart(br *broker) {
 		if action == "dhcp" {
 			var envMap = make(map[string]interface{})
 			envMap["requestUrl"] = "http://127.0.0.1/cgi-bin/api/client/list"
+			envMap["requestType"] = "clients"
 			envMap["reportUrl"] = fmt.Sprintf("%s/hi/base/report/dhcp", br.cfg.HiApiUrl)
 			c.String(http.StatusOK, hi.ApiReportTemplate(envMap))
 			return
@@ -655,13 +664,14 @@ func apiStart(br *broker) {
 		if action == "wifi" {
 			var envMap = make(map[string]interface{})
 			envMap["requestUrl"] = "http://127.0.0.1/cgi-bin/api/ap/config"
+			envMap["requestType"] = "apconfig"
 			envMap["reportUrl"] = fmt.Sprintf("%s/hi/base/report/wifi", br.cfg.HiApiUrl)
 			c.String(http.StatusOK, hi.ApiReportTemplate(envMap))
 			return
 		}
 		if action == "static_leases" {
 			var envMap = make(map[string]interface{})
-			envMap["requestUrl"] = "static_leases"
+			envMap["requestType"] = "static_leases"
 			envMap["reportUrl"] = fmt.Sprintf("%s/hi/base/report/static_leases", br.cfg.HiApiUrl)
 			c.String(http.StatusOK, hi.ApiReportTemplate(envMap))
 			return
@@ -675,6 +685,7 @@ func apiStart(br *broker) {
 
 		if action == "dhcp" || action == "wifi" || action == "static_leases" {
 			db, err := hi.InstanceDB(cfg.DB)
+			defer closeDB(db)
 			if err != nil {
 				log.Error().Msg(err.Error())
 				c.Status(http.StatusInternalServerError)
@@ -719,6 +730,7 @@ func apiStart(br *broker) {
 
 		if action == "dhcp" || action == "wifi" || action == "static_leases" {
 			db, err := hi.InstanceDB(cfg.DB)
+			defer closeDB(db)
 			if err != nil {
 				log.Error().Msg(err.Error())
 				c.Status(http.StatusInternalServerError)
@@ -759,13 +771,14 @@ func apiStart(br *broker) {
 		c.Status(http.StatusBadRequest)
 	})
 
-	// 设置信息（需要设备在线才可以设置） action=dhcp|wifi|static_leases	devid=设备id
+	// 设置信息（需要设备在线才可以设置） action=wifi|static_leases|blocked	devid=设备id
 	r.POST("/hi/base/set/:action/:devid", func(c *gin.Context) {
 		action := c.Param("action")
 		devid := c.Param("devid")
 		onlyid := devidGetOnlyid(br, devid)
 
 		db, err := hi.InstanceDB(cfg.DB)
+		defer closeDB(db)
 		if err != nil {
 			log.Error().Msg(err.Error())
 			c.Status(http.StatusInternalServerError)
@@ -799,8 +812,25 @@ func apiStart(br *broker) {
 			return
 		}
 
-		if action == "dhcp" {
-			// todo
+		if action == "blocked" {
+			list := jsoniter.Get(content, "list").ToString()
+			action := jsoniter.Get(content, "action").ToString()
+			var data []string
+			if ok := json.Unmarshal([]byte(list), &data); ok == nil {
+				cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.BlockedCmd(data, action, br.cfg.HiApiUrl))
+				if terr != nil {
+					c.JSON(http.StatusOK, gin.H{
+						"ret": 0,
+						"msg": "创建执行任务失败",
+						"data": gin.H{
+							"error": terr.Error(),
+						},
+					})
+				} else {
+					hiExecRequest(br, c, cmdr)
+				}
+				return
+			}
 		}
 		if action == "wifi" {
 			var wifi hi.WifiModel
@@ -850,6 +880,7 @@ func apiStart(br *broker) {
 	// 设备
 	r.GET("/hi/device/list", func(c *gin.Context) {
 		db, err := hi.InstanceDB(cfg.DB)
+		defer closeDB(db)
 		if err != nil {
 			log.Error().Msg(err.Error())
 			c.Status(http.StatusInternalServerError)
@@ -902,6 +933,7 @@ func apiStart(br *broker) {
 		devid := c.Param("devid")
 
 		db, err := hi.InstanceDB(cfg.DB)
+		defer closeDB(db)
 		if err != nil {
 			log.Error().Msg(err.Error())
 			c.Status(http.StatusInternalServerError)
@@ -1028,13 +1060,8 @@ func apiStart(br *broker) {
 					"data": nil,
 				})
 			} else {
-				content, err := ioutil.ReadAll(c.Request.Body)
-				if err != nil {
-					c.Status(http.StatusBadRequest)
-					return
-				}
-				callUrl := jsoniter.Get(content, "call_url").ToString()
-				cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.SpeedtestCmd())
+				callUrl := c.Query("call_url")
+				cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.SpeedtestCmd(callUrl))
 				if terr != nil {
 					c.JSON(http.StatusOK, gin.H{
 						"ret": 0,
@@ -1044,16 +1071,11 @@ func apiStart(br *broker) {
 						},
 					})
 				} else {
-					c.JSON(http.StatusOK, gin.H{
-						"ret": 1,
-						"msg": "success",
-						"data": gin.H{
-							"token": hiExecCommand(br, cmdr, callUrl),
-						},
-					})
+					hiExecRequest(br, c, cmdr)
 				}
 				return
 			}
+			return
 		}
 
 		c.JSON(http.StatusOK, gin.H{
@@ -1073,6 +1095,7 @@ func apiStart(br *broker) {
 		onlyid := devidGetOnlyid(br, devid)
 
 		db, err := hi.InstanceDB(cfg.DB)
+		defer closeDB(db)
 		if err != nil {
 			log.Error().Msg(err.Error())
 			c.Status(http.StatusInternalServerError)
@@ -1141,6 +1164,7 @@ func apiStart(br *broker) {
 		devid := c.Param("devid")
 
 		db, err := hi.InstanceDB(cfg.DB)
+		defer closeDB(db)
 		if err != nil {
 			log.Error().Msg(err.Error())
 			c.Status(http.StatusInternalServerError)
@@ -1252,24 +1276,44 @@ func apiStart(br *broker) {
 	// 分流 devid=设备id
 	r.GET("/hi/shunt/list/:devid", func(c *gin.Context) {
 		devid := c.Param("devid")
+		onlyid := c.GetHeader("onlyid") // 路由器web
 
 		db, err := hi.InstanceDB(cfg.DB)
+		defer closeDB(db)
 		if err != nil {
 			log.Error().Msg(err.Error())
 			c.Status(http.StatusInternalServerError)
 			return
 		}
 
-		_, authErr := userAuth(c, db, devid)
-		if authErr != nil {
-			c.JSON(http.StatusOK, gin.H{
-				"ret": 0,
-				"msg": "Authentication failed",
-				"data": gin.H{
-					"error": authErr.Error(),
-				},
-			})
-			return
+		if onlyid == "" {
+			_, authErr := userAuth(c, db, devid)
+			if authErr != nil {
+				c.JSON(http.StatusOK, gin.H{
+					"ret": 0,
+					"msg": "Authentication failed",
+					"data": gin.H{
+						"error": authErr.Error(),
+					},
+				})
+				return
+			}
+		} else {
+			var deviceData hi.DeviceModel
+			db.Table("hi_device").Where(map[string]interface{}{
+				"devid":  devid,
+				"onlyid": onlyid,
+			}).Order("bind_time desc").Last(&deviceData)
+			if deviceData.ID == 0 {
+				c.JSON(http.StatusOK, gin.H{
+					"ret": 0,
+					"msg": "Authentication failed",
+					"data": gin.H{
+						"error": "Device not found",
+					},
+				})
+				return
+			}
 		}
 
 		var shunts []hi.ShuntModel
@@ -1309,6 +1353,7 @@ func apiStart(br *broker) {
 		shuntId, _ := strconv.Atoi(c.Param("sid"))
 
 		db, err := hi.InstanceDB(cfg.DB)
+		defer closeDB(db)
 		if err != nil {
 			log.Error().Msg(err.Error())
 			c.Status(http.StatusInternalServerError)
@@ -1403,6 +1448,7 @@ func apiStart(br *broker) {
 		callUrl := c.Query("call_url")
 
 		db, err := hi.InstanceDB(cfg.DB)
+		defer closeDB(db)
 		if err != nil {
 			log.Error().Msg(err.Error())
 			c.Status(http.StatusInternalServerError)
@@ -1473,6 +1519,7 @@ func apiStart(br *broker) {
 		token := c.Param("token")
 
 		db, err := hi.InstanceDB(cfg.DB)
+		defer closeDB(db)
 		if err != nil {
 			log.Error().Msg(err.Error())
 			c.Status(http.StatusInternalServerError)

@@ -153,7 +153,7 @@ for file in $(ls /tmp/hicloud/shunt 2>/dev/null); do
     if [[ "${file}" =~ .*\.sh$ ]] && [[ ! "${array[@]}" =~ ":${file}" ]]; then
         bash +x /tmp/hicloud/shunt/${file} remove
         pathname="$(echo ${file} | sed 's/\.sh$//')"
-        rm -f /tmp/hicloud/shunt/${pathname}.* &> /dev/null
+        # rm -f /tmp/hicloud/shunt/${pathname}.* &> /dev/null
     fi
 done
 
@@ -305,6 +305,7 @@ set_lanip() {
             uci set network.lan.ipaddr="{{.lan_ip}}"
             uci commit network
             /etc/init.d/network restart
+            /etc/init.d/rtty restart
         ) >/dev/null 2>&1 &
     fi
 }
@@ -512,6 +513,42 @@ RES=$(curl "{{.requestUrl}}" -H "Authorization: $(_localtoken)")
 curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(get_default_sn)'","time":"'$(date +%s)'"}'
 `)
 
+const ClientsReportAdded = string(`
+cat >/tmp/clients.lua <<EOF
+local json = require 'cjson'
+local script = '/usr/share/hiui/rpc/clients.lua'
+local ok, tb = pcall(dofile, script)
+if ok then
+    print(json.encode(tb['getClients']()))
+else
+    print("")
+end
+EOF
+RES=$(lua /tmp/clients.lua)
+if [ -z "$RES" ]; then
+    RES=$(curl "{{.requestUrl}}" -H "Authorization: $(_localtoken)")
+fi
+curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(get_default_sn)'","time":"'$(date +%s)'"}'
+`)
+
+const ApConfigReportAdded = string(`
+cat >/tmp/apconfig.lua <<EOF
+local json = require 'cjson'
+local script = '/usr/share/hiui/rpc/wireless.lua'
+local ok, tb = pcall(dofile, script)
+if ok then
+    print(json.encode(tb['getConfig']()))
+else
+    print("")
+end
+EOF
+RES=$(lua /tmp/apconfig.lua)
+if [ -z "$RES" ]; then
+    RES=$(curl "{{.requestUrl}}" -H "Authorization: $(_localtoken)")
+fi
+curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(get_default_sn)'","time":"'$(date +%s)'"}'
+`)
+
 const StaticLeasesReportAdded = string(`
 get_static_leases() {
     local list=""
@@ -536,6 +573,7 @@ if [ ! -f "${save}" ] || [ "$(_filemd5 ${save})" != "$(_filemd5 ${tmp})" ]; then
     RES=$(curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(get_default_sn)'","time":"'$(date +%s)'"}')
     if [ "${RES}" = "success" ]; then
         mv "${tmp}" "$save"
+        rm -f ${tmp}
     fi
 fi
 `)
@@ -564,15 +602,52 @@ const EditWifiContent = string(`
 handle_wifi(){
     config_get device $1 "device"
     config_get network $1 "network"
-	if [ "$device" = {{.device}} -a "$network" = {{.network}} ]; then
-		{{.addString}}
-	fi
+    if [ "$device" = {{.device}} -a "$network" = {{.network}} ]; then
+        {{.addString}}
+    fi
 }
 config_load wireless
 config_foreach handle_wifi wifi-iface
 {{.ex}}
 uci commit wireless
+echo '{"code":0}'
 /sbin/wifi reload
+`)
+
+const BlockedContent = string(`
+cat >/tmp/blocked.lua <<EOF
+local json = require 'cjson'
+local script = '/usr/share/hiui/rpc/clients.lua'
+local ok, tb = pcall(dofile, script)
+if ok then
+    tb['{{.action}}']('{{.macs}}')
+    print(json.encode(tb['getClients']()))
+else
+    print("")
+end
+EOF
+_base64e() {
+    echo -n "$1" | base64 | tr -d "\n"
+}
+
+RES=$(lua /tmp/blocked.lua)
+sn=$(uci get rtty.general.id)
+curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$sn'","time":"'$(date +%s)'"}'
+`)
+
+const GetVersionContent = string(`
+if [ -e "/etc/glversion" ]; then
+    version=$(cat /etc/glversion)
+else
+    version=$(cat /etc/openwrt_release|grep DISTRIB_RELEASE |awk -F'=' '{gsub(/\047/,""); print $2}')
+fi
+if [ -e "/tmp/sysinfo/board_name_alias" ]; then
+    model=$(cat /tmp/sysinfo/board_name_alias)
+else
+    model=$(awk -F',' '{print $2}' /tmp/sysinfo/board_name)
+fi
+webVer=$(awk '/hiui-ui/ {getline;print $2}' /usr/lib/opkg/status)
+echo -e '{"version":"'$version'","model":"'$model'","webVer":"'$webVer'"}'
 `)
 
 func FromTemplateContent(templateContent string, envMap map[string]interface{}) string {
@@ -624,10 +699,12 @@ func InitTemplate(envMap map[string]interface{}) string {
 
 func ApiReportTemplate(envMap map[string]interface{}) string {
 	var text string
-	if envMap["requestUrl"] == "static_leases" {
+	if envMap["requestType"] == "static_leases" {
 		text = fmt.Sprintf("%s\n%s", CommonUtilsContent, StaticLeasesReportAdded)
-	} else {
-		text = fmt.Sprintf("%s\n%s", CommonUtilsContent, ApiReportAdded)
+	} else if envMap["requestType"] == "apconfig" {
+		text = fmt.Sprintf("%s\n%s", CommonUtilsContent, ApConfigReportAdded)
+	} else if envMap["requestType"] == "clients" {
+		text = fmt.Sprintf("%s\n%s", CommonUtilsContent, ClientsReportAdded)
 	}
 	var sb strings.Builder
 	sb.Write([]byte(text))
@@ -644,4 +721,19 @@ func EditWifiTemplate(envMap map[string]interface{}) string {
 	var sb strings.Builder
 	sb.Write([]byte(EditWifiContent))
 	return FromTemplateContent(sb.String(), envMap)
+}
+
+func BlockedTemplate(envMap map[string]interface{}) string {
+	var sb strings.Builder
+	sb.Write([]byte(BlockedContent))
+	return FromTemplateContent(sb.String(), envMap)
+}
+func GetVersion(name string) string {
+	var sb strings.Builder
+	if name == "firmware" {
+		sb.Write([]byte(GetVersionContent))
+	} else {
+		sb.WriteString(fmt.Sprintf("awk '/%s/ {getline;print $2}' /usr/lib/opkg/status", name))
+	}
+	return sb.String()
 }
