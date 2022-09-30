@@ -62,6 +62,7 @@ func WireguardCmd(wg WgModel) string {
 	var envMap = make(map[string]interface{})
 	envMap["wg_conf"] = wg.Conf
 	envMap["lan_ip"] = wg.LanIp
+	envMap["dns_server"] = wg.DnsServer
 	cmds = append(cmds, WireguardTemplate(envMap))
 	//
 	if wg.ID == 0 {
@@ -74,6 +75,13 @@ func WireguardCmd(wg WgModel) string {
 	if IsIp(wg.LanIp) {
 		// 设置lan
 		cmds = append(cmds, "set_lanip")
+	}
+	if IsIp(wg.DnsServer) {
+		// 设置dns服务器ip
+		cmds = append(cmds, "set_hotdnsq")
+	} else {
+		// 取消dns服务器ip
+		cmds = append(cmds, "clear_hotdnsq")
 	}
 	return strings.Join(cmds, "\n")
 }

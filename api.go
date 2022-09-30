@@ -1173,6 +1173,7 @@ func apiStart(br *broker) {
 			wg.Onlyid = devidGetOnlyid(br, devid)
 			wg.Conf = jsoniter.Get(content, "conf").ToString()
 			wg.LanIp = jsoniter.Get(content, "lan_ip").ToString()
+			wg.DnsServer = jsoniter.Get(content, "dns_server").ToString()
 			wg.Status = "use"
 			if !strings.Contains(wg.Conf, "config proxy") || !strings.Contains(wg.Conf, "config peers") {
 				c.JSON(http.StatusOK, gin.H{

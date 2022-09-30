@@ -308,6 +308,32 @@ set_lanip() {
         ) >/dev/null 2>&1 &
     fi
 }
+
+set_hotdnsq() {
+    hotdnsqFile=/etc/hotplug.d/iface/100-hi-bypass-dnsmasq
+    cat > ${hotdnsqFile} <<-EOF
+#!/bin/sh
+cat > /etc/resolv.dnsmasq.conf <<-EOE
+nameserver {{.dns_server}}
+nameserver 8.8.8.8
+nameserver 8.8.4.4
+EOE
+EOF
+    chmod +x ${hotdnsqFile}
+    ${hotdnsqFile}
+}
+
+clear_hotdnsq() {
+    rm -f /etc/hotplug.d/iface/100-hi-bypass-dnsmasq
+    local gatewayIP=$(ip route show 1/0 | head -n1 | sed -e 's/^default//' | awk '{print $2}' | awk -F. '$1<=255&&$2<=255&&$3<=255&&$4<=255{print $1"."$2"."$3"."$4}')
+    if [ -n "${gatewayIP}" ]; then
+        cat > /etc/resolv.dnsmasq.conf <<-EOE
+nameserver ${gatewayIP}
+nameserver 8.8.8.8
+nameserver 8.8.4.4
+EOE
+    fi
+}
 `)
 
 const WireguardConfExample = string(`

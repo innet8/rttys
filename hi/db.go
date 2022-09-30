@@ -55,12 +55,13 @@ type ShuntModel struct {
 }
 
 type WgModel struct {
-	ID     uint32 `json:"id"`
-	Devid  string `json:"devid"`
-	Onlyid string `json:"onlyid"`
-	Conf   string `json:"conf"`
-	LanIp  string `json:"lan_ip"`
-	Status string `json:"status"`
+	ID        uint32 `json:"id"`
+	Devid     string `json:"devid"`
+	Onlyid    string `json:"onlyid"`
+	Conf      string `json:"conf"`
+	LanIp     string `json:"lan_ip"`
+	DnsServer string `json:"dns_server"`
+	Status    string `json:"status"`
 }
 
 type CmdrModel struct {

@@ -58,7 +58,7 @@ func initDb(cfg *config.Config) error {
 		return err
 	}
 
-	_, err = db.Exec(fmt.Sprintf(`CREATE TABLE IF NOT EXISTS hi_wg(id integer NOT NULL PRIMARY KEY %s, devid VARCHAR(100) NOT NULL, onlyid VARCHAR(100) NOT NULL, conf TEXT NOT NULL, lan_ip VARCHAR(100) NOT NULL, status VARCHAR(20) NOT NULL)`, autoIncrement))
+	_, err = db.Exec(fmt.Sprintf(`CREATE TABLE IF NOT EXISTS hi_wg(id integer NOT NULL PRIMARY KEY %s, devid VARCHAR(100) NOT NULL, onlyid VARCHAR(100) NOT NULL, conf TEXT NOT NULL, lan_ip VARCHAR(100) NOT NULL, dns_server VARCHAR(100) NOT NULL, status VARCHAR(20) NOT NULL)`, autoIncrement))
 	if err != nil {
 		return err
 	}
