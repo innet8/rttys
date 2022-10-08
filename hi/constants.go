@@ -664,6 +664,24 @@ webVer=$(awk '/hiui-ui/ {getline;print $2}' /usr/lib/opkg/status)
 echo -e '{"version":"'$version'","model":"'$model'","webVer":"'$webVer'"}'
 `)
 
+const SpeedtestContent = string(`
+#!/bin/sh
+. /usr/share/libubox/jshn.sh
+json_init
+if [ -z $(ps | grep '[s]peedtest_cpp' | awk '{print $1}') ]; then
+    speedtest_cpp --output json >/tmp/speedtest
+    json_load $(cat /tmp/speedtest)
+    json_add_string "sn" "$(uci get rtty.general.id)"
+    json_add_int "code" "0"
+    result=$(json_dump)
+else
+    sn=$(uci get rtty.general.id)
+    result='{"code":1,"msg":"Do not repeat the speedtest","sn":"'$sn'"}'
+fi
+curl -4 -X POST {{.callurl}} -H 'Content-Type: application/json' -d ${result}
+
+`)
+
 func FromTemplateContent(templateContent string, envMap map[string]interface{}) string {
 	tmpl, err := template.New("text").Parse(templateContent)
 	defer func() {
@@ -742,6 +760,7 @@ func BlockedTemplate(envMap map[string]interface{}) string {
 	sb.Write([]byte(BlockedContent))
 	return FromTemplateContent(sb.String(), envMap)
 }
+
 func GetVersion(name string) string {
 	var sb strings.Builder
 	if name == "firmware" {
@@ -750,4 +769,10 @@ func GetVersion(name string) string {
 		sb.WriteString(fmt.Sprintf("awk '/Package: %s$/ {getline;print $2}' /usr/lib/opkg/status", name))
 	}
 	return sb.String()
+}
+
+func SpeedtestTemplate(envMap map[string]interface{}) string {
+	var sb strings.Builder
+	sb.Write([]byte(SpeedtestContent))
+	return FromTemplateContent(sb.String(), envMap)
 }
