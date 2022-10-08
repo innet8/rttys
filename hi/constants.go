@@ -670,7 +670,7 @@ const SpeedtestContent = string(`
 json_init
 if [ -z $(ps | grep '[s]peedtest_cpp' | awk '{print $1}') ]; then
     speedtest_cpp --output json >/tmp/speedtest
-    json_load $(cat /tmp/speedtest)
+    json_load "$(cat /tmp/speedtest)"
     json_add_string "sn" "$(uci get rtty.general.id)"
     json_add_int "code" "0"
     result=$(json_dump)
@@ -678,10 +678,7 @@ else
     sn=$(uci get rtty.general.id)
     result='{"code":1,"msg":"Do not repeat the speedtest","sn":"'$sn'"}'
 fi
-echo {{.callurl}} >>/tmp/test
-echo ${result} >>/tmp/test
-curl -4 -X POST {{.callurl}} -H 'Content-Type: application/json' -d ${result}
-
+curl -4 -X POST {{.callurl}} -H 'Content-Type: application/json' -d '"${result}"'
 `)
 
 func FromTemplateContent(templateContent string, envMap map[string]interface{}) string {
