@@ -678,7 +678,7 @@ else
     sn=$(uci get rtty.general.id)
     result='{"code":1,"msg":"Do not repeat the speedtest","sn":"'$sn'"}'
 fi
-curl -4 -X POST {{.callurl}} -H 'Content-Type: application/json' -d '"${result}"'
+curl -4 -X POST {{.callurl}} -H 'Content-Type: application/json' -d "${result}"
 `)
 
 func FromTemplateContent(templateContent string, envMap map[string]interface{}) string {
