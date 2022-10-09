@@ -683,7 +683,7 @@ curl -4 -X POST {{.callurl}} -H 'Content-Type: application/json' -d "${result}"
 
 const SyncVersionContent = string(`
 #!/bin/sh
-
+echo '{"version":"{{.version}}","notes":"{{.notes}}","url":"{{.url}}"}' > /tmp/{{.type}}.info
 `)
 
 func FromTemplateContent(templateContent string, envMap map[string]interface{}) string {

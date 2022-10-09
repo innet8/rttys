@@ -79,7 +79,7 @@ func deviceOnline(br *broker, devid string) {
 	go hiInitCommand(br, devid, "")
 	go hiSynchWireguardConf(br, devid, "")
 	go hiSynchShuntConf(br, devid, "")
-	go hiSyncVersion(br, devid, "ipk")
+	// go hiSyncVersion(br, devid, "ipk")
 	go hiSyncVersion(br, devid, "firmware")
 }
 
