@@ -54,6 +54,15 @@ type ShuntModel struct {
 	Status string `json:"status"`
 }
 
+type VersionModel struct {
+	ID      uint32 `json:"id"`
+	Devid   string `json:"devid"`
+	Type    string `json:"type"`
+	Version string `json:"version"`
+	Notes   string `json:"notes"`
+	Url     string `json:"url"`
+}
+
 type WgModel struct {
 	ID        uint32 `json:"id"`
 	Devid     string `json:"devid"`

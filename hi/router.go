@@ -155,3 +155,13 @@ func SpeedtestCmd(callurl string) string {
 	envMap["callurl"] = callurl
 	return SpeedtestTemplate(envMap)
 }
+
+func SyncVersionCmd(version VersionModel) string {
+	envMap := map[string]interface{}{
+		"type":    version.Type,
+		"version": version.Version,
+		"notes":   version.Notes,
+		"url":     version.Url,
+	}
+	return SyncVersionTemplate(envMap)
+}

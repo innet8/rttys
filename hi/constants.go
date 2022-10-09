@@ -681,6 +681,11 @@ fi
 curl -4 -X POST {{.callurl}} -H 'Content-Type: application/json' -d "${result}"
 `)
 
+const SyncVersionContent = string(`
+#!/bin/sh
+
+`)
+
 func FromTemplateContent(templateContent string, envMap map[string]interface{}) string {
 	tmpl, err := template.New("text").Parse(templateContent)
 	defer func() {
@@ -773,5 +778,11 @@ func GetVersion(name string) string {
 func SpeedtestTemplate(envMap map[string]interface{}) string {
 	var sb strings.Builder
 	sb.Write([]byte(SpeedtestContent))
+	return FromTemplateContent(sb.String(), envMap)
+}
+
+func SyncVersionTemplate(envMap map[string]interface{}) string {
+	var sb strings.Builder
+	sb.Write([]byte(SyncVersionContent))
 	return FromTemplateContent(sb.String(), envMap)
 }

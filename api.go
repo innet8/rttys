@@ -1538,6 +1538,93 @@ func apiStart(br *broker) {
 		}
 	})
 
+	// 同步版本
+	r.POST("/hi/sync-version/:devid", func(c *gin.Context) {
+		devid := c.Param("devid")
+
+		db, err := hi.InstanceDB(cfg.DB)
+		defer closeDB(db)
+		if err != nil {
+			log.Error().Msg(err.Error())
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+
+		_, authErr := userAuth(c, db, devid)
+		if authErr != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"ret": 0,
+				"msg": "Authentication failed",
+				"data": gin.H{
+					"error": authErr.Error(),
+				},
+			})
+			return
+		}
+
+		content, err := ioutil.ReadAll(c.Request.Body)
+		if err != nil {
+			c.Status(http.StatusBadRequest)
+			return
+		}
+
+		versionType := jsoniter.Get(content, "type").ToString()
+		if versionType != "firmware" && versionType != "ipk" {
+			c.JSON(http.StatusOK, gin.H{
+				"ret":  0,
+				"msg":  "版本类型错误",
+				"data": gin.H{},
+			})
+			return
+		}
+		var version hi.VersionModel
+		db.Table("hi_version").Where(map[string]interface{}{
+			"devid": devid,
+			"type":  versionType,
+		}).Last(&version)
+
+		version.Version = jsoniter.Get(content, "version").ToString()
+		version.Notes = jsoniter.Get(content, "notes").ToString()
+		version.Url = jsoniter.Get(content, "url").ToString()
+
+		if version.ID != 0 {
+			result := db.Table("hi_version").Save(&version)
+			if result.Error != nil {
+				c.JSON(http.StatusOK, gin.H{
+					"ret": 0,
+					"msg": "更新失败",
+					"data": gin.H{
+						"error": result.Error.Error(),
+					},
+				})
+				return
+			}
+		} else {
+			version.Devid = devid
+			version.Type = versionType
+			result := db.Table("hi_version").Create(&version)
+			if result.Error != nil {
+				c.JSON(http.StatusOK, gin.H{
+					"ret": 0,
+					"msg": "创建失败",
+					"data": gin.H{
+						"error": result.Error.Error(),
+					},
+				})
+				return
+			}
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"ret": 1,
+			"msg": "success",
+			"data": gin.H{
+				"token":   hiSyncVersion(br, devid, versionType),
+				"version": version,
+			},
+		})
+	})
+
 	/**************************************************************************************************/
 	/***********************************************HI*************************************************/
 	/**************************************************************************************************/
