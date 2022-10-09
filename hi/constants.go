@@ -562,7 +562,6 @@ curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"conte
 `)
 
 const StaticLeasesReportAdded = string(`
-#!/bin/sh
 . /lib/functions.sh
 list=""
 function host_func() {
