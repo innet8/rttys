@@ -701,6 +701,28 @@ func apiStart(br *broker) {
 			result := hi.ApiResultCheck(hi.Base64Decode(jsoniter.Get(content, "content").ToString()))
 			devid := jsoniter.Get(content, "sn").ToString()
 			rtime := jsoniter.Get(content, "time").ToUint32()
+
+			// 更新固件、web版本信息
+			if action == "dhcp" {
+				ver := jsoniter.Get(content, "ver").ToString()
+				webVer := jsoniter.Get(content, "webVer").ToString()
+				if ver != "" || webVer != "" {
+					var deviceData hi.DeviceModel
+					db.Table("hi_device").Where(map[string]interface{}{
+						"devid": devid,
+					}).Last(&deviceData)
+					if deviceData.ID != 0 {
+						if ver != "" {
+							deviceData.Version = ver
+						}
+						if webVer != "" {
+							deviceData.WebVersion = webVer
+						}
+						db.Table("hi_device").Save(&deviceData)
+					}
+				}
+			}
+
 			if len(result) > 0 {
 				var count int64
 				db.Table("hi_info").Where(map[string]interface{}{

@@ -24,6 +24,8 @@ type DeviceModel struct {
 	Devid       string `json:"devid"`
 	Onlyid      string `json:"onlyid"`
 	Description string `json:"description"`
+	Version     string `json:"version"`
+	WebVersion  string `json:"web_version"`
 	Online      uint32 `json:"online"`
 	BindOpenid  string `json:"bind_openid"`
 	BindTime    uint32 `json:"bind_time"`
