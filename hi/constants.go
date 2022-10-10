@@ -630,22 +630,33 @@ echo '{"code":0}'
 `)
 
 const BlockedContent = string(`
-cat >/tmp/blocked.lua <<EOF
-local json = require 'cjson'
-local script = '/usr/share/hiui/rpc/clients.lua'
-local ok, tb = pcall(dofile, script)
-if ok then
-    tb['{{.action}}']('{{.macs}}')
-    print(json.encode(tb['getClients']()))
-else
-    print("")
-end
-EOF
+#!/bin/sh
+. /usr/share/libubox/jshn.sh
+while [ 1 ]; do
+    [ ! -f /var/run/block.lock ] && break
+    sleep 1
+done
+json_init
+json_load '{{.macs}}'
+if [ "{{.action}}" == "addBlocked" ]; then
+    status=1
+elif [ "{{.action}}" == "delBlocked" ]; then
+    status=0
+fi
+dump_item() {
+    local mac=$1
+    res=$(awk '$1=="$mac" {sub(/[0-1]]/,$status,$7);print}' /etc/clients)
+    sed -i "/$mac/c $res" /etc/clients
+}
+touch /var/run/block.lock
+json_for_each_item "dump_item" "macs"
+rm -f /var/run/block.lock
+
 _base64e() {
     echo -n "$1" | base64 | tr -d "\n"
 }
 
-RES=$(lua /tmp/blocked.lua)
+RES=$(lua /tmp/clients.lua)
 sn=$(uci get rtty.general.id)
 curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$sn'","time":"'$(date +%s)'"}'
 `)
