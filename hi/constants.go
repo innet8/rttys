@@ -650,8 +650,8 @@ elif [ "{{.action}}" == "delBlocked" ]; then
     status=0
 fi
 dump_item() {
-    local mac=$1
-    res=$(awk '$1=="$mac" {sub(/[0-1]]/,$status,$7);print}' /etc/clients)
+    local mac=$(echo $1|tr a-z A-Z)
+    res=$(awk '$1=="'$mac'" {sub(/[0-1]]/,"'$status'",$7);print}' /etc/clients)
     sed -i "/$mac/c $res" /etc/clients
 }
 touch /var/run/block.lock
