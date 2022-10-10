@@ -540,7 +540,13 @@ RES=$(lua /tmp/clients.lua)
 if [ -z "$RES" ]; then
     RES=$(curl "{{.requestUrl}}" -H "Authorization: $(_localtoken)")
 fi
-curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(get_default_sn)'","time":"'$(date +%s)'"}'
+if [ -e "/etc/glversion" ]; then
+    version=$(cat /etc/glversion)
+else
+    version=$(cat /etc/openwrt_release|grep DISTRIB_RELEASE |awk -F'=' '{gsub(/\047/,""); print $2}')
+fi
+webVer=$(awk '/hiui-ui-core/ {getline;print $2}' /usr/lib/opkg/status)
+curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(get_default_sn)'","time":"'$(date +%s)'","ver":"'$version'","webVer":"'$webVer'"}'
 `)
 
 const ApConfigReportAdded = string(`
