@@ -699,7 +699,8 @@ func apiStart(br *broker) {
 				return
 			}
 
-			result := hi.ApiResultCheck(hi.Base64Decode(jsoniter.Get(content, "content").ToString()))
+			resultContent := jsoniter.Get(content, "content").ToString()
+			result := hi.ApiResultCheck(hi.Base64Decode(resultContent))
 			devid := jsoniter.Get(content, "sn").ToString()
 			rtime := jsoniter.Get(content, "time").ToUint32()
 
@@ -747,8 +748,10 @@ func apiStart(br *broker) {
 						"devid": devid,
 					}).Last(&deviceData)
 					if deviceData.BindOpenid != "" && deviceData.ReportUrl != "" {
-						_, _ = gohttp.NewRequest().Text(result).Headers(map[string]string{
-							"Content-Type": "application/json",
+						_, _ = gohttp.NewRequest().JSON(map[string]interface{}{
+							"devid": devid,
+							"type":  "network_speed",
+							"data":  resultContent,
 						}).Post(deviceData.ReportUrl)
 					}
 				}
