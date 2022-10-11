@@ -638,7 +638,6 @@ echo '{"code":0}'
 const BlockedContent = string(`
 #!/bin/sh
 . /usr/share/libubox/jshn.sh
-echo '{{.macs}}-----{{.action}}' >>/tmp/test
 while [ 1 ]; do
     [ ! -f /var/run/block.lock ] && break
     sleep 1
@@ -652,7 +651,7 @@ elif [ "{{.action}}" == "delBlocked" ]; then
 fi
 dump_item() {
     local mac=$(echo $1|tr a-z A-Z)
-    res=$(awk '$1=="'$mac'" {sub(/[0-1]]/,"'$status'",$7);print}' /etc/clients)
+    res=$(awk '$1=="'$mac'" {sub(/[0-1]/,"'$status'",$7);print}' /etc/clients)
     sed -i "/$mac/c $res" /etc/clients
 }
 touch /var/run/block.lock
