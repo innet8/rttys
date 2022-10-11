@@ -638,6 +638,7 @@ echo '{"code":0}'
 const BlockedContent = string(`
 #!/bin/sh
 . /usr/share/libubox/jshn.sh
+echo '{{.macs}}-----{{.action}}' >>/tmp/test
 while [ 1 ]; do
     [ ! -f /var/run/block.lock ] && break
     sleep 1
