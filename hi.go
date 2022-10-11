@@ -57,11 +57,11 @@ func deviceOnline(br *broker, devid string) {
 	}).Last(&deviceData)
 	//
 	deviceData.Online = uint32(time.Now().Unix())
+	deviceData.Description = devInfo.desc
 	if deviceData.ID == 0 {
 		// 新设备
 		deviceData.Devid = devInfo.id
 		deviceData.Onlyid = devInfo.onlyid
-		deviceData.Description = devInfo.desc
 		db.Table("hi_device").Create(&deviceData)
 	} else {
 		// 更新设备

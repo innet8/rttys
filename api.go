@@ -5,6 +5,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"github.com/nahid/gohttp"
 	"io/fs"
 	"io/ioutil"
 	"net"
@@ -698,9 +699,32 @@ func apiStart(br *broker) {
 				return
 			}
 
-			result := hi.ApiResultCheck(hi.Base64Decode(jsoniter.Get(content, "content").ToString()))
+			resultContent := jsoniter.Get(content, "content").ToString()
+			result := hi.ApiResultCheck(hi.Base64Decode(resultContent))
 			devid := jsoniter.Get(content, "sn").ToString()
 			rtime := jsoniter.Get(content, "time").ToUint32()
+
+			// 更新固件、web版本信息
+			if action == "dhcp" {
+				ver := jsoniter.Get(content, "ver").ToString()
+				webVer := jsoniter.Get(content, "webVer").ToString()
+				if ver != "" || webVer != "" {
+					var deviceData hi.DeviceModel
+					db.Table("hi_device").Where(map[string]interface{}{
+						"devid": devid,
+					}).Last(&deviceData)
+					if deviceData.ID != 0 {
+						if ver != "" {
+							deviceData.Version = ver
+						}
+						if webVer != "" {
+							deviceData.WebVersion = webVer
+						}
+						db.Table("hi_device").Save(&deviceData)
+					}
+				}
+			}
+
 			if len(result) > 0 {
 				var count int64
 				db.Table("hi_info").Where(map[string]interface{}{
@@ -715,6 +739,21 @@ func apiStart(br *broker) {
 						Result: result,
 						Time:   rtime,
 					})
+				}
+
+				// 上报网速等信息
+				if action == "dhcp" {
+					var deviceData hi.DeviceModel
+					db.Table("hi_device").Where(map[string]interface{}{
+						"devid": devid,
+					}).Last(&deviceData)
+					if deviceData.BindOpenid != "" && deviceData.ReportUrl != "" {
+						_, _ = gohttp.NewRequest().JSON(map[string]interface{}{
+							"devid": devid,
+							"type":  "network_speed",
+							"data":  resultContent,
+						}).Post(deviceData.ReportUrl)
+					}
 				}
 			}
 			c.String(http.StatusOK, "success")
@@ -970,6 +1009,7 @@ func apiStart(br *broker) {
 				deviceData.Devid = devid
 				deviceData.BindOpenid = authUser.Openid
 				deviceData.BindTime = uint32(time.Now().Unix())
+				deviceData.ReportUrl = c.Query("report_url")
 				db.Table("hi_device").Create(&deviceData)
 				msg = "添加绑定成功"
 			} else if len(deviceData.BindOpenid) == 0 {
@@ -977,6 +1017,7 @@ func apiStart(br *broker) {
 				deviceData.Devid = devid
 				deviceData.BindOpenid = authUser.Openid
 				deviceData.BindTime = uint32(time.Now().Unix())
+				deviceData.ReportUrl = c.Query("report_url")
 				db.Table("hi_device").Save(&deviceData)
 				msg = "绑定成功"
 			} else {
