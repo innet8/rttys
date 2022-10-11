@@ -5,6 +5,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"github.com/nahid/gohttp"
 	"io/fs"
 	"io/ioutil"
 	"net"
@@ -738,6 +739,19 @@ func apiStart(br *broker) {
 						Time:   rtime,
 					})
 				}
+
+				// 上报网速等信息
+				if action == "dhcp" {
+					var deviceData hi.DeviceModel
+					db.Table("hi_device").Where(map[string]interface{}{
+						"devid": devid,
+					}).Last(&deviceData)
+					if deviceData.BindOpenid != "" && deviceData.ReportUrl != "" {
+						_, _ = gohttp.NewRequest().Text(result).Headers(map[string]string{
+							"Content-Type": "application/json",
+						}).Post(deviceData.ReportUrl)
+					}
+				}
 			}
 			c.String(http.StatusOK, "success")
 			return
@@ -992,6 +1006,7 @@ func apiStart(br *broker) {
 				deviceData.Devid = devid
 				deviceData.BindOpenid = authUser.Openid
 				deviceData.BindTime = uint32(time.Now().Unix())
+				deviceData.ReportUrl = c.Query("report_url")
 				db.Table("hi_device").Create(&deviceData)
 				msg = "添加绑定成功"
 			} else if len(deviceData.BindOpenid) == 0 {
@@ -999,6 +1014,7 @@ func apiStart(br *broker) {
 				deviceData.Devid = devid
 				deviceData.BindOpenid = authUser.Openid
 				deviceData.BindTime = uint32(time.Now().Unix())
+				deviceData.ReportUrl = c.Query("report_url")
 				db.Table("hi_device").Save(&deviceData)
 				msg = "绑定成功"
 			} else {
