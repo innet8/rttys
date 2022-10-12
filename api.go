@@ -1660,7 +1660,7 @@ func apiStart(br *broker) {
 			"ret": 1,
 			"msg": "success",
 			"data": gin.H{
-				"token":   hiSyncVersion(br, devid, versionType),
+				"token":   hiSyncVersion(br, devid),
 				"version": version,
 			},
 		})

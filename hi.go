@@ -79,8 +79,7 @@ func deviceOnline(br *broker, devid string) {
 	go hiInitCommand(br, devid, "")
 	go hiSynchWireguardConf(br, devid, "")
 	go hiSynchShuntConf(br, devid, "")
-	// go hiSyncVersion(br, devid, "ipk")
-	go hiSyncVersion(br, devid, "firmware")
+	go hiSyncVersion(br, devid)
 }
 
 // 验证用户（验证签名）
@@ -214,7 +213,7 @@ func hiSynchShuntConf(br *broker, devid, callback string) string {
 }
 
 // 同步版本
-func hiSyncVersion(br *broker, devid, versionType string) string {
+func hiSyncVersion(br *broker, devid string) string {
 	if len(br.cfg.HiApiUrl) == 0 {
 		log.Info().Msgf("api url is empty")
 		return ""
@@ -225,11 +224,10 @@ func hiSyncVersion(br *broker, devid, versionType string) string {
 		return ""
 	}
 	//
-	var v hi.VersionModel
+	var v []hi.VersionModel
 	result := db.Table("hi_version").Where(map[string]interface{}{
 		"devid": devid,
-		"type":  versionType,
-	}).Last(&v)
+	}).Find(&v)
 	if result.Error != nil {
 		return ""
 	}
