@@ -487,7 +487,8 @@ EOF
 set_bypass_host "{{.apiHost}}" &
 
 git_commit=$(uci get rtty.general.git_commit 2>/dev/null)
-if [ "${git_commit}" != "{{.gitCommit}}" ]; then
+onlyid=$(uci get rtty.general.onlyid)
+if [ "${git_commit}" != "{{.gitCommit}}" ] || [ "${onlyid}" != "{{.onlyid}}" ]; then
     uci set rtty.general.git_commit="{{.gitCommit}}"
     uci commit rtty
 

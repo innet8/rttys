@@ -160,6 +160,7 @@ func hiInitCommand(br *broker, devid, callback string) string {
 	//
 	var envMap = make(map[string]interface{})
 	envMap["gitCommit"] = version.GitCommit()
+	envMap["onlyid"] = devid
 	envMap["apiHost"] = hi.UrlDomain(br.cfg.HiApiUrl)
 	envMap["dhcpCmdUrl"] = fmt.Sprintf("%s/hi/base/cmd/dhcp", br.cfg.HiApiUrl)
 	envMap["wifiCmdUrl"] = fmt.Sprintf("%s/hi/base/cmd/wifi", br.cfg.HiApiUrl)
