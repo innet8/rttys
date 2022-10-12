@@ -157,11 +157,13 @@ func SpeedtestCmd(callurl string) string {
 }
 
 func SyncVersionCmd(version VersionModel) string {
-	envMap := map[string]interface{}{
+	firmware := map[string]interface{}{
 		"type":    version.Type,
 		"version": version.Version,
 		"notes":   version.Notes,
 		"url":     version.Url,
 	}
+	var envMap = make(map[string]interface{})
+	envMap["verInfo"] = firmware
 	return SyncVersionTemplate(envMap)
 }
