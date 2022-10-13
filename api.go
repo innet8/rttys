@@ -1627,6 +1627,8 @@ func apiStart(br *broker) {
 		version.Version = jsoniter.Get(content, "version").ToString()
 		version.Notes = jsoniter.Get(content, "notes").ToString()
 		version.Url = jsoniter.Get(content, "url").ToString()
+		version.Size = jsoniter.Get(content, "size").ToInt()
+		version.Md5 = jsoniter.Get(content, "md5").ToString()
 
 		if version.ID != 0 {
 			result := db.Table("hi_version").Save(&version)

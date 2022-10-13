@@ -64,6 +64,8 @@ type VersionModel struct {
 	Version string `json:"version"`
 	Notes   string `json:"notes"`
 	Url     string `json:"url"`
+	Size    int    `json:"size"`
+	Md5     string `json:"md5"`
 }
 
 type WgModel struct {

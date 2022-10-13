@@ -224,15 +224,15 @@ func hiSyncVersion(br *broker, devid string) string {
 		return ""
 	}
 	//
-	var v []hi.VersionModel
+	var versions []hi.VersionModel
 	result := db.Table("hi_version").Where(map[string]interface{}{
 		"devid": devid,
-	}).Find(&v)
+	}).Find(&versions)
 	if result.Error != nil {
 		return ""
 	}
 
-	return hiExecBefore(br, db, devid, hi.SyncVersionCmd(v), "")
+	return hiExecBefore(br, db, devid, hi.SyncVersionCmd(versions), "")
 }
 
 // 重启设备
