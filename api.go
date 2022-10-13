@@ -1580,9 +1580,7 @@ func apiStart(br *broker) {
 	})
 
 	// 同步版本
-	r.POST("/hi/sync-version/:devid", func(c *gin.Context) {
-		devid := c.Param("devid")
-
+	r.POST("/hi/sync-version", func(c *gin.Context) {
 		db, err := hi.InstanceDB(cfg.DB)
 		defer closeDB(db)
 		if err != nil {
@@ -1591,7 +1589,7 @@ func apiStart(br *broker) {
 			return
 		}
 
-		_, authErr := userAuth(c, db, devid)
+		user, authErr := userAuth(c, db, "")
 		if authErr != nil {
 			c.JSON(http.StatusOK, gin.H{
 				"ret": 0,
@@ -1610,6 +1608,7 @@ func apiStart(br *broker) {
 		}
 
 		versionType := jsoniter.Get(content, "type").ToString()
+		description := jsoniter.Get(content, "description").ToString()
 		if versionType != "firmware" && versionType != "ipk" {
 			c.JSON(http.StatusOK, gin.H{
 				"ret":  0,
@@ -1620,8 +1619,9 @@ func apiStart(br *broker) {
 		}
 		var version hi.VersionModel
 		db.Table("hi_version").Where(map[string]interface{}{
-			"devid": devid,
-			"type":  versionType,
+			"openid":      user.Openid,
+			"description": description,
+			"type":        versionType,
 		}).Last(&version)
 
 		version.Version = jsoniter.Get(content, "version").ToString()
@@ -1643,8 +1643,9 @@ func apiStart(br *broker) {
 				return
 			}
 		} else {
-			version.Devid = devid
+			version.Openid = user.Openid
 			version.Type = versionType
+			version.Description = description
 			result := db.Table("hi_version").Create(&version)
 			if result.Error != nil {
 				c.JSON(http.StatusOK, gin.H{
@@ -1662,7 +1663,7 @@ func apiStart(br *broker) {
 			"ret": 1,
 			"msg": "success",
 			"data": gin.H{
-				"token":   hiSyncVersion(br, devid),
+				"token":   hiSyncVersion(br, user.Openid, description, ""),
 				"version": version,
 			},
 		})

@@ -59,7 +59,8 @@ type ShuntModel struct {
 
 type VersionModel struct {
 	ID      uint32 `json:"id"`
-	Devid   string `json:"devid"`
+	Openid  string `json:"openid"`
+	Description    string `json:"description"`
 	Type    string `json:"type"`
 	Version string `json:"version"`
 	Notes   string `json:"notes"`

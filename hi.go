@@ -79,7 +79,7 @@ func deviceOnline(br *broker, devid string) {
 	go hiInitCommand(br, devid, "")
 	go hiSynchWireguardConf(br, devid, "")
 	go hiSynchShuntConf(br, devid, "")
-	go hiSyncVersion(br, devid)
+	go hiSyncVersion(br, deviceData.BindOpenid, deviceData.Description, devid)
 }
 
 // 验证用户（验证签名）
@@ -213,7 +213,7 @@ func hiSynchShuntConf(br *broker, devid, callback string) string {
 }
 
 // 同步版本
-func hiSyncVersion(br *broker, devid string) string {
+func hiSyncVersion(br *broker, openid, description, devid string) string {
 	if len(br.cfg.HiApiUrl) == 0 {
 		log.Info().Msgf("api url is empty")
 		return ""
@@ -223,16 +223,33 @@ func hiSyncVersion(br *broker, devid string) string {
 	if err != nil {
 		return ""
 	}
-	//
+
 	var versions []hi.VersionModel
 	result := db.Table("hi_version").Where(map[string]interface{}{
-		"devid": devid,
+		"openid":      openid,
+		"description": description,
 	}).Find(&versions)
 	if result.Error != nil {
 		return ""
 	}
 
-	return hiExecBefore(br, db, devid, hi.SyncVersionCmd(versions), "")
+	c := map[string]interface{}{
+		"bind_openid": openid,
+		"description": description,
+	}
+	if devid != "" {
+		c["devid"] = devid
+	}
+	var devices []hi.DeviceModel
+	result = db.Table("hi_device").Where(c).Find(&devices)
+	if result.Error != nil {
+		return ""
+	}
+
+	for _, device := range devices {
+		hiExecBefore(br, db, device.Devid, hi.SyncVersionCmd(versions), "")
+	}
+	return ""
 }
 
 // 重启设备
