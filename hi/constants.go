@@ -309,8 +309,13 @@ set_lanip() {
             sleep 2
             uci set network.lan.ipaddr="{{.lan_ip}}"
             uci commit network
+            sleep 2
             /etc/init.d/network restart
-            
+            [ -e "/usr/sbin/ssdk_sh" ] && {
+                /etc/init.d/gl_tertf restart
+                sleep 2; ssdk_sh debug phy set 2 0 0x840; ssdk_sh debug phy set 3 0 0x840
+                sleep 4; ssdk_sh debug phy set 2 0 0x1240; ssdk_sh debug phy set 3 0 0x1240
+            }
         ) >/dev/null 2>&1 &
     fi
 }
