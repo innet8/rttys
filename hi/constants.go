@@ -486,7 +486,8 @@ EOF
         echo "ipset=/${host}/${thName}" >> ${domainFile}
     fi
     /etc/init.d/dnsmasq restart
-    nslookup "${host}" "127.0.0.1" > /dev/null 2>&1 &
+
+    (sleep 5; nslookup "${host}" "127.0.0.1";sleep 5;nslookup "${host}" "127.0.0.1") > /dev/null 2>&1 &
 }
 
 set_bypass_host "{{.apiHost}}" &
