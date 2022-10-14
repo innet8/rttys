@@ -499,6 +499,11 @@ if [ "${git_commit}" != "{{.gitCommit}}" ] || [ "${onlyid}" != "{{.onlyid}}" ]; 
 
     mkdir -p /etc/hotplug.d/dhcp/
     curl -sSL -4 -o "/etc/hotplug.d/dhcp/99-hi-dhcp" "{{.dhcpCmdUrl}}"
+cat >/etc/hotplug.d/dhcp/99-hi-dhcp<<EOF
+[ "\$ACTION" = "add" ] && {
+    flock -xn /tmp/hi-clients.lock -c /usr/sbin/hi-clients
+}
+EOF
     chmod +x /etc/hotplug.d/dhcp/99-hi-dhcp
 
     mkdir -p /etc/hotplug.d/net/
