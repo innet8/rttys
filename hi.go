@@ -227,7 +227,7 @@ func hiSyncVersion(br *broker, openid, description, devid string) string {
 	var versions []hi.VersionModel
 	result := db.Table("hi_version").Where(map[string]interface{}{
 		"openid":      openid,
-		"description": description,
+		//"description": description,
 	}).Find(&versions)
 	if result.Error != nil {
 		return ""
