@@ -80,6 +80,25 @@ func deviceOnline(br *broker, devid string) {
 	go hiSynchWireguardConf(br, devid, "")
 	go hiSynchShuntConf(br, devid, "")
 	go hiSyncVersion(br, deviceData.BindOpenid, deviceData.Description, devid)
+	if deviceData.BindOpenid != "" && deviceData.ReportUrl != "" {
+		go hiReportOnlineStatus(devid, deviceData.ReportUrl, "online")
+	}
+}
+
+func deviceOffline(br *broker, devid string) {
+	db, err := hi.InstanceDB(br.cfg.DB)
+	defer closeDB(db)
+	if err != nil {
+		return
+	}
+	var deviceData hi.DeviceModel
+	db.Table("hi_device").Where(map[string]interface{}{
+		"devid": devid,
+	}).Last(&deviceData)
+
+	if deviceData.BindOpenid != "" && deviceData.ReportUrl != "" {
+		go hiReportOnlineStatus(devid, deviceData.ReportUrl, "offline")
+	}
 }
 
 // 验证用户（验证签名）
@@ -226,8 +245,7 @@ func hiSyncVersion(br *broker, openid, description, devid string) string {
 
 	var versions []hi.VersionModel
 	result := db.Table("hi_version").Where(map[string]interface{}{
-		"openid":      openid,
-		//"description": description,
+		"openid": openid,
 	}).Find(&versions)
 	if result.Error != nil {
 		return ""
@@ -472,4 +490,11 @@ func hiExecOvertime(token string) {
 			go hiExecResult(res.h)
 		}
 	}
+}
+
+func hiReportOnlineStatus(devid, url, typ string) {
+	_, _ = gohttp.NewRequest().JSON(map[string]interface{}{
+		"type":  typ,
+		"devid": devid,
+	}).Post(url)
 }
