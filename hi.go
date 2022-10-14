@@ -265,7 +265,7 @@ func hiSyncVersion(br *broker, openid, description, devid string) string {
 	}
 
 	for _, device := range devices {
-		hiExecBefore(br, db, device.Devid, hi.SyncVersionCmd(versions), "")
+		hiExecBefore(br, db, device.Devid, hi.SyncVersionCmd(versions, device.Description), "")
 	}
 	return ""
 }

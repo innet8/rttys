@@ -156,15 +156,17 @@ func SpeedtestCmd(callurl string) string {
 	return SpeedtestTemplate(envMap)
 }
 
-func SyncVersionCmd(versions []VersionModel) string {
+func SyncVersionCmd(versions []VersionModel, description string) string {
 	var vs = make(map[string]interface{})
 	for _, v := range versions {
-		vs[v.Type] = map[string]interface{}{
-			"version": v.Version,
-			"notes":   v.Notes,
-			"url":     v.Url,
-			"size":    v.Size,
-			"md5":     v.Md5,
+		if v.Description == description || v.Description == "" {
+			vs[v.Type] = map[string]interface{}{
+				"version": v.Version,
+				"notes":   v.Notes,
+				"url":     v.Url,
+				"size":    v.Size,
+				"md5":     v.Md5,
+			}
 		}
 	}
 	verInfo, _ := json.Marshal(vs)
