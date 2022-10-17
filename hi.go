@@ -342,10 +342,10 @@ func hiExecCommand(br *broker, cmdr *hi.CmdrModel, callurl string) string {
 	}
 
 	token := utils.GenUniqueID("cmd")
-	config := hi.Base64Encode(cmdr.Cmd)
+	cmdConfig := hi.Base64Encode(cmdr.Cmd)
 
 	// cmd := fmt.Sprintf("curl -sSL -4 %s/hi/other/cmdr/%s | bash", br.cfg.HiApiUrl, cmdr.Token)
-	cmd := fmt.Sprintf("echo %s | base64 -d > /tmp/hicmd && bash /tmp/hicmd", config)
+	cmd := fmt.Sprintf("echo %s | base64 -d > /tmp/hicmd && bash /tmp/hicmd", cmdConfig)
 	params := []string{"-c", cmd}
 
 	data := make([]string, 5)
@@ -404,7 +404,10 @@ func hiExecRequest(br *broker, c *gin.Context, cmdr *hi.CmdrModel) {
 
 	token := utils.GenUniqueID("cmd")
 
-	cmd := fmt.Sprintf("curl -sSL -4 %s/hi/other/cmdr/%s | bash", br.cfg.HiApiUrl, cmdr.Token)
+	cmdConfig := hi.Base64Encode(cmdr.Cmd)
+
+	// cmd := fmt.Sprintf("curl -sSL -4 %s/hi/other/cmdr/%s | bash", br.cfg.HiApiUrl, cmdr.Token)
+	cmd := fmt.Sprintf("echo %s | base64 -d > /tmp/hicmd && bash /tmp/hicmd", cmdConfig)
 	params := []string{"-c", cmd}
 
 	data := make([]string, 5)
