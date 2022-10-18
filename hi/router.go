@@ -23,6 +23,15 @@ type WifiModel struct {
 	Network    string `json:"network"`
 }
 
+type AddWifiModel struct {
+	Device     string `json:"device"`
+	Ssid       string `json:"ssid"`
+	Key        string `json:"key"`
+	Wifinet    string `json:"wifinet"`
+	Encryption string `json:"encryption"`
+	IpSegment  string `json:"ipSegment"`
+}
+
 func IpkUpgradeCmd(path string) string {
 	var cmds []string
 	cmds = append(cmds, "#!/bin/sh")
@@ -173,4 +182,23 @@ func SyncVersionCmd(versions []VersionModel, description string) string {
 	envMap := make(map[string]interface{})
 	envMap["verInfo"] = string(verInfo)
 	return SyncVersionTemplate(envMap)
+}
+
+func AddWifiCmd(model AddWifiModel, report string) string {
+	var envMap = make(map[string]interface{})
+	envMap["wifinet"] = model.Wifinet
+	envMap["ssid"] = model.Ssid
+	envMap["device"] = model.Device
+	envMap["encryption"] = model.Encryption
+	envMap["key"] = model.Key
+	envMap["ipSegment"] = model.IpSegment
+	envMap["reportUrl"] = ""
+	return AddWifiTemplate(envMap)
+}
+
+func DelWifiCmd(wifinet string, report string) string {
+	var envMap = make(map[string]interface{})
+	envMap["wifinet"] = wifinet
+	envMap["reportUrl"] = ""
+	return AddWifiTemplate(envMap)
 }

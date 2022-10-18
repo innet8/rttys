@@ -714,6 +714,69 @@ const SyncVersionContent = string(`
 echo '{{.verInfo}}' > /tmp/version.info
 `)
 
+const AddWifiContent = string(`
+#!/bin/sh
+. /lib/functions.sh
+
+uci set wireless.{{.wifinet}}=wifi-iface
+uci set wireless.{{.wifinet}}.device='{{.device}}'
+uci set wireless.{{.wifinet}}.mode='ap'
+uci set wireless.{{.wifinet}}.ssid='{{.ssid}}'
+uci set wireless.{{.wifinet}}.encryption='{{.encryption}}'
+uci set wireless.{{.wifinet}}.key='{{.key}}'
+uci commit wireless
+wifi reload
+slee 3
+device=$(iwinfo | grep {{.ssid}} | awk '{print $1}')
+uci set network.{{.wifinet}}=interface
+uci set network.{{.wifinet}}.proto='static'
+uci set network.{{.wifinet}}.ipaddr='{{.ipSegment}}'
+uci set network.{{.wifinet}}.netmask='255.255.255.0'
+uci commit network
+uci set wireless.{{.wifinet}}.network='{{.wifinet}}'
+uci commit wireless
+
+handle_firewall(){
+    local tmp=$1
+    config_get name "$1" "name"
+    if [ "$name" == "lan" ]; then
+        uci add_list firewall.$tmp.network='{{.wifinet}}'
+    fi
+}
+config_load firewall
+config_foreach handle_firewall zone
+uci commit firewall
+
+uci set dhcp.{{.wifinet}}=dhcp
+uci set dhcp.{{.wifinet}}.interface='{{.wifinet}}'
+uci set dhcp.{{.wifinet}}.start='100'
+uci set dhcp.{{.wifinet}}.limit='150'
+uci set dhcp.{{.wifinet}}.leasetime='12h'
+uci commit dhcp
+
+/etc/init.d/firewall reload
+/etc/init.d/network reload
+RES=$(lua /tmp/apconfig.lua)
+curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(get_default_sn)'","time":"'$(date +%s)'"}'
+
+`)
+
+const DelWifiContent = string(`
+#!/bin/sh
+uci delete dhcp.{{.wifinet}}
+uci delete network.{{.wifinet}}
+uci delete wireless.{{.wifinet}}
+sed -i '/{{.wifinet}}/d' /etc/config/firewall
+uci commit firewall
+uci commit network
+uci commit wireless
+uci commit dhcp
+wifi reload
+RES=$(lua /tmp/apconfig.lua)
+curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(get_default_sn)'","time":"'$(date +%s)'"}'
+
+`)
+
 func FromTemplateContent(templateContent string, envMap map[string]interface{}) string {
 	tmpl, err := template.New("text").Parse(templateContent)
 	defer func() {
@@ -812,5 +875,17 @@ func SpeedtestTemplate(envMap map[string]interface{}) string {
 func SyncVersionTemplate(envMap map[string]interface{}) string {
 	var sb strings.Builder
 	sb.Write([]byte(SyncVersionContent))
+	return FromTemplateContent(sb.String(), envMap)
+}
+
+func AddWifiTemplate(envMap map[string]interface{}) string {
+	var sb strings.Builder
+	sb.Write([]byte(AddWifiContent))
+	return FromTemplateContent(sb.String(), envMap)
+}
+
+func DelWifiTemplate(envMap map[string]interface{}) string {
+	var sb strings.Builder
+	sb.Write([]byte(DelWifiContent))
 	return FromTemplateContent(sb.String(), envMap)
 }

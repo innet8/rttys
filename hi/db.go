@@ -3,11 +3,12 @@ package hi
 import (
 	"database/sql/driver"
 	"encoding/json"
+	"strings"
+	"time"
+
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
-	"strings"
-	"time"
 )
 
 type Array []string
@@ -58,15 +59,15 @@ type ShuntModel struct {
 }
 
 type VersionModel struct {
-	ID      uint32 `json:"id"`
-	Openid  string `json:"openid"`
-	Description    string `json:"description"`
-	Type    string `json:"type"`
-	Version string `json:"version"`
-	Notes   string `json:"notes"`
-	Url     string `json:"url"`
-	Size    int    `json:"size"`
-	Md5     string `json:"md5"`
+	ID          uint32 `json:"id"`
+	Openid      string `json:"openid"`
+	Description string `json:"description"`
+	Type        string `json:"type"`
+	Version     string `json:"version"`
+	Notes       string `json:"notes"`
+	Url         string `json:"url"`
+	Size        int    `json:"size"`
+	Md5         string `json:"md5"`
 }
 
 type WgModel struct {
