@@ -1698,8 +1698,13 @@ func apiStart(br *broker) {
 
         //根据action执行不同的动作
         if action == "create" {   //新增wifi命令
-            //获取参数
-            jsoniter.Get(content, "xx").ToString()
+            //wifi名称
+            wifiName := jsoniter.Get(content, "wifiName").ToString()
+            //密码
+            password := jsoniter.Get(content, "password").ToString()
+            //ip段
+            ipSegment := jsoniter.Get(content, "ipSegment").ToString()
+
 
         } else if action == "delete"{  //执行删除wifi命令
 
