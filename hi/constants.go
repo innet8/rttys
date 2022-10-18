@@ -215,8 +215,6 @@ wireguard_stop() {
     if [ -n "$(wg)" ]; then
         /bin/sh /etc/rc.common /etc/init.d/wireguard stop
     fi
-    uci set wireguard.@proxy[0].enable="0"
-    uci commit wireguard
 }
 
 wireguard_hotup() {
@@ -229,7 +227,7 @@ wireguard_hotup() {
     PeerName=""
     MainServer=$(uci get wireguard.@proxy[0].main_server)
     i=0
-    while [ "$i" -le "100" ]; do
+    while [ "$i" -le "10" ]; do
         PeerName=$(uci get wireguard.@peers[$i].name)
         if [ -z "$PeerName" ]; then
             break
