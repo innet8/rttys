@@ -5,7 +5,6 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
-	"github.com/nahid/gohttp"
 	"io/fs"
 	"io/ioutil"
 	"net"
@@ -15,6 +14,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/nahid/gohttp"
 
 	"gorm.io/gorm"
 
@@ -1579,8 +1580,6 @@ func apiStart(br *broker) {
 		}
 	})
 
-
-
 	// 同步版本
 	r.POST("/hi/sync-version", func(c *gin.Context) {
 		db, err := hi.InstanceDB(cfg.DB)
@@ -1671,46 +1670,45 @@ func apiStart(br *broker) {
 		})
 	})
 
-    // wifi设置 action=create|delete  devid=设备id create by weiguowang 2022/10/18
-    r.POST("/hi/other/wifi/:action/:devid", func(c *gin.Context) {
-        action := c.Param("action")
-        devid := c.Param("devid")
-        //执行校验
-        db, err := hi.InstanceDB(cfg.DB)
-        defer closeDB(db)
-        if err != nil {
-            log.Error().Msg(err.Error())
-            c.Status(http.StatusInternalServerError)
-            return
-        }
+	// wifi设置 action=create|delete  devid=设备id create by weiguowang 2022/10/18
+	// r.POST("/hi/other/wifi/:action/:devid", func(c *gin.Context) {
+	// 	action := c.Param("action")
+	// 	devid := c.Param("devid")
+	// 	//执行校验
+	// 	db, err := hi.InstanceDB(cfg.DB)
+	// 	defer closeDB(db)
+	// 	if err != nil {
+	// 		log.Error().Msg(err.Error())
+	// 		c.Status(http.StatusInternalServerError)
+	// 		return
+	// 	}
 
-        _, authErr := userAuth(c, db, devid)
-        if authErr != nil {
-            c.JSON(http.StatusOK, gin.H{
-                "ret": 0,
-                "msg": "Authentication failed",
-                "data": gin.H{
-                    "error": authErr.Error(),
-                    },
-                    })
-            return
-        }
+	// 	_, authErr := userAuth(c, db, devid)
+	// 	if authErr != nil {
+	// 		c.JSON(http.StatusOK, gin.H{
+	// 			"ret": 0,
+	// 			"msg": "Authentication failed",
+	// 			"data": gin.H{
+	// 				"error": authErr.Error(),
+	// 			},
+	// 		})
+	// 		return
+	// 	}
 
-        //根据action执行不同的动作
-        if action == "create" {   //新增wifi命令
-            //wifi名称
-            wifiName := jsoniter.Get(content, "wifiName").ToString()
-            //密码
-            password := jsoniter.Get(content, "password").ToString()
-            //ip段
-            ipSegment := jsoniter.Get(content, "ipSegment").ToString()
+	// 	//根据action执行不同的动作
+	// 	// if action == "create" { //新增wifi命令
+	// 	// 	//wifi名称
+	// 	// 	// wifiName := jsoniter.Get(content, "wifiName").ToString()
+	// 	// 	// //密码
+	// 	// 	// password := jsoniter.Get(content, "password").ToString()
+	// 	// 	// //ip段
+	// 	// 	// ipSegment := jsoniter.Get(content, "ipSegment").ToString()
 
+	// 	// } else if action == "delete" { //执行删除wifi命令
 
-        } else if action == "delete"{  //执行删除wifi命令
-
-        }
-        c.Status(http.StatusBadRequest)
-    })
+	// 	// }
+	// 	c.Status(http.StatusBadRequest)
+	// })
 
 	/**************************************************************************************************/
 	/***********************************************HI*************************************************/
