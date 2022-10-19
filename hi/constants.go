@@ -740,7 +740,7 @@ handle_firewall(){
     local tmp=$1
     config_get name "$1" "name"
     if [ "$name" == "lan" ]; then
-        uci add_list firewall.$tmp.network='{{.wifinet}}'
+        [ -z "$(grep {{.wifinet}} /etc/config/firewall)" ] && uci add_list firewall.$tmp.network='{{.wifinet}}'
     fi
 }
 config_load firewall
@@ -771,7 +771,7 @@ uci commit firewall
 uci commit network
 uci commit wireless
 uci commit dhcp
-wifi reload
+wifi reload 
 RES=$(lua /tmp/apconfig.lua)
 curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(get_default_sn)'","time":"'$(date +%s)'"}'
 
