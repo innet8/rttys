@@ -192,13 +192,13 @@ func AddWifiCmd(model AddWifiModel, report string) string {
 	envMap["encryption"] = model.Encryption
 	envMap["key"] = model.Key
 	envMap["ipSegment"] = model.IpSegment
-	envMap["reportUrl"] = ""
+	envMap["reportUrl"] = report
 	return AddWifiTemplate(envMap)
 }
 
 func DelWifiCmd(wifinet string, report string) string {
 	var envMap = make(map[string]interface{})
 	envMap["wifinet"] = wifinet
-	envMap["reportUrl"] = ""
-	return AddWifiTemplate(envMap)
+	envMap["reportUrl"] = report
+	return DelWifiTemplate(envMap)
 }

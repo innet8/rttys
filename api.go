@@ -1720,7 +1720,7 @@ func apiStart(br *broker) {
 				return
 			}
 		} else if action == "delete" { //执行删除wifi命令
-			wifinet := jsoniter.Get(content, "version").ToString()
+			wifinet := jsoniter.Get(content, "wifinet").ToString()
 			cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.DelWifiCmd(wifinet, report))
 			if terr != nil {
 				c.JSON(http.StatusOK, gin.H{

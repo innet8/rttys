@@ -718,6 +718,11 @@ const AddWifiContent = string(`
 #!/bin/sh
 . /lib/functions.sh
 
+ipseg=$(echo {{.ipSegment}} | awk -F'.' '{print $1"."$2"."$3}')
+[ -n "$(grep $ipseg /etc/config/network)" ] && {
+    echo '{"code":101,"msg":"ipsegment already exist"}'
+    exit 0
+} 
 uci set wireless.{{.wifinet}}=wifi-iface
 uci set wireless.{{.wifinet}}.device='{{.device}}'
 uci set wireless.{{.wifinet}}.mode='ap'
