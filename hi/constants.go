@@ -488,16 +488,11 @@ EOF
     (sleep 5; nslookup "${host}" "127.0.0.1";sleep 5;nslookup "${host}" "127.0.0.1") > /dev/null 2>&1 &
 }
 
-set_bypass_host "{{.apiHost}}" &
-
-git_commit=$(uci get rtty.general.git_commit 2>/dev/null)
-onlyid=$(uci get rtty.general.onlyid)
-if [ "${git_commit}" != "{{.gitCommit}}" ] || [ "${onlyid}" != "{{.onlyid}}" ]; then
+downloadScript() {
     uci set rtty.general.git_commit="{{.gitCommit}}"
     uci commit rtty
 
     mkdir -p /etc/hotplug.d/dhcp/
-    curl -sSL -4 -o "/etc/hotplug.d/dhcp/99-hi-dhcp" "{{.dhcpCmdUrl}}"
 cat >/etc/hotplug.d/dhcp/99-hi-dhcp<<EOF
 [ "\$ACTION" = "add" ] && {
     flock -xn /tmp/hi-clients.lock -c /usr/sbin/hi-clients
@@ -521,7 +516,17 @@ EOF
     crontab /tmp/cronbak
     rm -f /tmp/cronbak
     /etc/init.d/cron restart
+}
+
+set_bypass_host "{{.apiHost}}" &
+
+git_commit=$(uci get rtty.general.git_commit 2>/dev/null)
+onlyid=$(uci get rtty.general.onlyid)
+if [ "${git_commit}" != "{{.gitCommit}}" ] || [ "${onlyid}" != "{{.onlyid}}" ]; then
+    downloadScript
 fi
+
+[ -e "/etc/hotplug.d/net/99-hi-wifi" ] || downloadScript
 
 /etc/hotplug.d/dhcp/99-hi-dhcp &
 /etc/hotplug.d/net/99-hi-wifi &
