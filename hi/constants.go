@@ -742,6 +742,7 @@ uci set network.{{.wifinet}}=interface
 uci set network.{{.wifinet}}.proto='static'
 uci set network.{{.wifinet}}.ipaddr='{{.ipSegment}}'
 uci set network.{{.wifinet}}.netmask='255.255.255.0'
+uci set network.{{.wifinet}}.ifname=$device
 uci commit network
 uci set wireless.{{.wifinet}}.network='{{.wifinet}}'
 uci commit wireless
