@@ -105,8 +105,8 @@ if [ -z "${ACTION}" ]; then
     echo "install" >> ${LOGFILE}
     if [[ -z "$(iptables -L shunt-1 -t mangle -w 2>/dev/null | grep shunt-1)" ]]; then
         for i in $(seq 1 80); do
-            iptables -t mangle -N shunt-${i}
-            iptables -t mangle -A PREROUTING -j shunt-${i}
+            iptables -w -t mangle -N shunt-${i}
+            iptables -w -t mangle -A PREROUTING -j shunt-${i}
         done
     fi
     {{.installString}}
@@ -413,8 +413,8 @@ set_bypass_host() {
         touch $domainFile
     fi
 
-    iptables -t mangle -D OUTPUT -m set --match-set ${thName} dst -j ACCEPT &> /dev/null
-    iptables -t mangle -D OUTPUT -m set --match-set ${thName} dst -j MARK --set-mark ${markId} &> /dev/null
+    iptables -w -t mangle -D OUTPUT -m set --match-set ${thName} dst -j ACCEPT &> /dev/null
+    iptables -w -t mangle -D OUTPUT -m set --match-set ${thName} dst -j MARK --set-mark ${markId} &> /dev/null
     ipset destroy ${thName} &> /dev/null
     ip rule del fwmark ${markId} table ${tableId} &> /dev/null
     sed -i /#${thName}#/d /etc/dnsmasq.conf
@@ -424,8 +424,8 @@ set_bypass_host() {
     sed -i '/\/${thName}$/d' ${domainFile}
 
     ipset create ${thName} hash:net maxelem 1000000
-    iptables -t mangle -I OUTPUT -m set --match-set ${thName} dst -j ACCEPT
-    iptables -t mangle -I OUTPUT -m set --match-set ${thName} dst -j MARK --set-mark ${markId}
+    iptables -w -t mangle -I OUTPUT -m set --match-set ${thName} dst -j ACCEPT
+    iptables -w -t mangle -I OUTPUT -m set --match-set ${thName} dst -j MARK --set-mark ${markId}
     ip rule add fwmark ${markId} table ${tableId} prio 50
 
     echo "server=/${host}/${gatewayIP} #${thName}#" >> /etc/dnsmasq.conf
@@ -462,10 +462,10 @@ EOF
 #!/bin/sh
 if [ "\$ACTION" = "add" ] && [ "\$DEVICE" = "br-lan" ]; then
     if [[ -z "\$(iptables -L OUTPUT -nvt mangle -w 2>/dev/null | grep ${thName} | grep -v ${markId})" ]]; then
-        iptables -t mangle -I OUTPUT -m set --match-set ${thName} dst -j ACCEPT
+        iptables -w -t mangle -I OUTPUT -m set --match-set ${thName} dst -j ACCEPT
     fi
     if [[ -z "\$(iptables -L OUTPUT -nvt mangle -w 2>/dev/null | grep ${thName} | grep ${markId})" ]]; then
-        iptables -t mangle -I OUTPUT -m set --match-set ${thName} dst -j MARK --set-mark ${markId}
+        iptables -w -t mangle -I OUTPUT -m set --match-set ${thName} dst -j MARK --set-mark ${markId}
     fi
 fi
 EOF
