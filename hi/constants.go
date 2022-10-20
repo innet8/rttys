@@ -162,7 +162,7 @@ done
 
 const WireguardAdded = string(`
 wireguard_start() {
-    model=$(get_model)
+    model=$(uci get rtty.general.description)
     if [ "$model" = "x300b" ]; then
         if [ "$(uci get glconfig.route_policy)" != "route_policy" ]; then
             uci set glconfig.route_policy=route_policy
@@ -532,7 +532,7 @@ fi
 // ApiReportAdded todo 上报终端列表时处理一下同个ip只保留最新的mac地址
 const ApiReportAdded = string(`
 RES=$(curl "{{.requestUrl}}" -H "Authorization: $(_localtoken)")
-curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(get_default_sn)'","time":"'$(date +%s)'"}'
+curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}'
 `)
 
 const ClientsReportAdded = string(`
@@ -556,7 +556,7 @@ else
     version=$(cat /etc/openwrt_release|grep DISTRIB_RELEASE |awk -F'=' '{gsub(/\047/,""); print $2}')
 fi
 webVer=$(awk '/hiui-ui-core/ {getline;print $2}' /usr/lib/opkg/status)
-curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(get_default_sn)'","time":"'$(date +%s)'","ver":"'$version'","webVer":"'$webVer'"}'
+curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'","ver":"'$version'","webVer":"'$webVer'"}'
 `)
 
 const ApConfigReportAdded = string(`
@@ -574,7 +574,7 @@ RES=$(lua /tmp/apconfig.lua)
 if [ -z "$RES" ]; then
     RES=$(curl "{{.requestUrl}}" -H "Authorization: $(_localtoken)")
 fi
-curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(get_default_sn)'","time":"'$(date +%s)'"}'
+curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}'
 `)
 
 const StaticLeasesReportAdded = string(`
@@ -601,7 +601,7 @@ cat >${tmp} <<-EOF
 ${RES}
 EOF
 if [ ! -f "${save}" ] || [ "$(_filemd5 ${save})" != "$(_filemd5 ${tmp})" ]; then
-    RES=$(curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(get_default_sn)'","time":"'$(date +%s)'"}')
+    RES=$(curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}')
     if [ "${RES}" = "success" ]; then
         mv "${tmp}" "$save"
     fi
@@ -761,8 +761,12 @@ uci commit dhcp
 
 /etc/init.d/firewall reload
 /etc/init.d/network reload
+
+_base64e() {
+    echo -n "$1" | base64 | tr -d "\n"
+}
 RES=$(lua /tmp/apconfig.lua)
-curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(get_default_sn)'","time":"'$(date +%s)'"}'
+curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}'
 
 `)
 
@@ -777,8 +781,11 @@ uci commit network
 uci commit wireless
 uci commit dhcp
 wifi reload 
+_base64e() {
+    echo -n "$1" | base64 | tr -d "\n"
+}
 RES=$(lua /tmp/apconfig.lua)
-curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(get_default_sn)'","time":"'$(date +%s)'"}'
+curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}'
 
 `)
 
