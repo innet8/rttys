@@ -18,7 +18,7 @@ func GetCmdBatch(apiUrl string, shunts []ShuntModel) string {
 	}
 	var envMap = make(map[string]interface{})
 	envMap["cmds"] = strings.Join(cmds, "\n")
-	envMap["ths"] = strings.Join(ths, ":\n")
+	envMap["ths"] = strings.Join(ths, "\n:")
 	return ShuntBatchTemplate(envMap)
 }
 
