@@ -644,6 +644,10 @@ fi
 const EditWifiContent = string(`
 #!/bin/sh
 . /lib/functions.sh
+if [ -e "/var/run/delwifi.lock" ] || [ -e "/var/run/addwifi.lock" ]; then
+    echo '{"code":103,"msg":"wifi deling or adding"}'
+    exit 0
+fi
 handle_wifi(){
     config_get device $1 "device"
     config_get network $1 "network"
@@ -732,6 +736,11 @@ const AddWifiContent = string(`
 #!/bin/sh
 . /lib/functions.sh
 
+if [ -e "/var/run/addwifi.lock" ]; then
+    echo '{"code":102,"msg":"wifi adding"}'
+    exit 0
+fi
+touch /var/run/addwifi.lock
 ipseg=$(echo {{.ipSegment}} | awk -F'.' '{print $1"."$2"."$3}')
 [ -n "$(grep $ipseg /etc/config/network)" ] && {
     echo '{"code":101,"msg":"ipsegment already exist"}'
@@ -745,7 +754,7 @@ uci set wireless.{{.wifinet}}.encryption='{{.encryption}}'
 uci set wireless.{{.wifinet}}.key='{{.key}}'
 uci commit wireless
 wifi reload
-slee 3
+sleep 5
 device=$(iwinfo | grep {{.ssid}} | awk '{print $1}')
 uci set network.{{.wifinet}}=interface
 uci set network.{{.wifinet}}.proto='static'
@@ -754,6 +763,7 @@ uci set network.{{.wifinet}}.netmask='255.255.255.0'
 uci set network.{{.wifinet}}.ifname=$device
 uci commit network
 uci set wireless.{{.wifinet}}.network='{{.wifinet}}'
+uci set wireless.{{.wifinet}}.ifname=$device
 uci commit wireless
 
 handle_firewall(){
@@ -782,11 +792,16 @@ _base64e() {
 }
 RES=$(lua /tmp/apconfig.lua)
 curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}'
-
+rm -f /var/run/addwifi.lock
 `)
 
 const DelWifiContent = string(`
 #!/bin/sh
+if [ -e "/var/run/delwifi.lock" ]; then
+    echo '{"code":102,"msg":"wifi deling"}'
+    exit 0
+fi
+touch /var/run/delwifi.lock
 uci delete dhcp.{{.wifinet}}
 uci delete network.{{.wifinet}}
 uci delete wireless.{{.wifinet}}
@@ -795,13 +810,14 @@ uci commit firewall
 uci commit network
 uci commit wireless
 uci commit dhcp
-wifi reload 
+wifi reload
+
 _base64e() {
     echo -n "$1" | base64 | tr -d "\n"
 }
 RES=$(lua /tmp/apconfig.lua)
 curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}'
-
+rm -f /var/run/delwifi.lock
 `)
 
 func FromTemplateContent(templateContent string, envMap map[string]interface{}) string {
