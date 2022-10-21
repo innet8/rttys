@@ -48,14 +48,17 @@ type InfoModel struct {
 }
 
 type ShuntModel struct {
-	ID     uint32 `json:"id"`
-	Devid  string `json:"devid"`
-	Onlyid string `json:"onlyid"`
-	Source string `json:"source"`
-	Rule   string `json:"rule"`
-	Prio   uint32 `json:"prio"`
-	OutIp  string `json:"out_ip"`
-	Status string `json:"status"`
+	ID           uint32 `json:"id"`
+	Devid        string `json:"devid"`
+	Onlyid       string `json:"onlyid"`
+	Source       string `json:"source"`
+	Rule         string `json:"rule"`
+	Prio         uint32 `json:"prio"`
+	OutIp        string `json:"out_ip"`
+	Status       string `json:"status"`
+	SourceRemark string `json:"source_remark"`
+	RuleRemark   string `json:"rule_remark"`
+	OutRemark    string `json:"out_remark"`
 }
 
 type VersionModel struct {

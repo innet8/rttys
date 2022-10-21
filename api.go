@@ -1368,6 +1368,9 @@ func apiStart(br *broker) {
 			"prio",
 			"out_ip",
 			"rule",
+			"source_remark",
+			"rule_remark",
+			"out_remark",
 		}).Where(map[string]interface{}{
 			"status": "use",
 			"devid":  devid,
@@ -1442,6 +1445,9 @@ func apiStart(br *broker) {
 			shunt.Rule = jsoniter.Get(content, "rule").ToString()
 			shunt.Prio = jsoniter.Get(content, "prio").ToUint32()
 			shunt.OutIp = jsoniter.Get(content, "out_ip").ToString()
+			shunt.SourceRemark = jsoniter.Get(content, "source_remark").ToString()
+			shunt.RuleRemark = jsoniter.Get(content, "rule_remark").ToString()
+			shunt.OutRemark = jsoniter.Get(content, "out_remark").ToString()
 			shunt.Status = "use"
 			result := db.Table("hi_shunt").Save(&shunt)
 			if result.Error != nil {
@@ -1461,6 +1467,9 @@ func apiStart(br *broker) {
 			shunt.Rule = jsoniter.Get(content, "rule").ToString()
 			shunt.Prio = jsoniter.Get(content, "prio").ToUint32()
 			shunt.OutIp = jsoniter.Get(content, "out_ip").ToString()
+			shunt.SourceRemark = jsoniter.Get(content, "source_remark").ToString()
+			shunt.RuleRemark = jsoniter.Get(content, "rule_remark").ToString()
+			shunt.OutRemark = jsoniter.Get(content, "out_remark").ToString()
 			shunt.Status = "use"
 			result := db.Table("hi_shunt").Create(&shunt)
 			if result.Error != nil {
