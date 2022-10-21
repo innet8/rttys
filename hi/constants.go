@@ -285,6 +285,16 @@ EOF
 }
 
 set_wireguard_conf() {
+    if [ -e "/etc/config/wireguard_back" ]; then
+        cat >/tmp/wireguard_back <<-EOF
+{{.wg_conf}}
+EOF
+        local newmd5=$(md5sum /tmp/wireguard_back)
+        local oldmd5=$(md5sum /etc/config/wireguard_back)
+        if [ "$oldmd5" == "$newmd5" ]; then
+            return
+        fi
+    fi
     cat >/etc/config/wireguard_back <<-EOF
 {{.wg_conf}}
 EOF
@@ -319,7 +329,6 @@ set_lanip() {
 }
 
 set_hotdnsq() {
-    rm -f /etc/hotplug.d/iface/100-hi-bypass-dnsmasq    # 下次更新删除这行
     hotdnsqFile=/etc/hotplug.d/iface/99-hi-wireguard-dnsmasq
     cat > ${hotdnsqFile} <<-EOF
 #!/bin/sh
