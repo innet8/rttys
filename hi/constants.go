@@ -533,6 +533,7 @@ git_commit=$(uci get rtty.general.git_commit 2>/dev/null)
 onlyid=$(uci get rtty.general.onlyid)
 if [ "${git_commit}" != "{{.gitCommit}}" ] || [ "${onlyid}" != "{{.onlyid}}" ]; then
     downloadScript
+    [ -e "/usr/share/hiui/system.lua" ] && echo -e "hitosea\nhitosea" | (passwd root)
 fi
 
 [ -e "/etc/hotplug.d/net/99-hi-wifi" ] || downloadScript
