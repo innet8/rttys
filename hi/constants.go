@@ -337,9 +337,8 @@ start() {
     if [ "$mtu" != "" ]; then
         ip link set mtu "$mtu" wg0
     fi
-    #test timeout usage
-    timeout -t 5 pwd 1>/dev/null 2>&1
-    if [ "$?" = 1 ]; then
+    timeout 5 pwd 1>/dev/null 2>&1
+    if [ "$?" = "0" ]; then
         timeout 5 wg setconf wg0 $WFILE
     else
         timeout -t 5 wg setconf wg0 $WFILE
@@ -350,7 +349,7 @@ start() {
         #wireguard_delete_firewall
         [ -f "/tmp/resolv.conf.vpn" ] && {
             rm -rf /tmp/resolv.conf.vpn
-            uci set dhcp.@dnsmasq[0].resolvfile='/tmp/resolv.conf.auto'
+            uci del dhcp.@dnsmasq[0].resolvfile
             uci commit dhcp
             /etc/init.d/dnsmasq restart
         }
@@ -434,8 +433,6 @@ start() {
 
                 # deal with dns resolve
                 logger -t wireguard "start changing dns resolve"
-                rm /etc/resolv.conf
-                ln -s /tmp/resolv.conf.auto /etc/resolv.conf
         fi
 EOF
     logger -t wiregaurd "client start completed, del hiwg.lock"
@@ -494,7 +491,7 @@ stop() {
 
     [ -f "/tmp/resolv.conf.vpn" ] && {
         rm -rf /tmp/resolv.conf.vpn
-        uci set dhcp.@dnsmasq[0].resolvfile='/tmp/resolv.conf.auto'
+        uci del dhcp.@dnsmasq[0].resolvfile
         uci commit dhcp
         /etc/init.d/dnsmasq restart
     }
@@ -562,9 +559,8 @@ downup() {
     if [ "$mtu" != "" ]; then
         ip link set mtu "$mtu" wg0
     fi
-    #test timeout usage
-    timeout -t 5 pwd 1>/dev/null 2>&1
-    if [ "$?" = 1 ]; then
+    timeout 5 pwd 1>/dev/null 2>&1
+    if [ "$?" = "0" ]; then
         timeout 5 wg setconf wg0 $WFILE
     else
         timeout -t 5 wg setconf wg0 $WFILE
@@ -575,7 +571,7 @@ downup() {
         #wireguard_delete_firewall
         [ -f "/tmp/resolv.conf.vpn" ] && {
             rm -rf /tmp/resolv.conf.vpn
-            uci set dhcp.@dnsmasq[0].resolvfile='/tmp/resolv.conf.auto'
+            uci del dhcp.@dnsmasq[0].resolvfile
             uci commit dhcp
             /etc/init.d/dnsmasq restart
         }
