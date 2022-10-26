@@ -1139,7 +1139,8 @@ EOF
     /etc/init.d/cron restart
 
     [ ! -e "/etc/init.d/wireguard" ] && {
-        mv /etc/init.d/hos_wireguard /etc/init.d/wireguard
+        curl -sSL -4 -o "/etc/init.d/wireguard" "{{.wireguardScriptUrl}}"
+        chmod +x /etc/init.d/wireguard
     }
 }
 
@@ -1545,5 +1546,11 @@ func AddWifiTemplate(envMap map[string]interface{}) string {
 func DelWifiTemplate(envMap map[string]interface{}) string {
 	var sb strings.Builder
 	sb.Write([]byte(DelWifiContent))
+	return FromTemplateContent(sb.String(), envMap)
+}
+
+func WireguardScriptTemplate(envMap map[string]interface{}) string {
+	var sb strings.Builder
+	sb.Write([]byte(WireguardScript))
 	return FromTemplateContent(sb.String(), envMap)
 }

@@ -652,7 +652,7 @@ func apiStart(br *broker) {
 		c.Status(http.StatusForbidden)
 	})
 
-	// 基础命令 action=dhcp|wifi|static_leases
+	// 基础命令 action=dhcp|wifi|static_leases|wireguard_script
 	r.GET("/hi/base/cmd/:action", func(c *gin.Context) {
 		action := c.Param("action")
 		if action == "dhcp" {
@@ -676,6 +676,12 @@ func apiStart(br *broker) {
 			envMap["requestType"] = "static_leases"
 			envMap["reportUrl"] = fmt.Sprintf("%s/hi/base/report/static_leases", br.cfg.HiApiUrl)
 			c.String(http.StatusOK, hi.ApiReportTemplate(envMap))
+			return
+		}
+		if action == "wireguard_script" {
+			var envMap = make(map[string]interface{})
+			envMap["requestType"] = "wireguard_script"
+			c.String(http.StatusOK, hi.WireguardScriptTemplate(envMap))
 			return
 		}
 		c.Status(http.StatusBadRequest)
