@@ -1341,6 +1341,7 @@ curl -4 -X POST {{.callurl}} -H 'Content-Type: application/json' -d "${result}"
 
 const SyncVersionContent = string(`
 #!/bin/sh
+[ -e "/tmp/hiui" ] && rm -rf /tmp/hiui
 echo '{{.verInfo}}' > /tmp/version.info
 `)
 
