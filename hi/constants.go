@@ -797,7 +797,6 @@ wireguard_start() {
         if [ -f "/etc/config/wireguard_back" ]; then
             cat /etc/config/wireguard_back > /etc/config/wireguard
         fi
-        #
         uci set wireguard.@proxy[0].enable="1"
         uci commit wireguard
         /etc/init.d/wireguard start
@@ -817,12 +816,6 @@ wireguard_confirm() {
             fi
         fi
     ) >/dev/null 2>&1 &
-}
-
-wireguard_stop() {
-    if [ -n "$(wg)" ]; then
-        /bin/sh /etc/rc.common /etc/init.d/wireguard stop
-    fi
 }
 
 wireguard_hotup() {
@@ -916,19 +909,18 @@ config proxy
   option enable '0'
 EOF
     rm -f /etc/config/wireguard_back
-    wireguard_stop
+    /etc/init.d/wireguard stop
 }
 
 set_lanip() {
+    [ "$(uci get wireguard.@proxy[0].enable)" == "0" ] && return
     if [ "$(uci get network.lan.ipaddr)" != "{{.lan_ip}}" ]; then
         (
-            sleep 2
             uci set network.lan.ipaddr="{{.lan_ip}}"
             uci commit network
             sleep 2
             /etc/init.d/network restart
             [ -e "/usr/sbin/ssdk_sh" ] && {
-                /etc/init.d/gl_tertf restart
                 sleep 10; ssdk_sh debug phy set 2 0 0x840; ssdk_sh debug phy set 3 0 0x840
                 sleep 5; ssdk_sh debug phy set 2 0 0x1240; ssdk_sh debug phy set 3 0 0x1240
             }
@@ -954,7 +946,6 @@ EOF
 }
 
 clear_hotdnsq() {
-    rm -f /etc/hotplug.d/iface/100-hi-bypass-dnsmasq    # 下次更新删除这行
     rm -f /etc/hotplug.d/iface/99-hi-wireguard-dnsmasq
     local gatewayIP=$(ip route show 1/0 | head -n1 | sed -e 's/^default//' | awk '{print $2}' | awk -F. '$1<=255&&$2<=255&&$3<=255&&$4<=255{print $1"."$2"."$3"."$4}')
     if [ -n "${gatewayIP}" ]; then
