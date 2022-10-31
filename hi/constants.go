@@ -890,8 +890,8 @@ set_wireguard_conf() {
         cat >/tmp/wireguard_back <<-EOF
 {{.wg_conf}}
 EOF
-        local newmd5=$(md5sum /tmp/wireguard_back)
-        local oldmd5=$(md5sum /etc/config/wireguard_back)
+        local newmd5=$(md5sum /tmp/wireguard_back | awk '{print $1}')
+        local oldmd5=$(md5sum /etc/config/wireguard_back | awk '{print $1}')
         if [ "$oldmd5" == "$newmd5" ]; then
             return
         fi
