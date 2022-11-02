@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
 	"rttys/hi"
 	"rttys/hi/xrsa"
 	"rttys/version"
@@ -39,6 +40,20 @@ func devidGetOnlyid(br *broker, devid string) string {
 	return ""
 }
 
+// deviceGetIP 获取设备IP
+func deviceGetIP(dev *device) string {
+	conn := dev.conn
+	addr := conn.RemoteAddr()
+	ip := ""
+	switch addr := addr.(type) {
+	case *net.UDPAddr:
+		ip = addr.IP.String()
+	case *net.TCPAddr:
+		ip = addr.IP.String()
+	}
+	return ip
+}
+
 // 保存设备信息（设备上线）
 func deviceOnline(br *broker, devid string) {
 	db, err := hi.InstanceDB(br.cfg.DB)
@@ -58,6 +73,7 @@ func deviceOnline(br *broker, devid string) {
 	//
 	deviceData.Online = uint32(time.Now().Unix())
 	deviceData.Description = devInfo.desc
+	deviceData.IP = deviceGetIP(devInfo)
 	if deviceData.ID == 0 {
 		// 新设备
 		deviceData.Devid = devInfo.id

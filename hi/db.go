@@ -31,6 +31,7 @@ type DeviceModel struct {
 	BindOpenid  string `json:"bind_openid"`
 	ReportUrl   string `json:"report_url"`
 	BindTime    uint32 `json:"bind_time"`
+	IP          string `json:"ip"`
 }
 
 type DeviceApiModel struct {
