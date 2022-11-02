@@ -1263,7 +1263,7 @@ config_foreach handle_wifi wifi-iface
 {{.ex}}
 uci commit wireless
 echo '{"code":0}'
-/sbin/wifi reload
+/sbin/wifi reload /dev/null 2>&1 &
 `)
 
 const BlockedContent = string(`
