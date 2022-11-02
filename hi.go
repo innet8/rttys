@@ -97,7 +97,7 @@ func deviceOnline(br *broker, devid string) {
 	go hiSynchShuntConf(br, devid, "")
 	go hiSyncVersion(br, deviceData.BindOpenid, deviceData.Description, devid)
 	if deviceData.BindOpenid != "" && deviceData.ReportUrl != "" {
-		go hiReportOnlineStatus(devid, deviceData.ReportUrl, "online")
+		go hiReportOnlineStatus(devid, deviceData.ReportUrl, "online", deviceData.IP)
 	}
 }
 
@@ -113,7 +113,7 @@ func deviceOffline(br *broker, devid string) {
 	}).Last(&deviceData)
 
 	if deviceData.BindOpenid != "" && deviceData.ReportUrl != "" {
-		go hiReportOnlineStatus(devid, deviceData.ReportUrl, "offline")
+		go hiReportOnlineStatus(devid, deviceData.ReportUrl, "offline", deviceData.IP)
 	}
 }
 
@@ -514,9 +514,10 @@ func hiExecOvertime(token string) {
 	}
 }
 
-func hiReportOnlineStatus(devid, url, typ string) {
+func hiReportOnlineStatus(devid, url, typ, ip string) {
 	_, _ = gohttp.NewRequest().JSON(map[string]interface{}{
 		"type":  typ,
 		"devid": devid,
+		"ip":    ip,
 	}).Post(url)
 }
