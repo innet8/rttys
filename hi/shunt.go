@@ -107,8 +107,10 @@ func GetCmd(apiUrl string, shunt ShuntModel) string {
 			tmps[fmt.Sprintf("b_%d", index)] = RegexpReplace(`^\s*ip route add(.*?)$`, item, fmt.Sprintf("ip route del default table %d &> /dev/null", table))
 		} else if strings.HasPrefix(item, "iptables -w -t mangle -I") {
 			tmps[fmt.Sprintf("c_%d", index)] = RegexpReplace(`^\s*iptables -w -t mangle -I(.*?)$`, item, "iptables -w -t mangle -D$1 &> /dev/null")
+		} else if strings.HasPrefix(item, "iptables -w -t nat -I") {
+			tmps[fmt.Sprintf("d_%d", index)] = RegexpReplace(`^\s*iptables -w -t nat -I(.*?)$`, item, "iptables -w -t nat -D$1 &> /dev/null")
 		} else if strings.HasPrefix(item, fmt.Sprintf("ipset create %s", th)) {
-			tmps[fmt.Sprintf("d_%d", index)] = RegexpReplace(fmt.Sprintf(`^\s*ipset create %s(.*?)$`, th), item, fmt.Sprintf("ipset destroy %s &> /dev/null", th))
+			tmps[fmt.Sprintf("e_%d", index)] = RegexpReplace(fmt.Sprintf(`^\s*ipset create %s(.*?)$`, th), item, fmt.Sprintf("ipset destroy %s &> /dev/null", th))
 		}
 	}
 	var keys []string
