@@ -92,8 +92,8 @@ func GetCmd(apiUrl string, shunt ShuntModel) string {
 		}
 	}
 	if shunt.RuleRemark == "全部" && IsIp(shunt.OutIp) {
-		install = append(install, fmt.Sprintf("iptables-legacy -w -t nat -I shunt-%d -s %s -p udp -m udp --dport 53 -j DNAT --to-destination %s:53", prio, sources[0], shunt.OutIp))
-		install = append(install, fmt.Sprintf("iptables-legacy -w -t nat -I shunt-%d -s %s -p tcp -m tcp --dport 53 -j DNAT --to-destination %s:53", prio, sources[0], shunt.OutIp))
+		install = append(install, fmt.Sprintf("iptables -w -t nat -I shunt-%d -s %s -p udp -m udp --dport 53 -j DNAT --to-destination %s:53", prio, sources[0], shunt.OutIp))
+		install = append(install, fmt.Sprintf("iptables -w -t nat -I shunt-%d -s %s -p tcp -m tcp --dport 53 -j DNAT --to-destination %s:53", prio, sources[0], shunt.OutIp))
 	}
 	installString := strings.ReplaceAll(strings.Join(install, "\n"), "\n", "\n    ")
 	//
