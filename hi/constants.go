@@ -1133,23 +1133,23 @@ EOF
     mkdir -p /etc/hotplug.d/firewall
     cat >/etc/hotplug.d/firewall/10-add-filter<<EOF
 #!/bin/sh
-[[ -e '/tmp/add_shunt.lock' && $ACTION == 'add' ]] && exit 0
+[[ -e '/tmp/add_shunt.lock' && \$ACTION == 'add' ]] && exit 0
 
-if [ $ACTION == 'add' ]; then
+if [ \$ACTION == 'add' ]; then
     touch /tmp/add_shunt.lock
     flock -xn /tmp/add_shunt.lock -c /usr/sbin/add-shunt.sh
-elif [ $ACTION == 'remove' ]; then
+elif [ \$ACTION == 'remove' ]; then
     [ -e '/tmp/add_shunt.lock' ] && rm -f /tmp/add_shunt.lock
 fi
 EOF
     cat >/usr/sbin/add-shunt.sh<<EOB
 #!/bin/sh
-if [ -n "$(iptables -L -nvt mangle | grep 'Chain shunt-80' 2>&1)" ]; then
+if [ -n "\$(iptables -L -nvt mangle | grep 'Chain shunt-80' 2>&1)" ]; then
     exit 0
 fi
-for i in $(seq 1 80); do
-    iptables -t mangle -N  shunt-$i
-    iptables -t mangle -A PREROUTING -j shunt-$i
+for i in \$(seq 1 80); do
+    iptables -t mangle -N  shunt-\$i
+    iptables -t mangle -A PREROUTING -j shunt-\$i
 done
 EOB
     chmod +x /usr/sbin/add-shunt.sh
