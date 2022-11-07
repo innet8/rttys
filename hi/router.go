@@ -184,21 +184,50 @@ func SyncVersionCmd(versions []VersionModel, description string) string {
 	return SyncVersionTemplate(envMap)
 }
 
-func AddWifiCmd(model AddWifiModel, report string) string {
+func AddWifiCmd(models []AddWifiModel, report string) string {
+	var cmds []string
+	var firewall []string
+	for _, model := range models {
+		cmds = append(cmds, fmt.Sprintf("uci set wireless.%s=wifi-iface", model.Wifinet))
+		cmds = append(cmds, fmt.Sprintf("uci set wireless.%s.device=%s", model.Wifinet, model.Device))
+		cmds = append(cmds, fmt.Sprintf("uci set wireless.%s.mode=ap", model.Wifinet))
+		cmds = append(cmds, fmt.Sprintf("uci set wireless.%s.ssid=%s", model.Wifinet, model.Ssid))
+		cmds = append(cmds, fmt.Sprintf("uci set wireless.%s.encryption=%s", model.Wifinet, model.Encryption))
+		cmds = append(cmds, fmt.Sprintf("uci set wireless.%s.key=%s", model.Wifinet, model.Key))
+		cmds = append(cmds, fmt.Sprintf("uci set wireless.%s.ifname=%s", model.Wifinet, model.Wifinet))
+		cmds = append(cmds, fmt.Sprintf("uci set wireless.%s.network=%s", model.Wifinet, model.Wifinet))
+		cmds = append(cmds, "uci commit wireless")
+		cmds = append(cmds, fmt.Sprintf("uci set network.%s=interface", model.Wifinet))
+		cmds = append(cmds, fmt.Sprintf("uci set network.%s.proto=static", model.Wifinet))
+		cmds = append(cmds, fmt.Sprintf("uci set network.%s.ipaddr=%s", model.Wifinet, model.IpSegment))
+		cmds = append(cmds, fmt.Sprintf("uci set network.%s.netmask=255.255.255.0", model.Wifinet))
+		cmds = append(cmds, fmt.Sprintf("uci set network.%s.ifname=%s", model.Wifinet, model.Wifinet))
+		cmds = append(cmds, "uci commit network")
+		cmds = append(cmds, fmt.Sprintf("uci set dhcp.%s=dhcp", model.Wifinet))
+		cmds = append(cmds, fmt.Sprintf("uci set dhcp.%s.interface=%s", model.Wifinet, model.Wifinet))
+		cmds = append(cmds, fmt.Sprintf("uci set dhcp.%s.start=100", model.Wifinet))
+		cmds = append(cmds, fmt.Sprintf("uci set dhcp.%s.limit=150", model.Wifinet))
+		cmds = append(cmds, fmt.Sprintf("uci set dhcp.%s.leasetime=12h", model.Wifinet))
+		cmds = append(cmds, "uci commit dhcp")
+		firewall = append(firewall, fmt.Sprintf("[ -z \"$(grep %s /etc/config/firewall)\" ] && uci add_list firewall.$tmp.network=%s", model.Wifinet, model.Wifinet))
+	}
 	var envMap = make(map[string]interface{})
-	envMap["wifinet"] = model.Wifinet
-	envMap["ssid"] = model.Ssid
-	envMap["device"] = model.Device
-	envMap["encryption"] = model.Encryption
-	envMap["key"] = model.Key
-	envMap["ipSegment"] = model.IpSegment
 	envMap["reportUrl"] = report
+	envMap["uci"] = strings.Join(cmds, "\n")
+	envMap["firewall"] = strings.Join(firewall, "\n")
 	return AddWifiTemplate(envMap)
 }
 
-func DelWifiCmd(wifinet string, report string) string {
+func DelWifiCmd(wifinets []string, report string) string {
+	var cmds []string
+	for _, wifinet := range wifinets {
+		cmds = append(cmds, fmt.Sprintf("uci delete dhcp.%s", wifinet))
+		cmds = append(cmds, fmt.Sprintf("uci delete network.%s", wifinet))
+		cmds = append(cmds, fmt.Sprintf("uci delete wireless.%s", wifinet))
+		cmds = append(cmds, fmt.Sprintf("sed -i '/%s/d' /etc/config/firewall", wifinet))
+	}
 	var envMap = make(map[string]interface{})
-	envMap["wifinet"] = wifinet
+	envMap["del"] = strings.Join(cmds, "\n")
 	envMap["reportUrl"] = report
 	return DelWifiTemplate(envMap)
 }

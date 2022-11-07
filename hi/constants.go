@@ -1356,48 +1356,21 @@ ipseg=$(echo {{.ipSegment}} | awk -F'.' '{print $1"."$2"."$3}')
 [ -n "$(grep $ipseg /etc/config/network)" ] && {
     echo '{"code":101,"msg":"ipsegment already exist"}'
     exit 0
-} 
-uci set wireless.{{.wifinet}}=wifi-iface
-uci set wireless.{{.wifinet}}.device='{{.device}}'
-uci set wireless.{{.wifinet}}.mode='ap'
-uci set wireless.{{.wifinet}}.ssid='{{.ssid}}'
-uci set wireless.{{.wifinet}}.encryption='{{.encryption}}'
-uci set wireless.{{.wifinet}}.key='{{.key}}'
-uci commit wireless
-wifi reload
-sleep 5
-device=$(iwinfo | grep {{.ssid}} | awk '{print $1}')
-uci set network.{{.wifinet}}=interface
-uci set network.{{.wifinet}}.proto='static'
-uci set network.{{.wifinet}}.ipaddr='{{.ipSegment}}'
-uci set network.{{.wifinet}}.netmask='255.255.255.0'
-uci set network.{{.wifinet}}.ifname=$device
-uci commit network
-uci set wireless.{{.wifinet}}.network='{{.wifinet}}'
-uci set wireless.{{.wifinet}}.ifname=$device
-uci commit wireless
-
+}
+{{.uci}}
 handle_firewall(){
     local tmp=$1
     config_get name "$1" "name"
     if [ "$name" == "lan" ]; then
-        [ -z "$(grep {{.wifinet}} /etc/config/firewall)" ] && uci add_list firewall.$tmp.network='{{.wifinet}}'
+        {{.firewall}}
     fi
 }
 config_load firewall
 config_foreach handle_firewall zone
 uci commit firewall
-
-uci set dhcp.{{.wifinet}}=dhcp
-uci set dhcp.{{.wifinet}}.interface='{{.wifinet}}'
-uci set dhcp.{{.wifinet}}.start='100'
-uci set dhcp.{{.wifinet}}.limit='150'
-uci set dhcp.{{.wifinet}}.leasetime='12h'
-uci commit dhcp
-
+wifi reload
 /etc/init.d/firewall reload
 /etc/init.d/network reload
-
 _base64e() {
     echo -n "$1" | base64 | tr -d "\n"
 }
@@ -1413,16 +1386,12 @@ if [ -e "/var/run/delwifi.lock" ]; then
     exit 0
 fi
 touch /var/run/delwifi.lock
-uci delete dhcp.{{.wifinet}}
-uci delete network.{{.wifinet}}
-uci delete wireless.{{.wifinet}}
-sed -i '/{{.wifinet}}/d' /etc/config/firewall
+{{.del}}
 uci commit firewall
 uci commit network
 uci commit wireless
 uci commit dhcp
 wifi reload
-
 _base64e() {
     echo -n "$1" | base64 | tr -d "\n"
 }
