@@ -1357,7 +1357,15 @@ ipseg=$(echo {{.ipSegment}} | awk -F'.' '{print $1"."$2"."$3}')
     echo '{"code":101,"msg":"ipsegment already exist"}'
     exit 0
 }
-{{.uci}}
+{{.wireless}}
+uci commit wireless
+wifi reload
+sleep 5
+{{.network}}
+uci commit network
+uci commit wireless
+{{.dhcp}}
+uci commit dhcp
 handle_firewall(){
     local tmp=$1
     config_get name "$1" "name"
@@ -1368,7 +1376,6 @@ handle_firewall(){
 config_load firewall
 config_foreach handle_firewall zone
 uci commit firewall
-wifi reload
 /etc/init.d/firewall reload
 /etc/init.d/network reload
 _base64e() {
