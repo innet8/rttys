@@ -1720,7 +1720,10 @@ func apiStart(br *broker) {
 		if action == "create" { //新增wifi命令
 			var addWifi hi.AddWifiModel
 			if err := json.Unmarshal(content, &addWifi); err == nil {
-				cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.AddWifiCmd(addWifi, report))
+				addWifis:=[]hi.AddWifiModel{
+					addWifi,
+				}
+				cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.AddWifiCmd(addWifis, report))
 				if terr != nil {
 					c.JSON(http.StatusOK, gin.H{
 						"ret": 0,
@@ -1735,8 +1738,18 @@ func apiStart(br *broker) {
 				return
 			}
 		} else if action == "delete" { //执行删除wifi命令
-			wifinet := jsoniter.Get(content, "wifinet").ToString()
-			cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.DelWifiCmd(wifinet, report))
+			var deleteWifi hi.DeleteWifiModal
+			err := json.Unmarshal(content, &deleteWifi)
+			if err != nil || len(deleteWifi.Wifinets) < 1 {
+				c.JSON(http.StatusOK, gin.H{
+					"ret":  0,
+					"msg":  "参数错误",
+					"data": gin.H{},
+				})
+				return
+			}
+
+			cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.DelWifiCmd(deleteWifi.Wifinets, report))
 			if terr != nil {
 				c.JSON(http.StatusOK, gin.H{
 					"ret": 0,

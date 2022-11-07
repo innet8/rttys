@@ -32,6 +32,10 @@ type AddWifiModel struct {
 	IpSegment  string `json:"ipSegment"`
 }
 
+type DeleteWifiModal struct {
+	Wifinets []string `json:"wifinet"`
+}
+
 func IpkUpgradeCmd(path string) string {
 	var cmds []string
 	cmds = append(cmds, "#!/bin/sh")
