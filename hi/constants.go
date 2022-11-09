@@ -1437,7 +1437,7 @@ fi
 (
 for i in 0 1 2 3 4
 do
-    RES=$(oping -c 10 {{.ip}} | base64 | tr -d "\n")
+    RES=$(oping -c 10 $ips | base64 | tr -d "\n")
 	curl -4 -X POST "{{.callbackUrl}}" -H "Content-Type: application/json" -d '{"content":"'$RES'","sn":"'$(uci get rtty.general.id)'","type":"{{.type}}","batch":"{{.batch}}","index":'$i'}'
 done
 ) &
