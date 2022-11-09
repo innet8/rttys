@@ -1679,7 +1679,7 @@ func apiStart(br *broker) {
 			"ret": 1,
 			"msg": "success",
 			"data": gin.H{
-				"token":   hiSyncVersion(br, user.Openid, description, ""),
+				"token":   hiSyncVersion(br, user.Openid, ""),
 				"version": version,
 			},
 		})
@@ -1720,7 +1720,7 @@ func apiStart(br *broker) {
 		if action == "create" { //新增wifi命令
 			var addWifi hi.AddWifiModel
 			if err := json.Unmarshal(content, &addWifi); err == nil {
-				addWifis:=[]hi.AddWifiModel{
+				addWifis := []hi.AddWifiModel{
 					addWifi,
 				}
 				cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.AddWifiCmd(addWifis, report))
@@ -1764,6 +1764,51 @@ func apiStart(br *broker) {
 			return
 		}
 		c.Status(http.StatusBadRequest)
+	})
+
+	r.POST("/hi/other/diagnosis/:type/:devid", func(c *gin.Context) {
+		typ := c.Param("type")
+		devid := c.Param("devid")
+		onlyid := devidGetOnlyid(br, devid)
+		//执行校验
+		db, err := hi.InstanceDB(cfg.DB)
+		defer closeDB(db)
+		if err != nil {
+			log.Error().Msg(err.Error())
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+		_, authErr := userAuth(c, db, devid)
+		if authErr != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"ret": 0,
+				"msg": "Authentication failed",
+				"data": gin.H{
+					"error": authErr.Error(),
+				},
+			})
+			return
+		}
+		content, err := ioutil.ReadAll(c.Request.Body)
+		if err != nil {
+			c.Status(http.StatusBadRequest)
+			return
+		}
+		callbackUrl := jsoniter.Get(content, "callback_url").ToString()
+		batch := jsoniter.Get(content, "batch").ToString()
+		ip := jsoniter.Get(content, "ip").ToString()
+		cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.DiagnosisCmd(callbackUrl, typ, batch, ip))
+		if terr != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"ret": 0,
+				"msg": "创建失败",
+				"data": gin.H{
+					"error": terr.Error(),
+				},
+			})
+			return
+		}
+		hiExecRequest(br, c, cmdr)
 	})
 
 	/**************************************************************************************************/

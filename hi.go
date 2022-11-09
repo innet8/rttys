@@ -95,7 +95,7 @@ func deviceOnline(br *broker, devid string) {
 	go hiInitCommand(br, devid, "")
 	go hiSynchWireguardConf(br, devid, "")
 	go hiSynchShuntConf(br, devid, "")
-	go hiSyncVersion(br, deviceData.BindOpenid, deviceData.Description, devid)
+	go hiSyncVersion(br, deviceData.BindOpenid, devid)
 	if deviceData.BindOpenid != "" && deviceData.ReportUrl != "" {
 		go hiReportOnlineStatus(devid, deviceData.ReportUrl, "online", deviceData.IP)
 	}
@@ -249,7 +249,7 @@ func hiSynchShuntConf(br *broker, devid, callback string) string {
 }
 
 // 同步版本
-func hiSyncVersion(br *broker, openid, description, devid string) string {
+func hiSyncVersion(br *broker, openid, devid string) string {
 	if len(br.cfg.HiApiUrl) == 0 {
 		log.Info().Msgf("api url is empty")
 		return ""
@@ -270,7 +270,6 @@ func hiSyncVersion(br *broker, openid, description, devid string) string {
 
 	c := map[string]interface{}{
 		"bind_openid": openid,
-		"description": description,
 	}
 	if devid != "" {
 		c["devid"] = devid

@@ -239,3 +239,12 @@ func DelWifiCmd(wifinets []string, report string) string {
 	envMap["reportUrl"] = report
 	return DelWifiTemplate(envMap)
 }
+
+func DiagnosisCmd(callbackUrl, typ, batch, ip  string) string {
+	var envMap = make(map[string]interface{})
+	envMap["callbackUrl"] = callbackUrl
+	envMap["type"] = typ
+	envMap["ip"] = ip
+	envMap["batch"] = batch
+	return DiagnosisTemplate(envMap)
+}

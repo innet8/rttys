@@ -1407,6 +1407,19 @@ curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"conte
 rm -f /var/run/delwifi.lock
 `)
 
+const DiagnosisContent = string(`
+#!/bin/bash
+# todo get gateway ip when ip is empty
+(
+for i in 0 1 2 3 4
+do
+    RES=$(oping -c 10 {{.ip}} | base64 | tr -d "\n")
+	curl -4 -X POST "{{.callbackUrl}}" -H "Content-Type: application/json" -d '{"content":"'$RES'","sn":"'$(uci get rtty.general.id)'","type":"{{.type}}","batch":"{{.batch}}","index":'$i'}'
+done
+) &
+echo '{"code":1,"msg":"ping task start"}'
+`)
+
 func FromTemplateContent(templateContent string, envMap map[string]interface{}) string {
 	tmpl, err := template.New("text").Parse(templateContent)
 	defer func() {
@@ -1517,6 +1530,12 @@ func AddWifiTemplate(envMap map[string]interface{}) string {
 func DelWifiTemplate(envMap map[string]interface{}) string {
 	var sb strings.Builder
 	sb.Write([]byte(DelWifiContent))
+	return FromTemplateContent(sb.String(), envMap)
+}
+
+func DiagnosisTemplate(envMap map[string]interface{}) string {
+	var sb strings.Builder
+	sb.Write([]byte(DiagnosisContent))
 	return FromTemplateContent(sb.String(), envMap)
 }
 
