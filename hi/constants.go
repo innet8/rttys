@@ -1414,7 +1414,7 @@ rm -f /var/run/delwifi.lock
 
 const DiagnosisContent = string(`
 #!/bin/bash
-# todo get gateway ip when ip is empty
+
 . /lib/functions/network.sh
 get_wan_iface_and_gateway() {
     iface=$(cat /var/run/mwan3/indicator 2>/dev/null || echo "unknown")
@@ -1440,11 +1440,8 @@ if [ -z "$ips" ]; then
     ips=$gw
 fi
 (
-for i in 0 1 2 3 4
-do
-    RES=$(oping -c 10 ${ips} | base64 | tr -d "\n")
-	curl -4 -X POST "{{.callbackUrl}}" -H "Content-Type: application/json" -d '{"content":"'$RES'","sn":"'$(uci get rtty.general.id)'","type":"{{.type}}","batch":"{{.batch}}","index":'$i'}'
-done
+    RES=$(oping -c 5 ${ips} | base64 | tr -d "\n")
+	curl -4 -X POST "{{.callbackUrl}}" -H "Content-Type: application/json" -d '{"content":"'$RES'","sn":"'$(uci get rtty.general.id)'","type":"{{.type}}","batch":"{{.batch}}","index":0}'
 ) &
 echo '{"code":1,"msg":"ping task start"}'
 `)
