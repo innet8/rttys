@@ -15,8 +15,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nahid/gohttp"
-
 	"gorm.io/gorm"
 
 	jsoniter "github.com/json-iterator/go"
@@ -687,11 +685,11 @@ func apiStart(br *broker) {
 		c.Status(http.StatusBadRequest)
 	})
 
-	// 上报接口 action=dhcp|wifi|static_leases
+	// 上报接口 action=dhcp|wifi|static_leases|restarted
 	r.POST("/hi/base/report/:action", func(c *gin.Context) {
 		action := c.Param("action")
 
-		if action == "dhcp" || action == "wifi" || action == "static_leases" {
+		if action == "dhcp" || action == "wifi" || action == "static_leases" || action == "restarted" {
 			db, err := hi.InstanceDB(cfg.DB)
 			defer closeDB(db)
 			if err != nil {
@@ -732,6 +730,14 @@ func apiStart(br *broker) {
 				}
 			}
 
+			if action == "restarted" {
+				var deviceData hi.DeviceModel
+				db.Table("hi_device").Where(map[string]interface{}{
+					"devid": devid,
+				}).Last(&deviceData)
+				hiReport(br, deviceData, "restarted", "")
+			}
+
 			if len(result) > 0 {
 				var count int64
 				db.Table("hi_info").Where(map[string]interface{}{
@@ -754,13 +760,8 @@ func apiStart(br *broker) {
 					db.Table("hi_device").Where(map[string]interface{}{
 						"devid": devid,
 					}).Last(&deviceData)
-					if deviceData.BindOpenid != "" && deviceData.ReportUrl != "" {
-						_, _ = gohttp.NewRequest().JSON(map[string]interface{}{
-							"devid": devid,
-							"type":  "network_speed",
-							"data":  resultContent,
-						}).Post(deviceData.ReportUrl)
-					}
+
+					hiReport(br, deviceData, "network_speed", resultContent)
 				}
 			}
 			c.String(http.StatusOK, "success")

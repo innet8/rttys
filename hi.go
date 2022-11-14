@@ -96,9 +96,7 @@ func deviceOnline(br *broker, devid string) {
 	go hiSynchWireguardConf(br, devid, "")
 	go hiSynchShuntConf(br, devid, "")
 	go hiSyncVersion(br, deviceData.BindOpenid, devid)
-	if deviceData.BindOpenid != "" && deviceData.ReportUrl != "" {
-		go hiReportOnlineStatus(devid, deviceData.ReportUrl, "online", deviceData.IP)
-	}
+	hiReport(br, deviceData, "online", "")
 }
 
 func deviceOffline(br *broker, devid string) {
@@ -111,10 +109,7 @@ func deviceOffline(br *broker, devid string) {
 	db.Table("hi_device").Where(map[string]interface{}{
 		"devid": devid,
 	}).Last(&deviceData)
-
-	if deviceData.BindOpenid != "" && deviceData.ReportUrl != "" {
-		go hiReportOnlineStatus(devid, deviceData.ReportUrl, "offline", deviceData.IP)
-	}
+	hiReport(br, deviceData, "offline", "")
 }
 
 // 验证用户（验证签名）
@@ -513,10 +508,40 @@ func hiExecOvertime(token string) {
 	}
 }
 
-func hiReportOnlineStatus(devid, url, typ, ip string) {
+// hiReport 上报控制中心，typ=online|offline|network_speed|restarted
+func hiReport(br *broker, device hi.DeviceModel, typ, content string) {
+	if device.ID == 0 || device.BindOpenid == "" || device.ReportUrl == "" {
+		return
+	}
+	db, err := hi.InstanceDB(br.cfg.DB)
+	defer closeDB(db)
+	if err != nil {
+		return
+	}
+	var userData *hi.UserModel
+	db.Table("hi_user").Where(map[string]interface{}{
+		"openid": device.BindOpenid,
+	}).Last(&userData)
+	if userData.ID == 0 {
+		return
+	}
+
+	// about encrypt
+	//bs, err := json.Marshal(map[string]interface{}{
+	//	"ip":   device.IP,
+	//	"type": typ,
+	//	"data": content,
+	//})
+	//if err != nil {
+	//	return
+	//}
+	//
+	//data := xrsa.Encrypt(string(bs), userData.Public)
 	_, _ = gohttp.NewRequest().JSON(map[string]interface{}{
-		"type":  typ,
-		"devid": devid,
-		"ip":    ip,
-	}).Post(url)
+		"devid": device.Devid,
+		//"data":  data,
+		"ip":   device.IP,
+		"type": typ,
+		"data": content,
+	}).Post(device.ReportUrl)
 }
