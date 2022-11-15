@@ -202,13 +202,12 @@ func AddWifiCmd(models []AddWifiModel, report string) string {
 		wireless = append(wireless, fmt.Sprintf("uci set wireless.%s.key=%s", model.Wifinet, model.Key))
 		wireless = append(wireless, fmt.Sprintf("uci set wireless.%s.ifname=%s", model.Wifinet, model.Wifinet))
 		wireless = append(wireless, fmt.Sprintf("uci set wireless.%s.network=%s", model.Wifinet, model.Wifinet))
-		network = append(network, fmt.Sprintf("device=$(iwinfo | grep %s | awk '{print $1}')", model.Ssid))
-		network = append(network, fmt.Sprintf("uci set network.%s=interface", model.Wifinet))
+		network = append(network, fmt.Sprintf("device=$(cat $(grep -l \"ssid=%s$\" /var/run/*.conf ) | awk -F= '$1==\"interface\" {print $2}')", model.Ssid))
 		network = append(network, fmt.Sprintf("uci set network.%s=interface", model.Wifinet))
 		network = append(network, fmt.Sprintf("uci set network.%s.proto=static", model.Wifinet))
 		network = append(network, fmt.Sprintf("uci set network.%s.ipaddr=%s", model.Wifinet, model.IpSegment))
 		network = append(network, fmt.Sprintf("uci set network.%s.netmask=255.255.255.0", model.Wifinet))
-		network = append(network, fmt.Sprintf("uci set network.%s.ifname==$device", model.Wifinet))
+		network = append(network, fmt.Sprintf("uci set network.%s.ifname=$device", model.Wifinet))
 		network = append(network, fmt.Sprintf("uci set wireless.%s.ifname=$device", model.Wifinet))
 		dhcp = append(dhcp, fmt.Sprintf("uci set dhcp.%s=dhcp", model.Wifinet))
 		dhcp = append(dhcp, fmt.Sprintf("uci set dhcp.%s.interface=%s", model.Wifinet, model.Wifinet))
@@ -240,7 +239,7 @@ func DelWifiCmd(wifinets []string, report string) string {
 	return DelWifiTemplate(envMap)
 }
 
-func DiagnosisCmd(callbackUrl, typ, batch, ip  string) string {
+func DiagnosisCmd(callbackUrl, typ, batch, ip string) string {
 	var envMap = make(map[string]interface{})
 	envMap["callbackUrl"] = callbackUrl
 	envMap["type"] = typ
