@@ -200,7 +200,6 @@ func AddWifiCmd(models []AddWifiModel, report string) string {
 		wireless = append(wireless, fmt.Sprintf("uci set wireless.%s.ssid=%s", model.Wifinet, model.Ssid))
 		wireless = append(wireless, fmt.Sprintf("uci set wireless.%s.encryption=%s", model.Wifinet, model.Encryption))
 		wireless = append(wireless, fmt.Sprintf("uci set wireless.%s.key=%s", model.Wifinet, model.Key))
-		wireless = append(wireless, fmt.Sprintf("uci set wireless.%s.ifname=%s", model.Wifinet, model.Wifinet))
 		wireless = append(wireless, fmt.Sprintf("uci set wireless.%s.network=%s", model.Wifinet, model.Wifinet))
 		network = append(network, fmt.Sprintf("device=$(cat $(grep -l \"ssid=%s$\" /var/run/*.conf ) | awk -F= '$1==\"interface\" {print $2}')", model.Ssid))
 		network = append(network, fmt.Sprintf("uci set network.%s=interface", model.Wifinet))

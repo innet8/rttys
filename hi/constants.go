@@ -1195,6 +1195,9 @@ else
     print("")
 end
 EOF
+if [ -e "/var/run/delwifi.lock" ] || [ -e "/var/run/addwifi.lock" ]; then
+    exit 0
+fi
 RES=$(lua /tmp/apconfig.lua)
 if [ -z "$RES" ]; then
     exit 1
@@ -1366,7 +1369,7 @@ ipseg=$(echo {{.ipSegment}} | awk -F'.' '{print $1"."$2"."$3}')
 {{.wireless}}
 uci commit wireless
 wifi reload
-sleep 10
+sleep 20
 {{.network}}
 uci commit network
 uci commit wireless
