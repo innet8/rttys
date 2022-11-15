@@ -1366,7 +1366,7 @@ ipseg=$(echo {{.ipSegment}} | awk -F'.' '{print $1"."$2"."$3}')
 {{.wireless}}
 uci commit wireless
 wifi reload
-sleep 5
+sleep 10
 {{.network}}
 uci commit network
 uci commit wireless
