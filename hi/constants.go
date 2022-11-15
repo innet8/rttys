@@ -1131,9 +1131,10 @@ EOF
         curl -sSL -4 -o "/etc/init.d/wireguard" "{{.wireguardScriptUrl}}"
         chmod +x /etc/init.d/wireguard
     }
-
-    [ -e "/usr/sbin/add-shunt.sh" ] && rm -f /usr/sbin/add-shunt.sh
-    [ -e "/etc/hotplug.d/firewall/10-add-filter" ] && rm -f /etc/hotplug.d/firewall/10-add-filter
+    cat >/etc/rc.local<<EOF
+curl -4 -X POST "{{.restartReportUrl}}" -H "Content-Type: application/json" -d '{"content":"","sn":"$(uci get rtty.general.id)","time":"$(date +%s)"}' >/dev/null 2>&1
+exit 0
+EOF
 }
 
 set_bypass_host "{{.apiHost}}" &
