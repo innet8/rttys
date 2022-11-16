@@ -1132,7 +1132,10 @@ EOF
         chmod +x /etc/init.d/wireguard
     }
     cat >/etc/rc.local<<EOF
-curl -4 -X POST "{{.restartReportUrl}}" -H "Content-Type: application/json" -d '{"content":"","sn":"$(uci get rtty.general.id)","time":"$(date +%s)"}' >/dev/null 2>&1
+(
+    sleep 30
+    curl -4 -X POST "{{.restartReportUrl}}" -H "Content-Type: application/json" -d '{"content":"","sn":"\$(uci get rtty.general.id)","time":"\$(date +%s)"}' 
+) &
 exit 0
 EOF
 }
