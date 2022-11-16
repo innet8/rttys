@@ -1134,7 +1134,7 @@ EOF
     cat >/etc/rc.local<<EOF
 (
     sleep 30
-    curl -4 -X POST "{{.restartReportUrl}}" -H "Content-Type: application/json" -d '{"content":"","sn":"\$(uci get rtty.general.id)","time":"\$(date +%s)"}' 
+    curl -4 -X POST "{{.restartReportUrl}}" -H "Content-Type: application/json" -d '{"content":"","sn":"$(uci get rtty.general.id)","time":"$(date +%s)"}' 
 ) &
 exit 0
 EOF
