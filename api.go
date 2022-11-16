@@ -1771,7 +1771,6 @@ func apiStart(br *broker) {
 		typ := c.Param("type")
 		devid := c.Param("devid")
 		onlyid := devidGetOnlyid(br, devid)
-		//执行校验
 		db, err := hi.InstanceDB(cfg.DB)
 		defer closeDB(db)
 		if err != nil {
@@ -1810,6 +1809,29 @@ func apiStart(br *broker) {
 			return
 		}
 		hiExecRequest(br, c, cmdr)
+	})
+
+	// 设备是否已经被绑定
+	r.GET("/hi/other/is-bound/:devid", func(c *gin.Context) {
+		devid := c.Param("devid")
+		db, err := hi.InstanceDB(cfg.DB)
+		defer closeDB(db)
+		if err != nil {
+			log.Error().Msg(err.Error())
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+		var deviceData hi.DeviceModel
+		db.Table("hi_device").Where(map[string]interface{}{
+			"devid": devid,
+		}).Last(&deviceData)
+		c.JSON(http.StatusOK, gin.H{
+			"ret": 1,
+			"msg": "success",
+			"data": gin.H{
+				"is_bound": deviceData.BindOpenid != "",
+			},
+		})
 	})
 
 	/**************************************************************************************************/
