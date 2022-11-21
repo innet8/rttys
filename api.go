@@ -1834,6 +1834,58 @@ func apiStart(br *broker) {
 		})
 	})
 
+	// 验证密码
+	r.POST("/hi/other/verify-password/:devid", func(c *gin.Context) {
+		devid := c.Param("devid")
+		content, err := ioutil.ReadAll(c.Request.Body)
+		if err != nil {
+			c.Status(http.StatusBadRequest)
+			return
+		}
+		passwd := jsoniter.Get(content, "password").ToString()
+
+		db, err := hi.InstanceDB(cfg.DB)
+		if err != nil {
+			log.Error().Msg(err.Error())
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+		defer closeDB(db)
+
+		_, authErr := userAuth(c, db, devid)
+		if authErr != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"ret": 0,
+				"msg": "Authentication failed",
+				"data": gin.H{
+					"error": authErr.Error(),
+				},
+			})
+			return
+		}
+
+		var deviceData hi.DeviceModel
+		db.Table("hi_device").Where(map[string]interface{}{
+			"devid": devid,
+		}).Last(&deviceData)
+
+		hash := hi.StringMd5(fmt.Sprintf("%s:%s", hi.StringMd5(fmt.Sprintf("admin:%s", passwd)), devid))
+		pass := hash == deviceData.Password
+		retCode := 0
+		msg := "Verification failed"
+		if pass {
+			retCode = 1
+			msg = "Verification successful"
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"ret": retCode,
+			"msg": msg,
+			"data": gin.H{
+				"pass": pass,
+			},
+		})
+	})
+
 	/**************************************************************************************************/
 	/***********************************************HI*************************************************/
 	/**************************************************************************************************/
