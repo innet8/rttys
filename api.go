@@ -729,6 +729,22 @@ func apiStart(br *broker) {
 					}
 				}
 			}
+			// web密码
+			if action == "webpwd" {
+				webpwd := jsoniter.Get(content, "webpwd").ToString()
+				if webpwd != "" {
+					var deviceData hi.DeviceModel
+					db.Table("hi_device").Where(map[string]interface{}{
+						"devid": devid,
+					}).Last(&deviceData)
+					if deviceData.ID != 0 {
+						if webpwd != "" {
+							deviceData.Password = webpwd
+						}
+						db.Table("hi_device").Save(&deviceData)
+					}
+				}
+			}
 
 			if action == "restarted" {
 				var deviceData hi.DeviceModel
