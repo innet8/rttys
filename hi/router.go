@@ -193,6 +193,7 @@ func AddWifiCmd(models []AddWifiModel, report string) string {
 	var wireless []string
 	var dhcp []string
 	var firewall []string
+	var chaos_calmer []string
 	for _, model := range models {
 		wireless = append(wireless, fmt.Sprintf("uci set wireless.%s=wifi-iface", model.Wifinet))
 		wireless = append(wireless, fmt.Sprintf("uci set wireless.%s.device=%s", model.Wifinet, model.Device))
@@ -201,13 +202,13 @@ func AddWifiCmd(models []AddWifiModel, report string) string {
 		wireless = append(wireless, fmt.Sprintf("uci set wireless.%s.encryption=%s", model.Wifinet, model.Encryption))
 		wireless = append(wireless, fmt.Sprintf("uci set wireless.%s.key='%s'", model.Wifinet, model.Key))
 		wireless = append(wireless, fmt.Sprintf("uci set wireless.%s.network=%s", model.Wifinet, model.Wifinet))
-		network = append(network, fmt.Sprintf("device=$(cat $(grep -l \"ssid=%s$\" /var/run/*.conf ) | awk -F= '$1==\"interface\" {print $2}')", model.Ssid))
 		network = append(network, fmt.Sprintf("uci set network.%s=interface", model.Wifinet))
 		network = append(network, fmt.Sprintf("uci set network.%s.proto=static", model.Wifinet))
 		network = append(network, fmt.Sprintf("uci set network.%s.ipaddr=%s", model.Wifinet, model.IpSegment))
 		network = append(network, fmt.Sprintf("uci set network.%s.netmask=255.255.255.0", model.Wifinet))
-		network = append(network, fmt.Sprintf("uci set network.%s.ifname=$device", model.Wifinet))
-		network = append(network, fmt.Sprintf("uci set wireless.%s.ifname=$device", model.Wifinet))
+		chaos_calmer = append(chaos_calmer, fmt.Sprintf("device=$(cat $(grep -l \"ssid=%s$\" /var/run/*.conf ) | awk -F= '$1==\"interface\" {print $2}')", model.Ssid))
+		chaos_calmer = append(chaos_calmer, fmt.Sprintf("uci set network.%s.ifname=$device", model.Wifinet))
+		chaos_calmer = append(chaos_calmer, fmt.Sprintf("uci set wireless.%s.ifname=$device", model.Wifinet))
 		dhcp = append(dhcp, fmt.Sprintf("uci set dhcp.%s=dhcp", model.Wifinet))
 		dhcp = append(dhcp, fmt.Sprintf("uci set dhcp.%s.interface=%s", model.Wifinet, model.Wifinet))
 		dhcp = append(dhcp, fmt.Sprintf("uci set dhcp.%s.start=100", model.Wifinet))
@@ -219,6 +220,7 @@ func AddWifiCmd(models []AddWifiModel, report string) string {
 	envMap["reportUrl"] = report
 	envMap["wireless"] = strings.Join(wireless, "\n")
 	envMap["network"] = strings.Join(network, "\n")
+	envMap["chaos_calmer"] = strings.Join(chaos_calmer, "\n")
 	envMap["dhcp"] = strings.Join(dhcp, "\n")
 	envMap["firewall"] = strings.Join(firewall, "\n")
 	return AddWifiTemplate(envMap)

@@ -1073,8 +1073,6 @@ EOF
 if [ "\$ACTION" = "add" ] && [ "\$DEVICE" = "br-lan" ]; then
     if [[ -z "\$(iptables -L OUTPUT -nvt mangle -w 2>/dev/null | grep ${thName} | grep -v ${markId})" ]]; then
         iptables -w -t mangle -I OUTPUT -m set --match-set ${thName} dst -j ACCEPT
-    fi
-    if [[ -z "\$(iptables -L OUTPUT -nvt mangle -w 2>/dev/null | grep ${thName} | grep ${markId})" ]]; then
         iptables -w -t mangle -I OUTPUT -m set --match-set ${thName} dst -j MARK --set-mark ${markId}
     fi
 fi
@@ -1184,7 +1182,8 @@ else
     version=$(cat /etc/openwrt_release|grep DISTRIB_RELEASE |awk -F'=' '{gsub(/\047/,""); print $2}')
 fi
 webVer=$(awk '/hiui-ui-core/ {getline;print $2}' /usr/lib/opkg/status)
-curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'","ver":"'$version'","webVer":"'$webVer'"}'
+tmp='{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'","ver":"'$version'","webVer":"'$webVer'"}'
+echo -n $tmp | curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d @-
 `)
 
 const ApConfigReportAdded = string(`
@@ -1372,8 +1371,11 @@ ipseg=$(echo {{.ipSegment}} | awk -F'.' '{print $1"."$2"."$3}')
 {{.wireless}}
 uci commit wireless
 wifi reload
-sleep 20
 {{.network}}
+if [ "$(cat /etc/openwrt_version)" == "15.05.1" ]; then
+    sleep 20
+    {{.chaos_calmer}}
+fi
 uci commit network
 uci commit wireless
 {{.dhcp}}
