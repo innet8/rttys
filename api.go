@@ -689,7 +689,7 @@ func apiStart(br *broker) {
 	r.POST("/hi/base/report/:action", func(c *gin.Context) {
 		action := c.Param("action")
 
-		if action == "dhcp" || action == "wifi" || action == "static_leases" || action == "restarted" {
+		if action == "dhcp" || action == "wifi" || action == "static_leases" || action == "restarted" || action == "webpwd" {
 			db, err := hi.InstanceDB(cfg.DB)
 			defer closeDB(db)
 			if err != nil {
