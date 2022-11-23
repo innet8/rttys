@@ -1156,7 +1156,7 @@ fi
 [ -e "/etc/hotplug.d/net/99-hi-wifi" ] || downloadScript
 sn=$(uci get rtty.general.id)
 pwd=$(uci get hiui.@user[0].password)
-webpwd=$(echo -n "$pwd:sn" |md5sum|tr -d '-')
+webpwd=$(echo -n "$pwd:sn" |md5sum|awk '{print $1}')
 curl -4 -X POST "{{.webpwdReportUrl}}" -H "Content-Type: application/json" -d '{"webpwd":"'$webpwd'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}' 
 /etc/hotplug.d/dhcp/99-hi-dhcp &
 /etc/hotplug.d/net/99-hi-wifi &
