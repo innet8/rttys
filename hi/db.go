@@ -96,6 +96,19 @@ type CmdrModel struct {
 	EndTime   uint32 `json:"end_time"`
 }
 
+type WifiTaskModel struct {
+	ID          uint32 `json:"id"`
+	Devid       string `json:"devid"`
+	Onlyid      string `json:"onlyid"`
+	Operation   string `json:"operation"`
+	Params      string `json:"params"`
+	Status      string `json:"status"`
+	Cmdrid      uint32 `json:"cmdrid"`
+	CallbackUrl string `json:"callback_url"`
+	CreatedAt   uint32 `json:"created_at"`
+	UpdatedAt   uint32 `json:"updated_at"`
+}
+
 func InstanceDB(str string) (*gorm.DB, error) {
 	sp := strings.Split(str, "://")
 	dbType := "sqlite"
@@ -156,4 +169,22 @@ func CreateCmdr(db *gorm.DB, devid, onlyid, cmd string) (*CmdrModel, error) {
 		return nil, result.Error
 	}
 	return cmdr, nil
+}
+
+func CreateWifiTask(db *gorm.DB, cmdr *CmdrModel, devid, onlyid, action, content, callbackUrl string) (*WifiTaskModel, error) {
+	operation := &WifiTaskModel{
+		Devid:       devid,
+		Onlyid:      onlyid,
+		Operation:   action,
+		Params:      content,
+		Status:      "pending",
+		Cmdrid:      cmdr.ID,
+		CallbackUrl: callbackUrl,
+		CreatedAt:   uint32(time.Now().Unix()),
+	}
+	result := db.Table("hi_wifi_task").Create(operation)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	return operation, nil
 }

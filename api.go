@@ -738,9 +738,7 @@ func apiStart(br *broker) {
 						"devid": devid,
 					}).Last(&deviceData)
 					if deviceData.ID != 0 {
-						if webpwd != "" {
-							deviceData.Password = webpwd
-						}
+						deviceData.Password = webpwd
 						db.Table("hi_device").Save(&deviceData)
 					}
 				}
@@ -1057,6 +1055,9 @@ func apiStart(br *broker) {
 			// 取消绑定
 			db.Table("hi_wg").Where(map[string]interface{}{"devid": devid}).Update("status", "unbind")
 			db.Table("hi_shunt").Where(map[string]interface{}{"devid": devid}).Update("status", "unbind")
+
+			// TODO 删除所有手动创建的Wifi
+
 			deviceData.BindOpenid = ""
 			db.Table("hi_device").Save(&deviceData)
 			msg = "取消绑定成功"
@@ -1781,6 +1782,118 @@ func apiStart(br *broker) {
 			return
 		}
 		c.Status(http.StatusBadRequest)
+	})
+
+	// wifi设置 action=create|delete  devid=设备id create by weiguowang 2022/10/18
+	r.POST("/hi/other/wifi2/:action/:devid", func(c *gin.Context) {
+		action := c.Param("action")
+		devid := c.Param("devid")
+		onlyid := devidGetOnlyid(br, devid)
+		if action != "create" && action != "delete" {
+			c.Status(http.StatusBadRequest)
+			return
+		}
+		if len(onlyid) == 0 {
+			c.JSON(http.StatusOK, gin.H{
+				"ret":  0,
+				"msg":  "设备不在线",
+				"data": nil,
+			})
+			return
+		}
+		//执行校验
+		db, err := hi.InstanceDB(cfg.DB)
+		defer closeDB(db)
+		if err != nil {
+			log.Error().Msg(err.Error())
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+		_, authErr := userAuth(c, db, devid)
+		if authErr != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"ret": 0,
+				"msg": "Authentication failed",
+				"data": gin.H{
+					"error": authErr.Error(),
+				},
+			})
+			return
+		}
+		content, err := ioutil.ReadAll(c.Request.Body)
+		if err != nil {
+			c.Status(http.StatusBadRequest)
+			return
+		}
+		report := fmt.Sprintf("%s/hi/base/report/wifi", br.cfg.HiApiUrl)
+		callbackUrl := jsoniter.Get(content, "call_url").ToString()
+		var cmdr *hi.CmdrModel
+		var terr error
+		//根据action执行不同的动作
+		if action == "create" { //新增wifi命令
+			var addWifi hi.AddWifiModel
+			if err := json.Unmarshal(content, &addWifi); err == nil {
+				addWifis := []hi.AddWifiModel{
+					addWifi,
+				}
+				cmdr, terr = hi.CreateCmdr(db, devid, onlyid, hi.AddWifiCmd(addWifis, report))
+				if terr != nil {
+					c.JSON(http.StatusOK, gin.H{
+						"ret": 0,
+						"msg": "添加失败",
+						"data": gin.H{
+							"error": terr.Error(),
+						},
+					})
+					return
+				}
+			}
+		} else if action == "delete" { //执行删除wifi命令
+			var deleteWifi hi.DeleteWifiModal
+			err := json.Unmarshal(content, &deleteWifi)
+			if err != nil || len(deleteWifi.Wifinets) < 1 {
+				c.JSON(http.StatusOK, gin.H{
+					"ret":  0,
+					"msg":  "参数错误",
+					"data": gin.H{},
+				})
+				return
+			}
+			cmdr, terr = hi.CreateCmdr(db, devid, onlyid, hi.DelWifiCmd(deleteWifi.Wifinets, report))
+			if terr != nil {
+				c.JSON(http.StatusOK, gin.H{
+					"ret": 0,
+					"msg": "删除失败",
+					"data": gin.H{
+						"error": terr.Error(),
+					},
+				})
+				return
+			}
+		}
+		_, err = hi.CreateWifiTask(db, cmdr, devid, onlyid, action, string(content), callbackUrl)
+		msg := "添加失败"
+		successMsg := "添加成功"
+		if action == "delete" {
+			msg = "删除失败"
+			successMsg = "删除成功"
+		}
+		if terr != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"ret": 0,
+				"msg": msg,
+				"data": gin.H{
+					"error": terr.Error(),
+				},
+			})
+			return
+		}
+		go hiExecWifiTask(br, devid)
+		c.JSON(http.StatusOK, gin.H{
+			"ret":  1,
+			"msg":  successMsg,
+			"data": gin.H{},
+		})
 	})
 
 	r.POST("/hi/other/diagnosis/:type/:devid", func(c *gin.Context) {

@@ -86,6 +86,7 @@ func deviceOnline(br *broker, devid string) {
 				// 取消绑定
 				db.Table("hi_wg").Where(map[string]interface{}{"devid": devid}).Update("status", "unbind")
 				db.Table("hi_shunt").Where(map[string]interface{}{"devid": devid}).Update("status", "unbind")
+				db.Table("hi_wifi_task").Where(map[string]interface{}{"devid": devid}).Update("status", "unbind")
 				deviceData.BindOpenid = ""
 			}
 			deviceData.Onlyid = devInfo.onlyid
@@ -332,11 +333,11 @@ func hiExecBefore(br *broker, db *gorm.DB, devid, cmd, callback string) string {
 	if err != nil {
 		return ""
 	}
-	return hiExecCommand(br, cmdr, callback)
+	return hiExecCommand(br, cmdr, callback, "")
 }
 
 // 发送执行命令
-func hiExecCommand(br *broker, cmdr *hi.CmdrModel, callurl string) string {
+func hiExecCommand(br *broker, cmdr *hi.CmdrModel, callurl string, devid string) string {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	req := &commandReq{
@@ -380,17 +381,30 @@ func hiExecCommand(br *broker, cmdr *hi.CmdrModel, callurl string) string {
 	br.cmdReq <- req
 
 	commands.Store(token, req)
-	go func() {
-		tmr := time.NewTimer(time.Second * time.Duration(commandTimeout))
+	go func(cmdr *hi.CmdrModel, devid string) {
+		isWifiTask := devid != ""
+		duration := commandTimeout
+		if isWifiTask {
+			duration = 60 // wifi任务60秒超时
+		}
+		tmr := time.NewTimer(time.Second * time.Duration(duration))
 		select {
 		case <-tmr.C:
 			hiExecCallback(token, callurl, true)
 			hiExecOvertime(token)
+			if isWifiTask {
+				hiUpdateWifiTask(br, devid, cmdr.ID, "timeout")
+				go hiExecWifiTask(br, devid)
+			}
 			commands.Delete(token)
 		case <-ctx.Done():
 			hiExecCallback(token, callurl, false)
+			if isWifiTask {
+				hiUpdateWifiTask(br, devid, cmdr.ID, "done")
+				go hiExecWifiTask(br, devid)
+			}
 		}
-	}()
+	}(cmdr, devid)
 
 	return token
 }
@@ -546,4 +560,79 @@ func hiReport(br *broker, device hi.DeviceModel, typ, content string) {
 		"type": typ,
 		"data": content,
 	}).Post(device.ReportUrl)
+}
+
+func hiUpdateWifiTask(br *broker, devid string, cmdrid uint32, status string) {
+	db, err := hi.InstanceDB(br.cfg.DB)
+	if err != nil {
+		return
+	}
+	defer closeDB(db)
+	var runningTask hi.WifiTaskModel
+	db.Table("hi_wifi_task").Where(map[string]interface{}{
+		"devid":  devid,
+		"cmdrid": cmdrid,
+		"status": "running",
+	}).First(&runningTask)
+	if runningTask.ID != 0 {
+		runningTask.Status = status
+		db.Table("hi_wifi_task").Save(&runningTask)
+	}
+}
+
+func hiExecWifiTask(br *broker, devid string) {
+	db, err := hi.InstanceDB(br.cfg.DB)
+	if err != nil {
+		return
+	}
+	defer closeDB(db)
+
+	onlyid := devidGetOnlyid(br, devid)
+	if len(onlyid) == 0 {
+		return
+	}
+
+	var runningTask, pendingTask hi.WifiTaskModel
+	where := map[string]interface{}{
+		"devid":  devid,
+		"onlyid": onlyid,
+	}
+	where["status"] = "running"
+	db.Table("hi_wifi_task").Where(where).First(&runningTask)
+	if runningTask.ID != 0 {
+		if runningTask.CreatedAt+60 < uint32(time.Now().Unix()) { // 运行的任务超时
+			var cmdr hi.CmdrModel
+			db.Table("hi_cmdr").Where(map[string]interface{}{
+				"id": runningTask.Cmdrid,
+			}).Find(&cmdr)
+			result := hiExecCallback(cmdr.Token, runningTask.CallbackUrl, true)
+			cmdr.Result = result
+			cmdr.EndTime = uint32(time.Now().Unix())
+			db.Table("hi_cmdr").Save(&cmdr)
+
+			runningTask.Status = "timeout"
+			db.Table("hi_wifi_task").Save(&runningTask)
+		} else {
+			return
+		}
+	}
+	where["status"] = "pending"
+	db.Table("hi_wifi_task").Where(where).First(&pendingTask)
+	if pendingTask.ID == 0 {
+		return
+	}
+
+	var cmdr hi.CmdrModel
+	db.Table("hi_cmdr").Where(map[string]interface{}{
+		"id": pendingTask.Cmdrid,
+	}).Find(&cmdr)
+	if cmdr.ID == 0 {
+		pendingTask.Status = "error"
+		db.Table("hi_wifi_task").Save(&pendingTask)
+		return
+	}
+	pendingTask.Status = "running"
+	db.Table("hi_wifi_task").Save(&pendingTask)
+
+	go hiExecCommand(br, &cmdr, pendingTask.CallbackUrl, devid)
 }
