@@ -1424,6 +1424,27 @@ curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"conte
 rm -f /var/run/delwifi.lock
 `)
 
+const DelAllCustomWifi = string(`
+#!/bin/sh
+. /lib/functions.sh
+handle_wifi(){
+    local tmp=$1
+    if [ -n "$(echo $tmp|grep wifinet)" ]; then
+        uci delete dhcp.$tmp
+        uci delete network.$tmp
+        uci delete wireless.$tmp
+        sed -i '/$tmp/d' /etc/config/firewall
+    fi
+}
+config_load wireless
+config_foreach handle_wifi wifi-iface
+uci commit firewall
+uci commit network
+uci commit wireless
+uci commit dhcp
+wifi reload &
+`)
+
 const DiagnosisContent = string(`
 #!/bin/bash
 
