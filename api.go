@@ -1788,12 +1788,12 @@ func apiStart(br *broker) {
 		c.Status(http.StatusBadRequest)
 	})
 
-	// wifi设置 action=create|delete  devid=设备id create by weiguowang 2022/10/18
+	// wifi设置 action=create|delete|edit
 	r.POST("/hi/other/wifi2/:action/:devid", func(c *gin.Context) {
 		action := c.Param("action")
 		devid := c.Param("devid")
 		onlyid := devidGetOnlyid(br, devid)
-		if action != "create" && action != "delete" {
+		if action != "create" && action != "delete" && action != "edit" {
 			c.Status(http.StatusBadRequest)
 			return
 		}
@@ -1874,6 +1874,21 @@ func apiStart(br *broker) {
 				})
 				return
 			}
+		} else { //修改wifi命令
+			var wifi hi.WifiModel
+			if err := json.Unmarshal(content, &wifi); err == nil {
+				cmdr, terr = hi.CreateCmdr(db, devid, onlyid, hi.EditWifiCmd(wifi, report))
+				if terr != nil {
+					c.JSON(http.StatusOK, gin.H{
+						"ret": 0,
+						"msg": "创建失败",
+						"data": gin.H{
+							"error": terr.Error(),
+						},
+					})
+					return
+				}
+			}
 		}
 		_, err = hi.CreateWifiTask(db, cmdr, devid, onlyid, action, string(content), callbackUrl)
 		msg := "添加失败"
@@ -1881,6 +1896,9 @@ func apiStart(br *broker) {
 		if action == "delete" {
 			msg = "删除失败"
 			successMsg = "删除成功"
+		} else if action == "edit" {
+			msg = "修改失败"
+			successMsg = "修改成功"
 		}
 		if terr != nil {
 			c.JSON(http.StatusOK, gin.H{
