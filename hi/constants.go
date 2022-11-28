@@ -1278,13 +1278,12 @@ config_load wireless
 config_foreach handle_wifi wifi-iface
 {{.ex}}
 uci commit wireless
-echo '{"code":0}'
-/sbin/wifi reload /dev/null 2>&1 &
 _base64e() {
     echo -n "$1" | base64 | tr -d "\n"
 }
 RES=$(lua /tmp/apconfig.lua)
 curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}'
+/sbin/wifi reload /dev/null 2>&1 &
 `)
 
 const BlockedContent = string(`
