@@ -386,7 +386,7 @@ func hiExecCommand(br *broker, cmdr *hi.CmdrModel, callurl string, devid string)
 		isWifiTask := devid != ""
 		duration := commandTimeout
 		if isWifiTask {
-			duration = 60 // wifi任务60秒超时
+			duration = 60 * 3 // wifi任务3分钟超时
 		}
 		tmr := time.NewTimer(time.Second * time.Duration(duration))
 		select {

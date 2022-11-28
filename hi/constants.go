@@ -1415,7 +1415,7 @@ uci commit firewall
 uci commit network
 uci commit wireless
 uci commit dhcp
-wifi reload
+wifi reload &
 _base64e() {
     echo -n "$1" | base64 | tr -d "\n"
 }
