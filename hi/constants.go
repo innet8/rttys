@@ -1363,13 +1363,13 @@ const AddWifiContent = string(`
 
 if [ -e "/var/run/addwifi.lock" ]; then
     echo '{"code":102,"msg":"wifi adding"}'
-    exit 0
+    exit 1
 fi
 touch /var/run/addwifi.lock
 ipseg=$(echo {{.ipSegment}} | awk -F'.' '{print $1"."$2"."$3}')
 [ -n "$(grep $ipseg /etc/config/network)" ] && {
-    echo '{"code":101,"msg":"ipsegment already exist"}'
-    exit 0
+    echo '{"code":101,"msg":"ip segment already exist"}'
+    exit 1
 }
 {{.wireless}}
 uci commit wireless
@@ -1406,8 +1406,8 @@ rm -f /var/run/addwifi.lock
 const DelWifiContent = string(`
 #!/bin/sh
 if [ -e "/var/run/delwifi.lock" ]; then
-    echo '{"code":102,"msg":"wifi deling"}'
-    exit 0
+    echo '{"code":102,"msg":"wifi deleting"}'
+    exit 1
 fi
 touch /var/run/delwifi.lock
 {{.del}}

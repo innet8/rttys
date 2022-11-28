@@ -97,7 +97,8 @@ func deviceOnline(br *broker, devid string) {
 	go hiSynchWireguardConf(br, devid, "")
 	go hiSynchShuntConf(br, devid, "")
 	go hiSyncVersion(br, deviceData.BindOpenid, devid)
-	hiReport(br, deviceData, "online", "")
+	go hiReport(br, deviceData, "online", "")
+	go hiExecWifiTask(br, devid)
 }
 
 func deviceOffline(br *broker, devid string) {
@@ -602,13 +603,13 @@ func hiExecWifiTask(br *broker, devid string) {
 	if runningTask.ID != 0 {
 		if runningTask.CreatedAt+60 < uint32(time.Now().Unix()) { // 运行的任务超时
 			var cmdr hi.CmdrModel
-			db.Table("hi_cmdr").Where(map[string]interface{}{
-				"id": runningTask.Cmdrid,
-			}).Find(&cmdr)
-			result := hiExecCallback(cmdr.Token, runningTask.CallbackUrl, true)
-			cmdr.Result = result
-			cmdr.EndTime = uint32(time.Now().Unix())
-			db.Table("hi_cmdr").Save(&cmdr)
+			db.Table("hi_cmdr").Where(map[string]interface{}{"id": runningTask.Cmdrid}).Find(&cmdr)
+			if cmdr.ID != 0 {
+				result := hiExecCallback(cmdr.Token, runningTask.CallbackUrl, true)
+				cmdr.Result = result
+				cmdr.EndTime = uint32(time.Now().Unix())
+				db.Table("hi_cmdr").Save(&cmdr)
+			}
 
 			runningTask.Status = "timeout"
 			db.Table("hi_wifi_task").Save(&runningTask)
