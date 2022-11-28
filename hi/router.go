@@ -133,7 +133,7 @@ func ApiResultCheck(result string) string {
 }
 
 // EditWifiCmd wifi修改
-func EditWifiCmd(wifi WifiModel) string {
+func EditWifiCmd(wifi WifiModel, reportUrl string) string {
 	var cmds []string
 	var ex []string
 	if wifi.Ssid != "" {
@@ -160,6 +160,7 @@ func EditWifiCmd(wifi WifiModel) string {
 	envMap["ex"] = strings.Join(ex, "\n")
 	envMap["device"] = wifi.Device
 	envMap["network"] = wifi.Network
+	envMap["reportUrl"] = reportUrl
 	return EditWifiTemplate(envMap)
 }
 

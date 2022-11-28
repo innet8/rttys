@@ -1264,8 +1264,8 @@ const EditWifiContent = string(`
 #!/bin/sh
 . /lib/functions.sh
 if [ -e "/var/run/delwifi.lock" ] || [ -e "/var/run/addwifi.lock" ]; then
-    echo '{"code":103,"msg":"wifi deling or adding"}'
-    exit 0
+    echo '{"code":103,"msg":"wifi deleting or adding"}'
+    exit 1
 fi
 handle_wifi(){
     config_get device $1 "device"
@@ -1280,6 +1280,11 @@ config_foreach handle_wifi wifi-iface
 uci commit wireless
 echo '{"code":0}'
 /sbin/wifi reload /dev/null 2>&1 &
+_base64e() {
+    echo -n "$1" | base64 | tr -d "\n"
+}
+RES=$(lua /tmp/apconfig.lua)
+curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}'
 `)
 
 const BlockedContent = string(`

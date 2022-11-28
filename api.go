@@ -896,7 +896,8 @@ func apiStart(br *broker) {
 		if action == "wifi" {
 			var wifi hi.WifiModel
 			if err := json.Unmarshal(content, &wifi); err == nil {
-				cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.EditWifiCmd(wifi))
+				report := fmt.Sprintf("%s/hi/base/report/wifi", br.cfg.HiApiUrl)
+				cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.EditWifiCmd(wifi, report))
 				if terr != nil {
 					c.JSON(http.StatusOK, gin.H{
 						"ret": 0,
