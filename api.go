@@ -1055,8 +1055,11 @@ func apiStart(br *broker) {
 			// 取消绑定
 			db.Table("hi_wg").Where(map[string]interface{}{"devid": devid}).Update("status", "unbind")
 			db.Table("hi_shunt").Where(map[string]interface{}{"devid": devid}).Update("status", "unbind")
-
-			// TODO 删除所有手动创建的Wifi
+			// 清空自定义WiFi
+			if cmdr, err := hi.CreateCmdr(db, devid, deviceData.Onlyid, hi.DelAllCustomWifi); err == nil {
+				_, err = hi.CreateWifiTask(db, cmdr, devid, deviceData.Onlyid, action, "", "")
+				go hiExecWifiTask(br, deviceData.Devid)
+			}
 
 			deviceData.BindOpenid = ""
 			db.Table("hi_device").Save(&deviceData)
