@@ -1404,7 +1404,7 @@ _base64e() {
 }
 RES=$(lua /tmp/apconfig.lua)
 for i in 1 2 3 4 5; do
-	curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}'
+	curl -4 --connect-timeout 3 -m 6 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}'
 	if [ "$(echo $?)" == "0" ]; then
 		rm -f /var/run/addwifi.lock
 		exit 0
