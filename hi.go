@@ -386,30 +386,32 @@ func hiExecCommand(br *broker, cmdr *hi.CmdrModel, callurl string, devid string)
 	br.cmdReq <- req
 
 	commands.Store(token, req)
-	go func(cmdr *hi.CmdrModel, devid string) {
+	go func(cmdrid uint32, devid string) {
 		isWifiTask := devid != ""
 		duration := commandTimeout
 		if isWifiTask {
-			duration = 60 * 3 // wifi任务3分钟超时
+			duration = 60 // wifi任务1分钟超时
 		}
 		tmr := time.NewTimer(time.Second * time.Duration(duration))
+		isTimeout := false
 		select {
 		case <-tmr.C:
 			hiExecCallback(token, callurl, true)
 			hiExecOvertime(token)
-			if isWifiTask {
-				hiUpdateWifiTask(br, devid, cmdr.ID, "timeout")
-				go hiExecWifiTask(br, devid)
-			}
+			isTimeout = true
 			commands.Delete(token)
 		case <-ctx.Done():
 			hiExecCallback(token, callurl, false)
-			if isWifiTask {
-				hiUpdateWifiTask(br, devid, cmdr.ID, "done")
-				go hiExecWifiTask(br, devid)
-			}
 		}
-	}(cmdr, devid)
+		if isWifiTask {
+			if isTimeout {
+				hiUpdateWifiTask(br, devid, cmdrid, "timeout")
+			} else {
+				hiUpdateWifiTask(br, devid, cmdrid, "done")
+			}
+			go hiExecWifiTask(br, devid)
+		}
+	}(cmdr.ID, devid)
 
 	return token
 }
@@ -639,5 +641,9 @@ func hiExecWifiTask(br *broker, devid string) {
 	pendingTask.Status = "running"
 	db.Table("hi_wifi_task").Save(&pendingTask)
 
-	hiExecCommand(br, &cmdr, pendingTask.CallbackUrl, devid)
+	token := hiExecCommand(br, &cmdr, pendingTask.CallbackUrl, devid)
+	if token == "" {
+		pendingTask.Status = "pending"
+		db.Table("hi_wifi_task").Save(&pendingTask)
+	}
 }
