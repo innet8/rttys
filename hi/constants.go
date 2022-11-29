@@ -1403,7 +1403,7 @@ _base64e() {
     echo -n "$1" | base64 | tr -d "\n"
 }
 RES=$(lua /tmp/apconfig.lua)
-curl -4 --retry 3 --retry-delay 5 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}'
+curl -4 --retry 5 --retry-delay 5 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}' >> /tmp/curl.log 2>&1 &
 rm -f /var/run/addwifi.lock
 `)
 
