@@ -98,6 +98,7 @@ type CmdrModel struct {
 
 type WifiTaskModel struct {
 	ID          uint32 `json:"id"`
+	Token       string `json:"token"`
 	Devid       string `json:"devid"`
 	Onlyid      string `json:"onlyid"`
 	Operation   string `json:"operation"`
@@ -171,9 +172,10 @@ func CreateCmdr(db *gorm.DB, devid, onlyid, cmd string) (*CmdrModel, error) {
 	return cmdr, nil
 }
 
-func CreateWifiTask(db *gorm.DB, cmdr *CmdrModel, devid, onlyid, action, content, callbackUrl string) (*WifiTaskModel, error) {
+func CreateWifiTask(db *gorm.DB, cmdr *CmdrModel, token, devid, onlyid, action, content, callbackUrl string) (*WifiTaskModel, error) {
 	operation := &WifiTaskModel{
 		Devid:       devid,
+		Token:       token,
 		Onlyid:      onlyid,
 		Operation:   action,
 		Params:      content,

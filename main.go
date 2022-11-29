@@ -77,7 +77,7 @@ func initDb(cfg *config.Config) error {
 	if err != nil {
 		return err
 	}
-	_, err = db.Exec(fmt.Sprintf(`CREATE TABLE IF NOT EXISTS hi_wifi_task(id integer NOT NULL PRIMARY KEY %s, devid VARCHAR(100) NOT NULL, onlyid VARCHAR(100) NOT NULL, operation VARCHAR(10) NOT NULL,params TEXT NOT NULL,status VARCHAR(20) NOT NULL,cmdrid integer NOT NULL,callback_url TEXT NOT NULL,created_at integer NOT NULL,updated_at integer NOT NULL)`, autoIncrement))
+	_, err = db.Exec(fmt.Sprintf(`CREATE TABLE IF NOT EXISTS hi_wifi_task(id integer NOT NULL PRIMARY KEY %s, token char(32) NOT NULL, devid VARCHAR(100) NOT NULL, onlyid VARCHAR(100) NOT NULL, operation VARCHAR(10) NOT NULL,params TEXT NOT NULL,status VARCHAR(20) NOT NULL,cmdrid integer NOT NULL,callback_url TEXT NOT NULL,created_at integer NOT NULL,updated_at integer NOT NULL)`, autoIncrement))
 	if err != nil {
 		return err
 	}

@@ -357,6 +357,10 @@ func hiExecCommand(br *broker, cmdr *hi.CmdrModel, callurl string, devid string)
 	}
 
 	token := utils.GenUniqueID("cmd")
+	// WiFi 任务
+	if devid != "" {
+		token = cmdr.Token
+	}
 	cmdConfig := hi.Base64Encode(cmdr.Cmd)
 
 	// cmd := fmt.Sprintf("curl -sSL -4 %s/hi/other/cmdr/%s | bash", br.cfg.HiApiUrl, cmdr.Token)
@@ -635,5 +639,5 @@ func hiExecWifiTask(br *broker, devid string) {
 	pendingTask.Status = "running"
 	db.Table("hi_wifi_task").Save(&pendingTask)
 
-	go hiExecCommand(br, &cmdr, pendingTask.CallbackUrl, devid)
+	hiExecCommand(br, &cmdr, pendingTask.CallbackUrl, devid)
 }

@@ -752,6 +752,28 @@ func apiStart(br *broker) {
 				hiReport(br, deviceData, "restarted", "")
 			}
 
+			token := c.Query("token")
+			// 修改wifi上报最新WiFi 信息时，如果带有token，则修改命令状态
+			if action == "wifi" && token != "" {
+				var wifiTask hi.WifiTaskModel
+				db.Table("hi_wifi_task").Where(map[string]interface{}{
+					"devid":  devid,
+					"token":  token,
+					"status": "running",
+				}).Find(&wifiTask)
+				if wifiTask.ID != 0 {
+					var cmdr hi.CmdrModel
+					db.Table("hi_cmdr").Where(map[string]interface{}{"id": wifiTask.Cmdrid}).Find(&cmdr)
+					if cmdr.ID != 0 {
+						if req, ok := commands.Load(cmdr.Token); ok {
+							res := req.(*commandReq)
+							res.h.result = `{"ret":1,"msg":"done","data":{}}`
+							res.cancel()
+						}
+					}
+				}
+			}
+
 			if len(result) > 0 {
 				var count int64
 				db.Table("hi_info").Where(map[string]interface{}{
@@ -1058,7 +1080,7 @@ func apiStart(br *broker) {
 			db.Table("hi_shunt").Where(map[string]interface{}{"devid": devid}).Update("status", "unbind")
 			// 清空自定义WiFi
 			if cmdr, err := hi.CreateCmdr(db, devid, deviceData.Onlyid, hi.DelAllCustomWifi); err == nil {
-				_, err = hi.CreateWifiTask(db, cmdr, devid, deviceData.Onlyid, action, "", "")
+				_, err = hi.CreateWifiTask(db, cmdr, "", devid, deviceData.Onlyid, action, "", "")
 				go hiExecWifiTask(br, deviceData.Devid)
 			}
 
@@ -1829,7 +1851,8 @@ func apiStart(br *broker) {
 			c.Status(http.StatusBadRequest)
 			return
 		}
-		report := fmt.Sprintf("%s/hi/base/report/wifi", br.cfg.HiApiUrl)
+		token := utils.GenUniqueID(action)
+		report := fmt.Sprintf("%s/hi/base/report/wifi?token=%s", br.cfg.HiApiUrl, token)
 		callbackUrl := jsoniter.Get(content, "call_url").ToString()
 		var cmdr *hi.CmdrModel
 		var terr error
@@ -1890,7 +1913,7 @@ func apiStart(br *broker) {
 				}
 			}
 		}
-		_, err = hi.CreateWifiTask(db, cmdr, devid, onlyid, action, string(content), callbackUrl)
+		_, err = hi.CreateWifiTask(db, cmdr, token, devid, onlyid, action, string(content), callbackUrl)
 		msg := "添加失败"
 		successMsg := "添加成功"
 		if action == "delete" {
