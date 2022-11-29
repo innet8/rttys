@@ -1409,6 +1409,7 @@ for i in 1 2 3 4 5; do
 		rm -f /var/run/addwifi.lock
 		exit 0
 	fi
+	sleep 3
 done
 rm -f /var/run/addwifi.lock
 `)
