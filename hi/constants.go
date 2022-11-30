@@ -1399,6 +1399,7 @@ config_foreach handle_firewall zone
 uci commit firewall
 /etc/init.d/firewall reload
 /etc/init.d/network reload
+rm -f /var/run/addwifi.lock
 _base64e() {
     echo -n "$1" | base64 | tr -d "\n"
 }
@@ -1406,12 +1407,10 @@ RES=$(lua /tmp/apconfig.lua)
 for i in 1 2 3 4 5; do
 	curl -4 --connect-timeout 3 -m 6 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}'
 	if [ "$(echo $?)" == "0" ]; then
-		rm -f /var/run/addwifi.lock
 		exit 0
 	fi
 	sleep 3
 done
-rm -f /var/run/addwifi.lock
 `)
 
 const DelWifiContent = string(`
@@ -1427,12 +1426,12 @@ uci commit network
 uci commit wireless
 uci commit dhcp
 wifi reload &
+rm -f /var/run/delwifi.lock
 _base64e() {
     echo -n "$1" | base64 | tr -d "\n"
 }
 RES=$(lua /tmp/apconfig.lua)
 curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}'
-rm -f /var/run/delwifi.lock
 `)
 
 const DelAllCustomWifi = string(`
