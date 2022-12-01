@@ -650,6 +650,16 @@ _filemd5() {
         echo ""
     fi
 }
+
+_sign() {
+	secretKey=$(cat /tmp/pwd.txt)
+	nonce=$(echo -n $(date +%s) | md5sum | md5sum | cut -d ' ' -f 1)
+	ts=$(date +%s)
+	append="nonce=${nonce}&ts=${ts}&ver=1.0"
+	sign=$(echo -n "${append}${secretKey}" | md5sum  | cut -d ' ' -f 1)
+	queries="?${append}&sign=${sign}"
+	echo -n $queries
+}
 `)
 
 const ShuntDomainPartial = string(`
@@ -1096,6 +1106,16 @@ EOF
     (sleep 5; nslookup "${host}" "127.0.0.1";sleep 5;nslookup "${host}" "127.0.0.1") > /dev/null 2>&1 &
 }
 
+_sign() {
+	secretKey=$(cat /tmp/pwd.txt)
+	nonce=$(echo -n $(date +%s) | md5sum | md5sum | cut -d ' ' -f 1)
+	ts=$(date +%s)
+	append="nonce=${nonce}&ts=${ts}&ver=1.0"
+	sign=$(echo -n "${append}${secretKey}" | md5sum  | cut -d ' ' -f 1)
+	queries="?${append}&sign=${sign}"
+	echo -n $queries
+}
+
 downloadScript() {
     uci set rtty.general.git_commit="{{.gitCommit}}"
     uci commit rtty
@@ -1109,14 +1129,14 @@ EOF
     chmod +x /etc/hotplug.d/dhcp/99-hi-dhcp
 
     mkdir -p /etc/hotplug.d/net/
-    curl -sSL -4 -o "/etc/hotplug.d/net/99-hi-wifi" "{{.wifiCmdUrl}}"
+    curl -sSL -4 -o "/etc/hotplug.d/net/99-hi-wifi" "{{.wifiCmdUrl}}$(_sign)&devid=$(uci get rtty.general.id)"
     chmod +x /etc/hotplug.d/net/99-hi-wifi
 
-    curl -sSL -4 -o "/usr/sbin/hi-static-leases" "{{.staticLeasesCmdUrl}}"
+    curl -sSL -4 -o "/usr/sbin/hi-static-leases" "{{.staticLeasesCmdUrl}}$(_sign)&devid=$(uci get rtty.general.id)"
     chmod +x /usr/sbin/hi-static-leases
     rm -f /tmp/.hi_static_leases
 
-    curl -sSL -4 -o "/usr/sbin/hi-clients" "{{.dhcpCmdUrl}}"
+    curl -sSL -4 -o "/usr/sbin/hi-clients" "{{.dhcpCmdUrl}}$(_sign)&devid=$(uci get rtty.general.id)"
     chmod +x /usr/sbin/hi-clients
     crontab -l >/tmp/cronbak
     sed -i '/hi-clients/d' /tmp/cronbak
@@ -1126,13 +1146,13 @@ EOF
     /etc/init.d/cron restart
 
     [ ! -e "/etc/init.d/wireguard" ] && {
-        curl -sSL -4 -o "/etc/init.d/wireguard" "{{.wireguardScriptUrl}}"
+        curl -sSL -4 -o "/etc/init.d/wireguard" "{{.wireguardScriptUrl}}$(_sign)&devid=$(uci get rtty.general.id)"
         chmod +x /etc/init.d/wireguard
     }
     cat >/etc/rc.local<<EOF
 (
     sleep 30
-    curl -4 -X POST "{{.restartReportUrl}}" -H "Content-Type: application/json" -d '{"content":"","sn":"$(uci get rtty.general.id)","time":"$(date +%s)"}' 
+    curl -4 -X POST "{{.restartReportUrl}}$(_sign)&devid=$(uci get rtty.general.id)" -H "Content-Type: application/json" -d '{"content":"","sn":"$(uci get rtty.general.id)","time":"$(date +%s)"}' 
 ) &
 exit 0
 EOF
@@ -1186,7 +1206,7 @@ else
 fi
 webVer=$(awk '/hiui-ui-core/ {getline;print $2}' /usr/lib/opkg/status)
 tmp='{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'","ver":"'$version'","webVer":"'$webVer'"}'
-echo -n $tmp | curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d @-
+echo -n $tmp | curl -4 -X POST "{{.reportUrl}}$(_sign)" -H "Content-Type: application/json" -d @-
 `)
 
 const ApConfigReportAdded = string(`
@@ -1207,7 +1227,7 @@ RES=$(lua /tmp/apconfig.lua)
 if [ -z "$RES" ]; then
     exit 1
 fi
-curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}'
+curl -4 -X POST "{{.reportUrl}}$(_sign)" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}'
 `)
 
 const StaticLeasesReportAdded = string(`
@@ -1234,7 +1254,7 @@ cat >${tmp} <<-EOF
 ${RES}
 EOF
 if [ ! -f "${save}" ] || [ "$(_filemd5 ${save})" != "$(_filemd5 ${tmp})" ]; then
-    RES=$(curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}')
+    RES=$(curl -4 -X POST "{{.reportUrl}}$(_sign)" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}')
     if [ "${RES}" = "success" ]; then
         mv "${tmp}" "$save"
     fi

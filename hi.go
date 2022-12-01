@@ -57,10 +57,10 @@ func deviceGetIP(dev *device) string {
 // 保存设备信息（设备上线）
 func deviceOnline(br *broker, devid string) {
 	db, err := hi.InstanceDB(br.cfg.DB)
-	defer closeDB(db)
 	if err != nil {
 		return
 	}
+	defer closeDB(db)
 	devInfo := devidGetDev(br, devid)
 	if devInfo == nil {
 		return
@@ -74,6 +74,7 @@ func deviceOnline(br *broker, devid string) {
 	deviceData.Online = uint32(time.Now().Unix())
 	deviceData.Description = devInfo.desc
 	deviceData.IP = deviceGetIP(devInfo)
+	deviceData.SecretKey = strings.ToUpper(hi.StringMd5(hi.RandString(16)))
 	if deviceData.ID == 0 {
 		// 新设备
 		deviceData.Devid = devInfo.id
@@ -93,6 +94,9 @@ func deviceOnline(br *broker, devid string) {
 		}
 		db.Table("hi_device").Save(&deviceData)
 	}
+	// 同步签名秘钥
+	cmdr, _ := hi.CreateCmdr(db, devid, devInfo.onlyid, fmt.Sprintf("#!/bin/sh\necho -n '%s' > /tmp/pwd.txt", deviceData.SecretKey))
+	hiExecRequest(br, nil, cmdr)
 	go hiInitCommand(br, devid, "")
 	go hiSynchWireguardConf(br, devid, "")
 	go hiSynchShuntConf(br, devid, "")
@@ -103,10 +107,10 @@ func deviceOnline(br *broker, devid string) {
 
 func deviceOffline(br *broker, devid string) {
 	db, err := hi.InstanceDB(br.cfg.DB)
-	defer closeDB(db)
 	if err != nil {
 		return
 	}
+	defer closeDB(db)
 	var deviceData hi.DeviceModel
 	db.Table("hi_device").Where(map[string]interface{}{
 		"devid": devid,
@@ -177,6 +181,20 @@ func userAuth(c *gin.Context, db *gorm.DB, devid string) (*hi.UserModel, error) 
 	return userData, nil
 }
 
+// verifySign 验证签名
+func verifySign(c *gin.Context, db *gorm.DB, devid string) bool {
+	nonce := c.Query("nonce")
+	ts := c.Query("ts")
+	ver := c.Query("ver")
+	var deviceData hi.DeviceModel
+	db.Table("hi_device").Where(map[string]string{"devid": devid}).Find(&deviceData)
+	if deviceData.ID != 0 {
+		calcMd5 := hi.StringMd5(fmt.Sprintf("nonce=%s&ts=%s&ver=%s%s", nonce, ts, ver, deviceData.SecretKey))
+		return strings.ToUpper(calcMd5) == strings.ToUpper(c.Query("sign"))
+	}
+	return false
+}
+
 // 初始化执行
 func hiInitCommand(br *broker, devid, callback string) string {
 	if len(br.cfg.HiApiUrl) == 0 {
@@ -184,10 +202,10 @@ func hiInitCommand(br *broker, devid, callback string) string {
 		return ""
 	}
 	db, err := hi.InstanceDB(br.cfg.DB)
-	defer closeDB(db)
 	if err != nil {
 		return ""
 	}
+	defer closeDB(db)
 	//
 	var envMap = make(map[string]interface{})
 	envMap["gitCommit"] = version.GitCommit()
@@ -209,10 +227,10 @@ func hiSynchWireguardConf(br *broker, devid, callback string) string {
 		return ""
 	}
 	db, err := hi.InstanceDB(br.cfg.DB)
-	defer closeDB(db)
 	if err != nil {
 		return ""
 	}
+	defer closeDB(db)
 	//
 	var wg hi.WgModel
 	db.Table("hi_wg").Where(map[string]interface{}{
@@ -230,10 +248,10 @@ func hiSynchShuntConf(br *broker, devid, callback string) string {
 		return ""
 	}
 	db, err := hi.InstanceDB(br.cfg.DB)
-	defer closeDB(db)
 	if err != nil {
 		return ""
 	}
+	defer closeDB(db)
 	//
 	var shunts []hi.ShuntModel
 	result := db.Table("hi_shunt").Where(map[string]interface{}{
@@ -254,10 +272,10 @@ func hiSyncVersion(br *broker, openid, devid string) string {
 		return ""
 	}
 	db, err := hi.InstanceDB(br.cfg.DB)
-	defer closeDB(db)
 	if err != nil {
 		return ""
 	}
+	defer closeDB(db)
 
 	var versions []hi.VersionModel
 	result := db.Table("hi_version").Where(map[string]interface{}{
@@ -292,10 +310,10 @@ func hiRebootDevice(br *broker, devid string) string {
 		return ""
 	}
 	db, err := hi.InstanceDB(br.cfg.DB)
-	defer closeDB(db)
 	if err != nil {
 		return ""
 	}
+	defer closeDB(db)
 	return hiExecBefore(br, db, devid, "#!/bin/sh\nreboot", "")
 }
 
@@ -306,10 +324,10 @@ func hiDeviceFirmwareUpgrade(br *broker, devid string, path string, callback str
 		return ""
 	}
 	db, err := hi.InstanceDB(br.cfg.DB)
-	defer closeDB(db)
 	if err != nil {
 		return ""
 	}
+	defer closeDB(db)
 	return hiExecBefore(br, db, devid, hi.FirmwareUpgradeCmd(path), callback)
 }
 
@@ -320,10 +338,10 @@ func hiDeviceIpkUpgrade(br *broker, devid string, path string, callback string) 
 		return ""
 	}
 	db, err := hi.InstanceDB(br.cfg.DB)
-	defer closeDB(db)
 	if err != nil {
 		return ""
 	}
+	defer closeDB(db)
 	return hiExecBefore(br, db, devid, hi.IpkUpgradeCmd(path), callback)
 }
 
@@ -508,10 +526,10 @@ func hiExecCallback(token, callurl string, overtime bool) string {
 // 执行命令结果
 func hiExecResult(hir *hiReq) {
 	db, err := hi.InstanceDB(hir.db)
-	defer closeDB(db)
 	if err != nil {
 		return
 	}
+	defer closeDB(db)
 	db.Table("hi_cmdr").Where(map[string]interface{}{
 		"token": hir.token,
 	}).Updates(map[string]interface{}{
@@ -537,10 +555,10 @@ func hiReport(br *broker, device hi.DeviceModel, typ, content string) {
 		return
 	}
 	db, err := hi.InstanceDB(br.cfg.DB)
-	defer closeDB(db)
 	if err != nil {
 		return
 	}
+	defer closeDB(db)
 	var userData *hi.UserModel
 	db.Table("hi_user").Where(map[string]interface{}{
 		"openid": device.BindOpenid,

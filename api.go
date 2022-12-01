@@ -609,12 +609,12 @@ func apiStart(br *broker) {
 
 		if action == "create" {
 			db, err := hi.InstanceDB(cfg.DB)
-			defer closeDB(db)
 			if err != nil {
 				log.Error().Msg(err.Error())
 				c.Status(http.StatusInternalServerError)
 				return
 			}
+			defer closeDB(db)
 
 			content, err := ioutil.ReadAll(c.Request.Body)
 			if err != nil {
@@ -653,157 +653,174 @@ func apiStart(br *broker) {
 	// 基础命令 action=dhcp|wifi|static_leases|wireguard_script
 	r.GET("/hi/base/cmd/:action", func(c *gin.Context) {
 		action := c.Param("action")
+
+		if !hi.InArray(action, []string{"dhcp", "wifi", "static_leases", "wireguard_script"}) {
+			c.Status(http.StatusBadRequest)
+			return
+		}
+
+		db, err := hi.InstanceDB(cfg.DB)
+		if err != nil {
+			log.Error().Msg(err.Error())
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+		defer closeDB(db)
+
+		if !verifySign(c, db, c.Query("devid")) {
+			c.Status(http.StatusBadRequest)
+			return
+		}
+
 		if action == "dhcp" {
 			var envMap = make(map[string]interface{})
 			envMap["requestUrl"] = "http://127.0.0.1/cgi-bin/api/client/list"
 			envMap["requestType"] = "clients"
 			envMap["reportUrl"] = fmt.Sprintf("%s/hi/base/report/dhcp", br.cfg.HiApiUrl)
 			c.String(http.StatusOK, hi.ApiReportTemplate(envMap))
-			return
-		}
-		if action == "wifi" {
+		} else if action == "wifi" {
 			var envMap = make(map[string]interface{})
 			envMap["requestUrl"] = "http://127.0.0.1/cgi-bin/api/ap/config"
 			envMap["requestType"] = "apconfig"
 			envMap["reportUrl"] = fmt.Sprintf("%s/hi/base/report/wifi", br.cfg.HiApiUrl)
 			c.String(http.StatusOK, hi.ApiReportTemplate(envMap))
-			return
-		}
-		if action == "static_leases" {
+		} else if action == "static_leases" {
 			var envMap = make(map[string]interface{})
 			envMap["requestType"] = "static_leases"
 			envMap["reportUrl"] = fmt.Sprintf("%s/hi/base/report/static_leases", br.cfg.HiApiUrl)
 			c.String(http.StatusOK, hi.ApiReportTemplate(envMap))
-			return
-		}
-		if action == "wireguard_script" {
+		} else if action == "wireguard_script" {
 			var envMap = make(map[string]interface{})
 			envMap["requestType"] = "wireguard_script"
 			c.String(http.StatusOK, hi.WireguardScriptTemplate(envMap))
-			return
 		}
-		c.Status(http.StatusBadRequest)
 	})
 
 	// 上报接口 action=dhcp|wifi|static_leases|restarted
 	r.POST("/hi/base/report/:action", func(c *gin.Context) {
 		action := c.Param("action")
 
-		if action == "dhcp" || action == "wifi" || action == "static_leases" || action == "restarted" || action == "webpwd" {
-			db, err := hi.InstanceDB(cfg.DB)
-			defer closeDB(db)
-			if err != nil {
-				log.Error().Msg(err.Error())
-				c.Status(http.StatusInternalServerError)
-				return
-			}
+		if !hi.InArray(action, []string{"dhcp", "wifi", "static_leases", "restarted", "webpwd"}) {
+			c.Status(http.StatusBadRequest)
+			return
+		}
 
-			content, err := ioutil.ReadAll(c.Request.Body)
-			if err != nil {
-				c.Status(http.StatusBadRequest)
-				return
-			}
+		db, err := hi.InstanceDB(cfg.DB)
+		if err != nil {
+			log.Error().Msg(err.Error())
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+		defer closeDB(db)
 
-			resultContent := jsoniter.Get(content, "content").ToString()
-			result := hi.ApiResultCheck(hi.Base64Decode(resultContent))
-			devid := jsoniter.Get(content, "sn").ToString()
-			rtime := jsoniter.Get(content, "time").ToUint32()
+		content, err := ioutil.ReadAll(c.Request.Body)
+		if err != nil {
+			c.Status(http.StatusBadRequest)
+			return
+		}
 
-			// 更新固件、web版本信息
-			if action == "dhcp" {
-				ver := jsoniter.Get(content, "ver").ToString()
-				webVer := jsoniter.Get(content, "webVer").ToString()
-				if ver != "" || webVer != "" {
-					var deviceData hi.DeviceModel
-					db.Table("hi_device").Where(map[string]interface{}{
-						"devid": devid,
-					}).Last(&deviceData)
-					if deviceData.ID != 0 {
-						if ver != "" {
-							deviceData.Version = ver
-						}
-						if webVer != "" {
-							deviceData.WebVersion = webVer
-						}
-						db.Table("hi_device").Save(&deviceData)
-					}
-				}
-			}
-			// web密码
-			if action == "webpwd" {
-				webpwd := jsoniter.Get(content, "webpwd").ToString()
-				if webpwd != "" {
-					var deviceData hi.DeviceModel
-					db.Table("hi_device").Where(map[string]interface{}{
-						"devid": devid,
-					}).Last(&deviceData)
-					if deviceData.ID != 0 {
-						deviceData.Password = webpwd
-						db.Table("hi_device").Save(&deviceData)
-					}
-				}
-			}
+		resultContent := jsoniter.Get(content, "content").ToString()
+		result := hi.ApiResultCheck(hi.Base64Decode(resultContent))
+		devid := jsoniter.Get(content, "sn").ToString()
+		rtime := jsoniter.Get(content, "time").ToUint32()
 
-			if action == "restarted" {
+		if !verifySign(c, db, devid) {
+			c.Status(http.StatusBadRequest)
+			return
+		}
+
+		// 更新固件、web版本信息
+		if action == "dhcp" {
+			ver := jsoniter.Get(content, "ver").ToString()
+			webVer := jsoniter.Get(content, "webVer").ToString()
+			if ver != "" || webVer != "" {
 				var deviceData hi.DeviceModel
 				db.Table("hi_device").Where(map[string]interface{}{
 					"devid": devid,
 				}).Last(&deviceData)
-				hiReport(br, deviceData, "restarted", "")
+				if deviceData.ID != 0 {
+					if ver != "" {
+						deviceData.Version = ver
+					}
+					if webVer != "" {
+						deviceData.WebVersion = webVer
+					}
+					db.Table("hi_device").Save(&deviceData)
+				}
 			}
+		}
+		// web密码
+		if action == "webpwd" {
+			webpwd := jsoniter.Get(content, "webpwd").ToString()
+			if webpwd != "" {
+				var deviceData hi.DeviceModel
+				db.Table("hi_device").Where(map[string]interface{}{
+					"devid": devid,
+				}).Last(&deviceData)
+				if deviceData.ID != 0 {
+					deviceData.Password = webpwd
+					db.Table("hi_device").Save(&deviceData)
+				}
+			}
+		}
 
-			token := c.Query("token")
-			// 修改wifi上报最新WiFi 信息时，如果带有token，则修改命令状态
-			if action == "wifi" && token != "" {
-				var wifiTask hi.WifiTaskModel
-				db.Table("hi_wifi_task").Where(map[string]interface{}{
-					"devid":  devid,
-					"token":  token,
-					"status": "running",
-				}).Find(&wifiTask)
-				if wifiTask.ID != 0 {
-					var cmdr hi.CmdrModel
-					db.Table("hi_cmdr").Where(map[string]interface{}{"id": wifiTask.Cmdrid}).Find(&cmdr)
-					if cmdr.ID != 0 {
-						if req, ok := commands.Load(cmdr.Token); ok {
-							res := req.(*commandReq)
-							res.h.result = `{"ret":1,"msg":"done","data":{}}`
-							res.cancel()
-						}
+		if action == "restarted" {
+			var deviceData hi.DeviceModel
+			db.Table("hi_device").Where(map[string]interface{}{
+				"devid": devid,
+			}).Last(&deviceData)
+			hiReport(br, deviceData, "restarted", "")
+		}
+
+		token := c.Query("token")
+		// 修改wifi上报最新WiFi 信息时，如果带有token，则修改命令状态
+		if action == "wifi" && token != "" {
+			var wifiTask hi.WifiTaskModel
+			db.Table("hi_wifi_task").Where(map[string]interface{}{
+				"devid":  devid,
+				"token":  token,
+				"status": "running",
+			}).Find(&wifiTask)
+			if wifiTask.ID != 0 {
+				var cmdr hi.CmdrModel
+				db.Table("hi_cmdr").Where(map[string]interface{}{"id": wifiTask.Cmdrid}).Find(&cmdr)
+				if cmdr.ID != 0 {
+					if req, ok := commands.Load(cmdr.Token); ok {
+						res := req.(*commandReq)
+						res.h.result = `{"ret":1,"msg":"done","data":{}}`
+						res.cancel()
 					}
 				}
 			}
-
-			if len(result) > 0 {
-				var count int64
-				db.Table("hi_info").Where(map[string]interface{}{
-					"type":  action,
-					"devid": devid,
-				}).Where("time > ?", rtime).Count(&count)
-				if count == 0 {
-					db.Table("hi_info").Create(&hi.InfoModel{
-						Devid:  devid,
-						Onlyid: devidGetOnlyid(br, devid),
-						Type:   action,
-						Result: result,
-						Time:   rtime,
-					})
-				}
-
-				// 上报网速等信息
-				if action == "dhcp" {
-					var deviceData hi.DeviceModel
-					db.Table("hi_device").Where(map[string]interface{}{
-						"devid": devid,
-					}).Last(&deviceData)
-
-					hiReport(br, deviceData, "network_speed", resultContent)
-				}
-			}
-			c.String(http.StatusOK, "success")
-			return
 		}
-		c.Status(http.StatusBadRequest)
+
+		if len(result) > 0 {
+			var count int64
+			db.Table("hi_info").Where(map[string]interface{}{
+				"type":  action,
+				"devid": devid,
+			}).Where("time > ?", rtime).Count(&count)
+			if count == 0 {
+				db.Table("hi_info").Create(&hi.InfoModel{
+					Devid:  devid,
+					Onlyid: devidGetOnlyid(br, devid),
+					Type:   action,
+					Result: result,
+					Time:   rtime,
+				})
+			}
+
+			// 上报网速等信息
+			if action == "dhcp" {
+				var deviceData hi.DeviceModel
+				db.Table("hi_device").Where(map[string]interface{}{
+					"devid": devid,
+				}).Last(&deviceData)
+
+				hiReport(br, deviceData, "network_speed", resultContent)
+			}
+		}
+		c.String(http.StatusOK, "success")
 	})
 
 	// 查询信息 action=dhcp|wifi|static_leases	devid=设备id
@@ -811,47 +828,49 @@ func apiStart(br *broker) {
 		action := c.Param("action")
 		devid := c.Param("devid")
 
-		if action == "dhcp" || action == "wifi" || action == "static_leases" {
-			db, err := hi.InstanceDB(cfg.DB)
-			defer closeDB(db)
-			if err != nil {
-				log.Error().Msg(err.Error())
-				c.Status(http.StatusInternalServerError)
-				return
-			}
-
-			_, authErr := userAuth(c, db, devid)
-			if authErr != nil {
-				c.JSON(http.StatusOK, gin.H{
-					"ret": 0,
-					"msg": "Authentication failed",
-					"data": gin.H{
-						"error": authErr.Error(),
-					},
-				})
-				return
-			}
-
-			var info hi.InfoModel
-			db.Table("hi_info").Where(map[string]interface{}{
-				"type":  action,
-				"devid": devid,
-			}).Last(&info)
-			if info.ID == 0 {
-				c.JSON(http.StatusOK, gin.H{
-					"ret":  0,
-					"msg":  "当前没有配置",
-					"data": nil,
-				})
-			} else {
-				c.JSON(http.StatusOK, gin.H{
-					"ret":  1,
-					"msg":  "success",
-					"data": info,
-				})
-			}
+		if !hi.InArray(action, []string{"dhcp", "wifi", "static_leases"}) {
+			c.Status(http.StatusBadRequest)
+			return
 		}
-		c.Status(http.StatusBadRequest)
+
+		db, err := hi.InstanceDB(cfg.DB)
+		if err != nil {
+			log.Error().Msg(err.Error())
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+		defer closeDB(db)
+
+		_, authErr := userAuth(c, db, devid)
+		if authErr != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"ret": 0,
+				"msg": "Authentication failed",
+				"data": gin.H{
+					"error": authErr.Error(),
+				},
+			})
+			return
+		}
+
+		var info hi.InfoModel
+		db.Table("hi_info").Where(map[string]interface{}{
+			"type":  action,
+			"devid": devid,
+		}).Last(&info)
+		if info.ID == 0 {
+			c.JSON(http.StatusOK, gin.H{
+				"ret":  0,
+				"msg":  "当前没有配置",
+				"data": nil,
+			})
+		} else {
+			c.JSON(http.StatusOK, gin.H{
+				"ret":  1,
+				"msg":  "success",
+				"data": info,
+			})
+		}
 	})
 
 	// 设置信息（需要设备在线才可以设置） action=wifi|static_leases|blocked	devid=设备id
@@ -861,12 +880,12 @@ func apiStart(br *broker) {
 		onlyid := devidGetOnlyid(br, devid)
 
 		db, err := hi.InstanceDB(cfg.DB)
-		defer closeDB(db)
 		if err != nil {
 			log.Error().Msg(err.Error())
 			c.Status(http.StatusInternalServerError)
 			return
 		}
+		defer closeDB(db)
 
 		_, authErr := userAuth(c, db, devid)
 		if authErr != nil {
@@ -964,12 +983,12 @@ func apiStart(br *broker) {
 	// 设备
 	r.GET("/hi/device/list", func(c *gin.Context) {
 		db, err := hi.InstanceDB(cfg.DB)
-		defer closeDB(db)
 		if err != nil {
 			log.Error().Msg(err.Error())
 			c.Status(http.StatusInternalServerError)
 			return
 		}
+		defer closeDB(db)
 
 		authUser, authErr := userAuth(c, db, "")
 		if authErr != nil {
@@ -1017,12 +1036,12 @@ func apiStart(br *broker) {
 		devid := c.Param("devid")
 
 		db, err := hi.InstanceDB(cfg.DB)
-		defer closeDB(db)
 		if err != nil {
 			log.Error().Msg(err.Error())
 			c.Status(http.StatusInternalServerError)
 			return
 		}
+		defer closeDB(db)
 
 		var authUser *hi.UserModel
 		var authErr error
@@ -1187,12 +1206,12 @@ func apiStart(br *broker) {
 		onlyid := devidGetOnlyid(br, devid)
 
 		db, err := hi.InstanceDB(cfg.DB)
-		defer closeDB(db)
 		if err != nil {
 			log.Error().Msg(err.Error())
 			c.Status(http.StatusInternalServerError)
 			return
 		}
+		defer closeDB(db)
 
 		_, authErr := userAuth(c, db, devid)
 		if authErr != nil {
@@ -1256,12 +1275,12 @@ func apiStart(br *broker) {
 		devid := c.Param("devid")
 
 		db, err := hi.InstanceDB(cfg.DB)
-		defer closeDB(db)
 		if err != nil {
 			log.Error().Msg(err.Error())
 			c.Status(http.StatusInternalServerError)
 			return
 		}
+		defer closeDB(db)
 
 		_, authErr := userAuth(c, db, devid)
 		if authErr != nil {
@@ -1371,12 +1390,12 @@ func apiStart(br *broker) {
 		onlyid := c.GetHeader("onlyid") // 路由器web
 
 		db, err := hi.InstanceDB(cfg.DB)
-		defer closeDB(db)
 		if err != nil {
 			log.Error().Msg(err.Error())
 			c.Status(http.StatusInternalServerError)
 			return
 		}
+		defer closeDB(db)
 
 		if onlyid == "" {
 			_, authErr := userAuth(c, db, devid)
@@ -1449,12 +1468,12 @@ func apiStart(br *broker) {
 		shuntId, _ := strconv.Atoi(c.Param("sid"))
 
 		db, err := hi.InstanceDB(cfg.DB)
-		defer closeDB(db)
 		if err != nil {
 			log.Error().Msg(err.Error())
 			c.Status(http.StatusInternalServerError)
 			return
 		}
+		defer closeDB(db)
 
 		_, authErr := userAuth(c, db, devid)
 		if authErr != nil {
@@ -1550,12 +1569,12 @@ func apiStart(br *broker) {
 		callUrl := c.Query("call_url")
 
 		db, err := hi.InstanceDB(cfg.DB)
-		defer closeDB(db)
 		if err != nil {
 			log.Error().Msg(err.Error())
 			c.Status(http.StatusInternalServerError)
 			return
 		}
+		defer closeDB(db)
 
 		var shunt hi.ShuntModel
 		db.Table("hi_shunt").Where(map[string]interface{}{
@@ -1621,12 +1640,12 @@ func apiStart(br *broker) {
 		token := c.Param("token")
 
 		db, err := hi.InstanceDB(cfg.DB)
-		defer closeDB(db)
 		if err != nil {
 			log.Error().Msg(err.Error())
 			c.Status(http.StatusInternalServerError)
 			return
 		}
+		defer closeDB(db)
 
 		var cmdr hi.CmdrModel
 		db.Table("hi_cmdr").Where(map[string]interface{}{
@@ -1642,12 +1661,12 @@ func apiStart(br *broker) {
 	// 同步版本
 	r.POST("/hi/sync-version", func(c *gin.Context) {
 		db, err := hi.InstanceDB(cfg.DB)
-		defer closeDB(db)
 		if err != nil {
 			log.Error().Msg(err.Error())
 			c.Status(http.StatusInternalServerError)
 			return
 		}
+		defer closeDB(db)
 
 		user, authErr := userAuth(c, db, "")
 		if authErr != nil {
@@ -1736,12 +1755,12 @@ func apiStart(br *broker) {
 		onlyid := devidGetOnlyid(br, devid)
 		//执行校验
 		db, err := hi.InstanceDB(cfg.DB)
-		defer closeDB(db)
 		if err != nil {
 			log.Error().Msg(err.Error())
 			c.Status(http.StatusInternalServerError)
 			return
 		}
+		defer closeDB(db)
 
 		_, authErr := userAuth(c, db, devid)
 		if authErr != nil {
@@ -1829,12 +1848,12 @@ func apiStart(br *broker) {
 		}
 		//执行校验
 		db, err := hi.InstanceDB(cfg.DB)
-		defer closeDB(db)
 		if err != nil {
 			log.Error().Msg(err.Error())
 			c.Status(http.StatusInternalServerError)
 			return
 		}
+		defer closeDB(db)
 		_, authErr := userAuth(c, db, devid)
 		if authErr != nil {
 			c.JSON(http.StatusOK, gin.H{
@@ -1946,12 +1965,12 @@ func apiStart(br *broker) {
 		devid := c.Param("devid")
 		onlyid := devidGetOnlyid(br, devid)
 		db, err := hi.InstanceDB(cfg.DB)
-		defer closeDB(db)
 		if err != nil {
 			log.Error().Msg(err.Error())
 			c.Status(http.StatusInternalServerError)
 			return
 		}
+		defer closeDB(db)
 		_, authErr := userAuth(c, db, devid)
 		if authErr != nil {
 			c.JSON(http.StatusOK, gin.H{
@@ -1989,12 +2008,12 @@ func apiStart(br *broker) {
 	r.GET("/hi/other/is-bound/:devid", func(c *gin.Context) {
 		devid := c.Param("devid")
 		db, err := hi.InstanceDB(cfg.DB)
-		defer closeDB(db)
 		if err != nil {
 			log.Error().Msg(err.Error())
 			c.Status(http.StatusInternalServerError)
 			return
 		}
+		defer closeDB(db)
 		var deviceData hi.DeviceModel
 		db.Table("hi_device").Where(map[string]interface{}{
 			"devid": devid,

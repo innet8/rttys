@@ -33,6 +33,7 @@ type DeviceModel struct {
 	BindTime    uint32 `json:"bind_time"`
 	IP          string `json:"ip"`
 	Password    string `json:"password"`
+	SecretKey   string `json:"secret_key"`
 }
 
 type DeviceApiModel struct {
