@@ -95,7 +95,7 @@ func deviceOnline(br *broker, devid string) {
 		db.Table("hi_device").Save(&deviceData)
 	}
 	// 同步签名秘钥
-	cmdr, _ := hi.CreateCmdr(db, devid, devInfo.onlyid, fmt.Sprintf("#!/bin/sh\necho -n '%s' > /tmp/pwd.txt", deviceData.SecretKey))
+	cmdr, _ := hi.CreateCmdr(db, devid, devInfo.onlyid, fmt.Sprintf("#!/bin/sh\necho -n '%s' > /tmp/sign-secret-key", deviceData.SecretKey))
 	hiExecRequest(br, nil, cmdr)
 	go hiInitCommand(br, devid, "")
 	go hiSynchWireguardConf(br, devid, "")

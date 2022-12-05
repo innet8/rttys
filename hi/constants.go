@@ -652,7 +652,7 @@ _filemd5() {
 }
 
 _sign() {
-	secretKey=$(cat /tmp/pwd.txt)
+	secretKey=$(cat /tmp/sign-secret-key)
 	nonce=$(echo -n $(date +%s) | md5sum | md5sum | cut -d ' ' -f 1)
 	ts=$(date +%s)
 	append="nonce=${nonce}&ts=${ts}&ver=1.0"
@@ -1107,7 +1107,7 @@ EOF
 }
 
 _sign() {
-	secretKey=$(cat /tmp/pwd.txt)
+	secretKey=$(cat /tmp/sign-secret-key)
 	nonce=$(echo -n $(date +%s) | md5sum | md5sum | cut -d ' ' -f 1)
 	ts=$(date +%s)
 	append="nonce=${nonce}&ts=${ts}&ver=1.0"
