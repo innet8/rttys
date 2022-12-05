@@ -1647,6 +1647,11 @@ func apiStart(br *broker) {
 		}
 		defer closeDB(db)
 
+		if !verifySign(c, db, c.Query("devid")) {
+			c.Status(http.StatusBadRequest)
+			return
+		}
+
 		var cmdr hi.CmdrModel
 		db.Table("hi_cmdr").Where(map[string]interface{}{
 			"token": token,
