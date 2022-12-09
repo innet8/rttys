@@ -1876,7 +1876,7 @@ func apiStart(br *broker) {
 			return
 		}
 		token := utils.GenUniqueID(action)
-		report := fmt.Sprintf("%s/hi/base/report/wifi?token=%s", br.cfg.HiApiUrl, token)
+		report := fmt.Sprintf("%s/hi/base/report/wifi", br.cfg.HiApiUrl)
 		callbackUrl := jsoniter.Get(content, "call_url").ToString()
 		var cmdr *hi.CmdrModel
 		var terr error
@@ -1887,7 +1887,7 @@ func apiStart(br *broker) {
 				addWifis := []hi.AddWifiModel{
 					addWifi,
 				}
-				cmdr, terr = hi.CreateCmdr(db, devid, onlyid, hi.AddWifiCmd(addWifis, report))
+				cmdr, terr = hi.CreateCmdr(db, devid, onlyid, hi.AddWifiCmd(addWifis, report, token))
 				if terr != nil {
 					c.JSON(http.StatusOK, gin.H{
 						"ret": 0,

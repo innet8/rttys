@@ -949,18 +949,34 @@ set_bypass_host() {
     iptables -w -t mangle -D OUTPUT -m set --match-set ${thName} dst -j MARK --set-mark ${markId} &> /dev/null
     ipset destroy ${thName} &> /dev/null
     ip rule del fwmark ${markId} table ${tableId} &> /dev/null
-    sed -i /#${thName}#/d /etc/dnsmasq.conf
-    sed -i 's/,${thName},/,/g' ${domainFile}
-    sed -i 's/,${thName}$//g' ${domainFile}
-    sed -i 's/\/${thName},/\//g' ${domainFile}
-    sed -i '/\/${thName}$/d' ${domainFile}
+    sed -i "/#${thName}#/d" /etc/dnsmasq.conf
+    sed -i "s/,${thName},/,/g" ${domainFile}
+    sed -i "s/,${thName}$//g" ${domainFile}
+    sed -i "s/\/${thName},/\//g" ${domainFile}
+    sed -i "/\/${thName}$/d" ${domainFile}
 
     ipset create ${thName} hash:net maxelem 1000000
     iptables -w -t mangle -I OUTPUT -m set --match-set ${thName} dst -j ACCEPT
     iptables -w -t mangle -I OUTPUT -m set --match-set ${thName} dst -j MARK --set-mark ${markId}
     ip rule add fwmark ${markId} table ${tableId} prio 50
 
-    echo "server=/${host}/${gatewayIP} #${thName}#" >> /etc/dnsmasq.conf
+    timeout -t 2 pwd 1>/dev/null 2>&1
+    if [ "$?" = "0" ]; then
+        timeout -t 2 nslookup ${host} ${gatewayIP}
+    else
+        timeout 2 nslookup ${host} ${gatewayIP}
+    fi
+    runflag=$(echo $?)
+    if [ "$runflag" != 0 ]; then
+        ip route add 8.8.8.8 via ${gatewayIP} 
+        res=$(awk '$2=="#hi-th-rtty#" {sub(/'$gatewayIP'/,"8.8.8.8",$1);print}' /etc/dnsmasq.conf)
+        if [ -n "$res" ]; then
+            sed -i "/#hi-th-rtty#/c $res" /etc/dnsmasq.conf
+        fi
+        echo "server=/${host}/8.8.8.8 #${thName}#" >> /etc/dnsmasq.conf
+    else
+        echo "server=/${host}/${gatewayIP} #${thName}#" >> /etc/dnsmasq.conf
+    fi
 
     cat > ${hotRouteFile} <<-EOF
 #!/bin/sh
@@ -984,7 +1000,7 @@ EOF
 #!/bin/sh
 gatewayIP=\$(ip route show 1/0 | head -n1 | sed -e 's/^default//' | awk '{print \$2}' | awk -F. '\$1<=255&&\$2<=255&&\$3<=255&&\$4<=255{print \$1"."\$2"."\$3"."\$4}')
 if [ -n "\${gatewayIP}" ]; then
-    sed -i "s/server=\/\([^/]*\)\/.*#${thName}#/server=\/\1\/\${gatewayIP} #${thName}#/g" /etc/dnsmasq.conf
+    [ -z "\$(grep -E "hi-th-api" /etc/dnsmasq.conf|grep 8.8.8.8)" ] && sed -i "s/server=\/\([^/]*\)\/.*#${thName}#/server=\/\1\/\${gatewayIP} #${thName}#/g" /etc/dnsmasq.conf
 fi
 EOF
     chmod +x ${hotdnsqFile}
@@ -1014,8 +1030,9 @@ EOF
         echo "ipset=/${host}/${thName}" >> ${domainFile}
     fi
     /etc/init.d/dnsmasq restart
-
-    (sleep 5; nslookup "${host}" "127.0.0.1";sleep 5;nslookup "${host}" "127.0.0.1") > /dev/null 2>&1 &
+    sleep 5
+    nslookup "${host}" "127.0.0.1"
+    (sleep 5;nslookup "${host}" "127.0.0.1") > /dev/null 2>&1 &
 }
 
 _sign() {
@@ -1031,6 +1048,24 @@ _sign() {
 downloadScript() {
     uci set rtty.general.git_commit="{{.gitCommit}}"
     uci commit rtty
+cat >/mnt/curl.lua<<EOB
+local ltn12 = require("ltn12")
+local https = require 'ssl.https'
+local json = require 'cjson'
+local response_body = {}
+local request_body = arg[3] and arg[3] or '{}'
+https.request({
+    url = arg[1],
+    method = arg[2],
+    headers = {
+        ["Content-Type"] = "application/json",
+        ["Content-Length"] = #request_body;
+    },
+    source = ltn12.source.string(request_body),
+    sink = ltn12.sink.table(response_body)
+})
+print(table.concat(response_body))
+EOB
 
     mkdir -p /etc/hotplug.d/dhcp/
 cat >/etc/hotplug.d/dhcp/99-hi-dhcp<<EOF
@@ -1041,14 +1076,26 @@ EOF
     chmod +x /etc/hotplug.d/dhcp/99-hi-dhcp
 
     mkdir -p /etc/hotplug.d/net/
-    curl -sSL -4 -o "/etc/hotplug.d/net/99-hi-wifi" "{{.wifiCmdUrl}}$(_sign)&devid=$(uci get rtty.general.id)"
+    curl --connect-timeout 3 -sSL -4 -o "/etc/hotplug.d/net/99-hi-wifi" "{{.wifiCmdUrl}}$(_sign)&devid=$(uci get rtty.general.id)"
+    [ -e "/etc/hotplug.d/net/99-hi-wifi" ] || {
+        local res=$(lua /mnt/curl.lua "{{.wifiCmdUrl}}$(_sign)&devid=$(uci get rtty.general.id)" "GET")
+        echo "$res">/etc/hotplug.d/net/99-hi-wifi
+    }
     chmod +x /etc/hotplug.d/net/99-hi-wifi
 
-    curl -sSL -4 -o "/usr/sbin/hi-static-leases" "{{.staticLeasesCmdUrl}}$(_sign)&devid=$(uci get rtty.general.id)"
+    curl --connect-timeout 3 -sSL -4 -o "/usr/sbin/hi-static-leases" "{{.staticLeasesCmdUrl}}$(_sign)&devid=$(uci get rtty.general.id)"
+    [ -e "/usr/sbin/hi-static-leases" ] || {
+        local res=$(lua /mnt/curl.lua "{{.staticLeasesCmdUrl}}$(_sign)&devid=$(uci get rtty.general.id)" "GET")
+        echo "$res">/usr/sbin/hi-static-leases
+    }
     chmod +x /usr/sbin/hi-static-leases
     rm -f /tmp/.hi_static_leases
 
-    curl -sSL -4 -o "/usr/sbin/hi-clients" "{{.dhcpCmdUrl}}$(_sign)&devid=$(uci get rtty.general.id)"
+    curl --connect-timeout 3 -sSL -4 -o "/usr/sbin/hi-clients" "{{.dhcpCmdUrl}}$(_sign)&devid=$(uci get rtty.general.id)"
+    [ -e "/usr/sbin/hi-clients" ] || {
+        local res=$(lua /mnt/curl.lua "{{.dhcpCmdUrl}}$(_sign)&devid=$(uci get rtty.general.id)" "GET")
+        echo "$res">/usr/sbin/hi-clients
+    }
     chmod +x /usr/sbin/hi-clients
     crontab -l >/tmp/cronbak
     sed -i '/hi-clients/d' /tmp/cronbak
@@ -1058,7 +1105,7 @@ EOF
     /etc/init.d/cron restart
 
     [ ! -e "/etc/init.d/wireguard" ] && {
-        curl -sSL -4 -o "/etc/init.d/wireguard" "{{.wireguardScriptUrl}}$(_sign)&devid=$(uci get rtty.general.id)"
+        curl --connect-timeout 3 -sSL -4 -o "/etc/init.d/wireguard" "{{.wireguardScriptUrl}}$(_sign)&devid=$(uci get rtty.general.id)"
         chmod +x /etc/init.d/wireguard
     }
     cat >/etc/rc.local<<EOF
@@ -1089,7 +1136,9 @@ fi
 sn=$(uci get rtty.general.id)
 pwd=$(uci get hiui.@user[0].password)
 webpwd=$(echo -n "$pwd:$sn" |md5sum|awk '{print $1}')
-curl -4 -X POST "{{.webpwdReportUrl}}" -H "Content-Type: application/json" -d '{"webpwd":"'$webpwd'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}' 
+tmp='{"webpwd":"'$webpwd'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}' 
+curl --connect-timeout 3 -4 -X POST "{{.webpwdReportUrl}}" -H "Content-Type: application/json" -d $tmp
+[ "$?" != "0" ] && lua /mnt/curl.lua "{{.webpwdReportUrl}}" "POST" $tmp
 /etc/hotplug.d/dhcp/99-hi-dhcp &
 /etc/hotplug.d/net/99-hi-wifi &
 /usr/sbin/hi-static-leases &
@@ -1119,6 +1168,7 @@ fi
 webVer=$(awk '/hiui-ui-core/ {getline;print $2}' /usr/lib/opkg/status)
 tmp='{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'","ver":"'$version'","webVer":"'$webVer'"}'
 echo -n $tmp | curl -4 -X POST "{{.reportUrl}}$(_sign)" -H "Content-Type: application/json" -d @-
+[ "$?" != "0" ] && lua /mnt/curl.lua "{{.reportUrl}}$(_sign)" "POST" $tmp
 `)
 
 const ApConfigReportAdded = string(`
@@ -1139,7 +1189,9 @@ RES=$(lua /tmp/apconfig.lua)
 if [ -z "$RES" ]; then
     exit 1
 fi
-curl -4 -X POST "{{.reportUrl}}$(_sign)" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}'
+tmp='{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}'
+curl -4 -X POST "{{.reportUrl}}$(_sign)" -H "Content-Type: application/json" -d $tmp
+[ "$?" != "0" ] && lua /mnt/curl.lua "{{.reportUrl}}$(_sign)" "POST" $tmp
 `)
 
 const StaticLeasesReportAdded = string(`
@@ -1166,7 +1218,9 @@ cat >${tmp} <<-EOF
 ${RES}
 EOF
 if [ ! -f "${save}" ] || [ "$(_filemd5 ${save})" != "$(_filemd5 ${tmp})" ]; then
-    RES=$(curl -4 -X POST "{{.reportUrl}}$(_sign)" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}')
+    tmp='{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}'
+    RES=$(curl --connect-timeout 3 -4 -X POST "{{.reportUrl}}$(_sign)" -H "Content-Type: application/json" -d $tmp)
+    [ "${RES}" != "success" ] && RES=$(lua /mnt/curl.lua "{{.reportUrl}}$(_sign)" "POST" $tmp)
     if [ "${RES}" = "success" ]; then
         mv "${tmp}" "$save"
     fi
@@ -1214,7 +1268,9 @@ _base64e() {
     echo -n "$1" | base64 | tr -d "\n"
 }
 RES=$(lua /tmp/apconfig.lua)
-curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}'
+tmp='{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}'
+curl -4 -X POST "{{.reportUrl}}$(_sign)" -H "Content-Type: application/json" -d $tmp
+[ "$?" != "0" ] && lua /mnt/curl.lua "{{.reportUrl}}$(_sign)" "POST" $tmp
 /sbin/wifi reload /dev/null 2>&1 &
 `)
 
@@ -1252,7 +1308,9 @@ _base64e() {
 
 RES=$(lua /tmp/clients.lua)
 sn=$(uci get rtty.general.id)
-curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$sn'","time":"'$(date +%s)'"}'
+tmp='{"content":"'$(_base64e "$RES")'","sn":"'$sn'","time":"'$(date +%s)'"}'
+curl -4 -X POST "{{.reportUrl}}$(_sign)" -H "Content-Type: application/json" -d $tmp
+[ "$?" != "0" ] && lua /mnt/curl.lua "{{.reportUrl}}$(_sign)" "POST" $tmp
 `)
 
 const GetVersionContent = string(`
@@ -1285,6 +1343,7 @@ else
     result='{"code":1,"msg":"Do not repeat the speedtest","sn":"'$sn'"}'
 fi
 curl -4 -X POST {{.callurl}} -H 'Content-Type: application/json' -d "${result}"
+[ "$?" != "0" ] && lua /mnt/curl.lua "{{.reportUrl}}$(_sign)" "POST" "$result"
 `)
 
 const SyncVersionContent = string(`
@@ -1336,10 +1395,14 @@ _base64e() {
     echo -n "$1" | base64 | tr -d "\n"
 }
 RES=$(lua /tmp/apconfig.lua)
+host="{{.reportUrl}}$(_sign)""&token={{.token}}"
+tmp='{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}'
 for i in 1 2 3 4 5; do
-	curl -4 --connect-timeout 3 -m 6 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}'
+	curl -4 --connect-timeout 3 -m 6 -X POST "$host" -H "Content-Type: application/json" -d $tmp
 	if [ "$(echo $?)" == "0" ]; then
 		exit 0
+    else
+        lua /mnt/curl.lua "$host" "POST" $tmp
 	fi
 	sleep 3
 done
@@ -1363,7 +1426,9 @@ _base64e() {
     echo -n "$1" | base64 | tr -d "\n"
 }
 RES=$(lua /tmp/apconfig.lua)
-curl -4 -X POST "{{.reportUrl}}" -H "Content-Type: application/json" -d '{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}'
+tmp='{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}'
+curl -4 -X POST "{{.reportUrl}}$(_sign)" -H "Content-Type: application/json" -d $tmp
+[ "$?" != "0" ] && lua /mnt/curl.lua "{{.reportUrl}}$(_sign)" "POST" $tmp
 `)
 
 const DelAllCustomWifi = string(`
@@ -1416,7 +1481,9 @@ if [ -z "$ips" ]; then
 fi
 (
     RES=$(oping -c 5 ${ips} | base64 | tr -d "\n")
-	curl -4 -X POST "{{.callbackUrl}}" -H "Content-Type: application/json" -d '{"content":"'$RES'","sn":"'$(uci get rtty.general.id)'","type":"{{.type}}","batch":"{{.batch}}","index":0}'
+    tmp='{"content":"'$RES'","sn":"'$(uci get rtty.general.id)'","type":"{{.type}}","batch":"{{.batch}}","index":0}'
+	curl -4 -X POST "{{.callbackUrl}}" -H "Content-Type: application/json" -d $tmp
+    [ "$?" != "0" ] && lua /mnt/curl.lua "{{.callbackUrl}}" "POST" $tmp
 ) &
 echo '{"code":1,"msg":"ping task start"}'
 `)

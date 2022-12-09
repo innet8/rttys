@@ -189,7 +189,7 @@ func SyncVersionCmd(versions []VersionModel, description string) string {
 	return SyncVersionTemplate(envMap)
 }
 
-func AddWifiCmd(models []AddWifiModel, report string) string {
+func AddWifiCmd(models []AddWifiModel, report string, token string) string {
 	var network []string
 	var wireless []string
 	var dhcp []string
@@ -219,6 +219,7 @@ func AddWifiCmd(models []AddWifiModel, report string) string {
 	}
 	var envMap = make(map[string]interface{})
 	envMap["reportUrl"] = report
+	envMap["token"] = token
 	envMap["wireless"] = strings.Join(wireless, "\n")
 	envMap["network"] = strings.Join(network, "\n")
 	envMap["chaos_calmer"] = strings.Join(chaos_calmer, "\n")
