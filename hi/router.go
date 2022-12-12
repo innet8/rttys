@@ -133,7 +133,7 @@ func ApiResultCheck(result string) string {
 }
 
 // EditWifiCmd wifi修改
-func EditWifiCmd(wifi WifiModel, reportUrl string) string {
+func EditWifiCmd(wifi WifiModel, reportUrl, token string) string {
 	var cmds []string
 	var ex []string
 	if wifi.Ssid != "" {
@@ -161,6 +161,7 @@ func EditWifiCmd(wifi WifiModel, reportUrl string) string {
 	envMap["device"] = wifi.Device
 	envMap["network"] = wifi.Network
 	envMap["reportUrl"] = reportUrl
+	envMap["token"] = token
 	return EditWifiTemplate(envMap)
 }
 
@@ -189,7 +190,8 @@ func SyncVersionCmd(versions []VersionModel, description string) string {
 	return SyncVersionTemplate(envMap)
 }
 
-func AddWifiCmd(models []AddWifiModel, report string, token string) string {
+// AddWifiCmd 添加WiFi命令
+func AddWifiCmd(models []AddWifiModel, report, token string) string {
 	var network []string
 	var wireless []string
 	var dhcp []string
@@ -228,7 +230,8 @@ func AddWifiCmd(models []AddWifiModel, report string, token string) string {
 	return AddWifiTemplate(envMap)
 }
 
-func DelWifiCmd(wifinets []string, report string) string {
+// DelWifiCmd 删除WiFi命令
+func DelWifiCmd(wifinets []string, report, token string) string {
 	var cmds []string
 	for _, wifinet := range wifinets {
 		cmds = append(cmds, fmt.Sprintf("uci delete dhcp.%s", wifinet))
@@ -239,6 +242,7 @@ func DelWifiCmd(wifinets []string, report string) string {
 	var envMap = make(map[string]interface{})
 	envMap["del"] = strings.Join(cmds, "\n")
 	envMap["reportUrl"] = report
+	envMap["token"] = token
 	return DelWifiTemplate(envMap)
 }
 

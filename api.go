@@ -938,7 +938,7 @@ func apiStart(br *broker) {
 			var wifi hi.WifiModel
 			if err := json.Unmarshal(content, &wifi); err == nil {
 				report := fmt.Sprintf("%s/hi/base/report/wifi", br.cfg.HiApiUrl)
-				cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.EditWifiCmd(wifi, report))
+				cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.EditWifiCmd(wifi, report, ""))
 				if terr != nil {
 					c.JSON(http.StatusOK, gin.H{
 						"ret": 0,
@@ -1791,7 +1791,7 @@ func apiStart(br *broker) {
 				addWifis := []hi.AddWifiModel{
 					addWifi,
 				}
-				cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.AddWifiCmd(addWifis, report))
+				cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.AddWifiCmd(addWifis, report, ""))
 				if terr != nil {
 					c.JSON(http.StatusOK, gin.H{
 						"ret": 0,
@@ -1817,7 +1817,7 @@ func apiStart(br *broker) {
 				return
 			}
 
-			cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.DelWifiCmd(deleteWifi.Wifinets, report))
+			cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.DelWifiCmd(deleteWifi.Wifinets, report, ""))
 			if terr != nil {
 				c.JSON(http.StatusOK, gin.H{
 					"ret": 0,
@@ -1910,7 +1910,7 @@ func apiStart(br *broker) {
 				})
 				return
 			}
-			cmdr, terr = hi.CreateCmdr(db, devid, onlyid, hi.DelWifiCmd(deleteWifi.Wifinets, report))
+			cmdr, terr = hi.CreateCmdr(db, devid, onlyid, hi.DelWifiCmd(deleteWifi.Wifinets, report, token))
 			if terr != nil {
 				c.JSON(http.StatusOK, gin.H{
 					"ret": 0,
@@ -1924,7 +1924,7 @@ func apiStart(br *broker) {
 		} else { //修改wifi命令
 			var wifi hi.WifiModel
 			if err := json.Unmarshal(content, &wifi); err == nil {
-				cmdr, terr = hi.CreateCmdr(db, devid, onlyid, hi.EditWifiCmd(wifi, report))
+				cmdr, terr = hi.CreateCmdr(db, devid, onlyid, hi.EditWifiCmd(wifi, report, token))
 				if terr != nil {
 					c.JSON(http.StatusOK, gin.H{
 						"ret": 0,

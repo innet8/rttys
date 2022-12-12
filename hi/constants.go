@@ -1247,7 +1247,6 @@ fi
 `)
 
 const EditWifiContent = string(`
-#!/bin/sh
 . /lib/functions.sh
 if [ -e "/var/run/delwifi.lock" ] || [ -e "/var/run/addwifi.lock" ]; then
     echo '{"code":103,"msg":"wifi deleting or adding"}'
@@ -1268,14 +1267,14 @@ _base64e() {
     echo -n "$1" | base64 | tr -d "\n"
 }
 RES=$(lua /tmp/apconfig.lua)
+host="{{.reportUrl}}$(_sign)""&token={{.token}}"
 tmp='{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}'
-curl -4 -X POST "{{.reportUrl}}$(_sign)" -H "Content-Type: application/json" -d $tmp
-[ "$?" != "0" ] && lua /mnt/curl.lua "{{.reportUrl}}$(_sign)" "POST" $tmp
+curl -4 -X POST "$host" -H "Content-Type: application/json" -d $tmp
+[ "$?" != "0" ] && lua /mnt/curl.lua "$host" "POST" $tmp
 /sbin/wifi reload /dev/null 2>&1 &
 `)
 
 const BlockedContent = string(`
-#!/bin/sh
 . /usr/share/libubox/jshn.sh
 while [ 1 ]; do
     [ ! -f /var/run/block.lock ] && break
@@ -1343,7 +1342,7 @@ else
     result='{"code":1,"msg":"Do not repeat the speedtest","sn":"'$sn'"}'
 fi
 curl -4 -X POST {{.callurl}} -H 'Content-Type: application/json' -d "${result}"
-[ "$?" != "0" ] && lua /mnt/curl.lua "{{.reportUrl}}$(_sign)" "POST" "$result"
+[ "$?" != "0" ] && lua /mnt/curl.lua "{{.callurl}}" "POST" "$result"
 `)
 
 const SyncVersionContent = string(`
@@ -1353,7 +1352,6 @@ echo '{{.verInfo}}' > /tmp/version.info
 `)
 
 const AddWifiContent = string(`
-#!/bin/sh
 . /lib/functions.sh
 
 if [ -e "/var/run/addwifi.lock" ]; then
@@ -1409,7 +1407,6 @@ done
 `)
 
 const DelWifiContent = string(`
-#!/bin/sh
 if [ -e "/var/run/delwifi.lock" ]; then
     echo '{"code":102,"msg":"wifi deleting"}'
     exit 1
@@ -1426,9 +1423,10 @@ _base64e() {
     echo -n "$1" | base64 | tr -d "\n"
 }
 RES=$(lua /tmp/apconfig.lua)
+host="{{.reportUrl}}$(_sign)""&token={{.token}}"
 tmp='{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}'
-curl -4 -X POST "{{.reportUrl}}$(_sign)" -H "Content-Type: application/json" -d $tmp
-[ "$?" != "0" ] && lua /mnt/curl.lua "{{.reportUrl}}$(_sign)" "POST" $tmp
+curl -4 -X POST "$host" -H "Content-Type: application/json" -d $tmp
+[ "$?" != "0" ] && lua /mnt/curl.lua "$host" "POST" $tmp
 `)
 
 const DelAllCustomWifi = string(`
@@ -1557,13 +1555,13 @@ func SetStaticLeasesTemplate(envMap map[string]interface{}) string {
 
 func EditWifiTemplate(envMap map[string]interface{}) string {
 	var sb strings.Builder
-	sb.Write([]byte(EditWifiContent))
+	sb.Write([]byte(fmt.Sprintf("%s\n%s", CommonUtilsContent, EditWifiContent)))
 	return FromTemplateContent(sb.String(), envMap)
 }
 
 func BlockedTemplate(envMap map[string]interface{}) string {
 	var sb strings.Builder
-	sb.Write([]byte(BlockedContent))
+	sb.Write([]byte(fmt.Sprintf("%s\n%s", CommonUtilsContent, BlockedContent)))
 	return FromTemplateContent(sb.String(), envMap)
 }
 
@@ -1591,13 +1589,13 @@ func SyncVersionTemplate(envMap map[string]interface{}) string {
 
 func AddWifiTemplate(envMap map[string]interface{}) string {
 	var sb strings.Builder
-	sb.Write([]byte(AddWifiContent))
+	sb.Write([]byte(fmt.Sprintf("%s\n%s", CommonUtilsContent, AddWifiContent)))
 	return FromTemplateContent(sb.String(), envMap)
 }
 
 func DelWifiTemplate(envMap map[string]interface{}) string {
 	var sb strings.Builder
-	sb.Write([]byte(DelWifiContent))
+	sb.Write([]byte(fmt.Sprintf("%s\n%s", CommonUtilsContent, DelWifiContent)))
 	return FromTemplateContent(sb.String(), envMap)
 }
 
