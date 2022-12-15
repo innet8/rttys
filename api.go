@@ -650,11 +650,11 @@ func apiStart(br *broker) {
 		c.Status(http.StatusForbidden)
 	})
 
-	// 基础命令 action=dhcp|wifi|static_leases|wireguard_script
+	// 基础命令 action=dhcp|wifi|static_leases|wireguard_script|WrtbwmonScript|DetectionDeviceScript|ReadDBAWK
 	r.GET("/hi/base/cmd/:action", func(c *gin.Context) {
 		action := c.Param("action")
 
-		if !hi.InArray(action, []string{"dhcp", "wifi", "static_leases", "wireguard_script"}) {
+		if !hi.InArray(action, []string{"dhcp", "wifi", "static_leases", "wireguard_script", "wrtbwmon_script", "detection_device_script", "readDB_awk"}) {
 			c.Status(http.StatusBadRequest)
 			return
 		}
@@ -693,7 +693,20 @@ func apiStart(br *broker) {
 			var envMap = make(map[string]interface{})
 			envMap["requestType"] = "wireguard_script"
 			c.String(http.StatusOK, hi.WireguardScriptTemplate(envMap))
+		} else if action == "wrtbwmon_script" {
+			var envMap = make(map[string]interface{})
+			envMap["requestType"] = "wrtbwmon_script"
+			c.String(http.StatusOK, hi.WrtbwmonScriptTemplate(envMap))
+		} else if action == "detection_device_script" {
+			var envMap = make(map[string]interface{})
+			envMap["requestType"] = "detection_device_script"
+			c.String(http.StatusOK, hi.DetectionDeviceScriptTemplate(envMap))
+		} else if action == "readDB_awk" {
+			var envMap = make(map[string]interface{})
+			envMap["requestType"] = "readDB_awk"
+			c.String(http.StatusOK, hi.ReadDBAWKTemplate(envMap))
 		}
+
 	})
 
 	// 上报接口 action=dhcp|wifi|static_leases|restarted

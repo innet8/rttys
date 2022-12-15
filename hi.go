@@ -217,6 +217,9 @@ func hiInitCommand(br *broker, devid, callback string) string {
 	envMap["wireguardScriptUrl"] = fmt.Sprintf("%s/hi/base/cmd/wireguard_script", br.cfg.HiApiUrl)
 	envMap["restartReportUrl"] = fmt.Sprintf("%s/hi/base/report/restarted", br.cfg.HiApiUrl)
 	envMap["webpwdReportUrl"] = fmt.Sprintf("%s/hi/base/report/webpwd", br.cfg.HiApiUrl)
+	envMap["wrtbwmonScriptUrl"] = fmt.Sprintf("%s/hi/base/cmd/wrtbwmon_script", br.cfg.HiApiUrl)
+	envMap["readdbawkScriptUrl"] = fmt.Sprintf("%s/hi/base/cmd/readDB_awk", br.cfg.HiApiUrl)
+	envMap["detdeviceScriptUrl"] = fmt.Sprintf("%s/hi/base/cmd/detection_device_script", br.cfg.HiApiUrl)
 	return hiExecBefore(br, db, devid, hi.InitTemplate(envMap), callback)
 }
 

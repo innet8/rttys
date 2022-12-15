@@ -8,6 +8,1063 @@ import (
 	"text/template"
 )
 
+const ReadDBAWK = string(`
+#!/usr/bin/awk
+
+function inInterfaces(host) {
+	return(interfaces ~ "(^| )" host "($| )")
+}
+
+function newRule(arp_ip, ipt_cmd) {
+	# checking for existing rules shouldn't be necessary if newRule is
+	# always called after db is read, arp table is read, and existing
+	# iptables rules are read.
+	ipt_cmd=iptKey " -t mangle -j RETURN -s " arp_ip
+	system(ipt_cmd " -C RRDIPT_FORWARD 2>/dev/null || " ipt_cmd " -A RRDIPT_FORWARD")
+	ipt_cmd=iptKey " -t mangle -j RETURN -d " arp_ip
+	system(ipt_cmd " -C RRDIPT_FORWARD 2>/dev/null || " ipt_cmd " -A RRDIPT_FORWARD")
+}
+
+function delRule(arp_ip, ipt_cmd) {
+	ipt_cmd=iptKey " -t mangle -D RRDIPT_FORWARD -j RETURN "
+	system(ipt_cmd "-s " arp_ip " 2>/dev/null")
+	system(ipt_cmd "-d " arp_ip " 2>/dev/null")
+}
+
+function total(i) {
+	return(bw[i "/in"] + bw[i "/out"])
+}
+
+BEGIN {
+	if (ipv6) {
+		iptNF	= 8
+		iptKey	= "ip6tables"
+	} else {
+		iptNF	= 9
+		iptKey	= "iptables"
+	}
+}
+
+/^#/ { # get DB filename
+	FS	= ","
+	dbFile	= FILENAME
+	next
+}
+
+# data from database; first file
+ARGIND==1 { #!@todo this doesn't help if the DB file is empty.
+	lb=$1
+
+	if (lb !~ "^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$") next
+
+	if (!(lb in mac)) {
+		mac[lb]		= $1
+		ip[lb]		= $2
+		inter[lb]	= $3
+		speed[lb "/in"]	= 0
+		speed[lb "/out"]= 0
+		bw[lb "/in"]	= $6
+		bw[lb "/out"]	= $7
+		firstDate[lb]	= $9
+		lastDate[lb]	= $10
+		ignore[lb]	= 1
+	} else {
+		if ($9 < firstDate[lb])
+			firstDate[lb]	= $9
+		if ($10 > lastDate[lb]) {
+			ip[lb]		= $2
+			inter[lb]	= $3
+			lastDate[lb]	= $10
+		}
+		bw[lb "/in"]	+= $6
+		bw[lb "/out"]	+= $7
+		ignore[lb]	= 0
+	}
+	next
+}
+
+# not triggered on the first file
+FNR==1 {
+	FS=" "
+	if(ARGIND == 2) next
+}
+
+# arp: ip hw flags hw_addr mask device
+ARGIND==2 {
+	#!@todo regex match IPs and MACs for sanity
+	if (ipv6) {
+		statFlag= ($4 != "FAILED" && $4 != "INCOMPLETE")
+		macAddr	= $5
+		hwIF	= $3
+	} else {
+		statFlag= ($3 != "0x0")
+		macAddr	= $4
+		hwIF	= $6
+	}
+
+	lb=$1
+	if (hwIF != wanIF && statFlag && macAddr ~ "^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$") {
+		hosts[lb]		= 1
+		arp_mac[lb]		= macAddr
+		arp_ip[lb]		= $1
+		arp_inter[lb]		= hwIF
+		arp_bw[lb "/in"]	= 0
+		arp_bw[lb "/out"]	= 0
+		arp_firstDate[lb]	= systime()
+		arp_lastDate[lb]	= arp_firstDate[lb]
+		arp_ignore[lb]		= 1
+	}
+	next
+}
+
+#!@todo could use mangle chain totals or tailing "unnact" rules to
+# account for data for new hosts from their first presence on the
+# network to rule creation. The "unnact" rules would have to be
+# maintained at the end of the list, and new rules would be inserted
+# at the top.
+ARGIND==3 && NF==iptNF && $1!="pkts" { # iptables input
+	if (ipv6) {
+		lfn = 5
+		tag = "::/0"
+	} else {
+		lfn = 6
+		tag = "0.0.0.0/0"
+	}
+
+	if ($(lfn) != "*") {
+		m = $(lfn)
+		n = m "/in"
+	} else if ($(++lfn) != "*") {
+		m = $(lfn)
+		n = m "/out"
+	} else if ($(++lfn) != tag) {
+		m = $(lfn)
+		n = m "/out"
+	} else { # $(++lfn) != tag
+		m = $(++lfn)
+		n = m "/in"
+	}
+
+	if (mode == "diff" || mode == "noUpdate") print n, $2
+	if (mode != "noUpdate") {
+		if (inInterfaces(m)) { # if label is an interface
+			if (!(m in arp_mac)) {
+				cmd = "cat /sys/class/net/" m "/address"
+				cmd | getline arp_mac[m]
+				close(cmd)
+
+				if (length(arp_mac[m]) == 0) arp_mac[m] = "00:00:00:00:00:00"
+
+				arp_ip[m]		= "NA"
+				arp_inter[m] 		= m
+				arp_bw[m "/in"]		= 0
+				arp_bw[m "/out"]	= 0
+				arp_firstDate[m]	= systime()
+				arp_lastDate[m]		= arp_firstDate[m]
+				arp_ignore[lb]		= 1
+			}
+		} else {
+			if (!(m in arp_mac)) hosts[m] = 0
+			else delete hosts[m]
+		}
+
+		if ($2 > 0) {
+			arp_bw[n]	= $2
+			arp_lastDate[m]	= systime()
+			arp_ignore[m]	= 0
+		}
+	}
+}
+
+END {
+	if (mode == "noUpdate") exit
+
+	for (i in arp_ip) {
+		lb = arp_mac[i]
+		if (!arp_ignore[i] || !(lb in mac)) {
+			ignore[lb]	= 0
+
+			if (lb in mac) {
+				bw[lb "/in"]	+= arp_bw[i "/in"]
+				bw[lb "/out"]	+= arp_bw[i "/out"]
+				lastDate[lb]	= arp_lastDate[i]
+			} else {
+				bw[lb "/in"]	= arp_bw[i "/in"]
+				bw[lb "/out"]	= arp_bw[i "/out"]
+				firstDate[lb]	= arp_firstDate[i]
+				lastDate[lb]	= arp_lastDate[i]
+			}
+			mac[lb]		= arp_mac[i]
+			ip[lb]		= arp_ip[i]
+			inter[lb]	= arp_inter[i]
+
+			if (interval != 0) {
+				speed[lb "/in"]	= int(arp_bw[i "/in"] / interval)
+				speed[lb "/out"]= int(arp_bw[i "/out"] / interval)
+			}
+		}
+	}
+
+	close(dbFile)
+	for (i in mac) {
+		if (!ignore[i]) {
+			print "#mac,ip,iface,speed_in,speed_out,in,out,total,first_date,last_date" > dbFile
+			OFS=","
+			for (i in mac)
+				print mac[i], ip[i], inter[i], speed[i "/in"], speed[i "/out"], bw[i "/in"], bw[i "/out"], total(i), firstDate[i], lastDate[i] > dbFile
+			close(dbFile)
+			break
+		}
+	}
+
+	# for hosts without rules
+	for (i in hosts)
+		if (hosts[i]) newRule(i)
+		else delRule(i)
+}
+`)
+
+const WrtbwmonScript = string(`
+#!/bin/sh
+#
+
+# Default input parameters for wrtbwmon.
+runMode=0
+Monitor46=4
+
+# Some parameters for monitor process.
+for46=
+updatePID=
+logFile=/var/log/wrtbwmon.log
+lockFile=/var/lock/wrtbwmon.lock
+pidFile=/var/run/wrtbwmon.pid
+tmpDir=/var/tmp/wrtbwmon
+interval4=0
+interval6=0
+
+# Debug parameters for readDB.awk.
+mode=
+DEBUG=
+
+# Constant parameter for wrtbwmon.
+binDir=/usr/sbin
+dataDir=/usr/share/wrtbwmon
+
+networkFuncs=/lib/functions/network.sh
+uci=$(which uci 2>/dev/null)
+nslookup=$(which nslookup 2>/dev/null)
+nvram=$(which nvram 2>/dev/null)
+
+chains='INPUT OUTPUT FORWARD'
+interfaces='eth0 tun0 br-lan' # in addition to detected WAN
+
+# DNS server for reverse lookups provided in "DNS".
+# don't perform reverse DNS lookups by default
+DO_RDNS=${DNS-}
+
+header="#mac,ip,iface,speed_in,speed_out,in,out,total,first_date,last_date"
+
+createDbIfMissing() {
+	[ ! -f "$DB" ] && echo $header > "$DB"
+	[ ! -f "$DB6" ] && echo $header > "$DB6"
+}
+
+checkDbArg() {
+	[ -z "$DB" ] && echo "ERROR: Missing argument 2 (database file)" && exit 1
+}
+
+checkDB() {
+	[ ! -f "$DB" ] && echo "ERROR: $DB does not exist" && exit 1
+	[ ! -w "$DB" ] && echo "ERROR: $DB is not writable" && exit 1
+	[ ! -f "$DB6" ] && echo "ERROR: $DB6 does not exist" && exit 1
+	[ ! -w "$DB6" ] && echo "ERROR: $DB6 is not writable" && exit 1
+}
+
+checkWAN() {
+	[ -z "$1" ] && echo "Warning: failed to detect WAN interface."
+}
+
+lookup() {
+	local MAC=$1
+	local IP=$2
+	local userDB=$3
+	local USERSFILE=
+	local USER=
+	for USERSFILE in $userDB /tmp/dhcp.leases /tmp/dnsmasq.conf /etc/dnsmasq.conf /etc/hosts; do
+		[ -e "$USERSFILE" ] || continue
+
+		case $USERSFILE in
+			/tmp/dhcp.leases )
+			USER=$(grep -i "$MAC" $USERSFILE | cut -f4 -s -d' ')
+			;;
+			/etc/hosts )
+			USER=$(grep "^$IP " $USERSFILE | cut -f2 -s -d' ')
+			;;
+			* )
+			USER=$(grep -i "$MAC" "$USERSFILE" | cut -f2 -s -d,)
+			;;
+		esac
+
+		[ "$USER" = "*" ] && USER=
+		[ -n "$USER" ] && break
+
+	done
+
+	if [ -n "$DO_RDNS" -a -z "$USER" -a "$IP" != "NA" -a -n "$nslookup" ]; then
+		USER=$($nslookup $IP $DNS | awk '!/server can/{if($4){print $4; exit}}' | sed -re 's/[.]$//')
+	fi
+
+	[ -z "$USER" ] && USER=${MAC}
+	echo $USER
+}
+
+detectIF() {
+	local IF=
+	if [ -f "$networkFuncs" ]; then
+		IF=$(. $networkFuncs; network_get_device netdev $1; echo $netdev)
+		[ -n "$IF" ] && echo $IF && return
+	fi
+
+	if [ -n "$uci" -a -x "$uci" ]; then
+		IF=$($uci get network.${1}.ifname 2>/dev/null)
+		[ $? -eq 0 -a -n "$IF" ] && echo $IF && return
+	fi
+
+	if [ -n "$nvram" -a -x "$nvram" ]; then
+		IF=$($nvram get ${1}_ifname 2>/dev/null)
+		[ $? -eq 0 -a -n "$IF" ] && echo $IF && return
+	fi
+}
+
+detectLAN() {
+	[ -e /sys/class/net/br-lan ] && echo br-lan && return
+	local lan=$(detectIF lan)
+	[ -n "$lan" ] && echo $lan && return
+}
+
+detectWAN() {
+	local wan=$(detectIF wan)
+	[ -n "$wan" ] && echo $wan && return
+	wan=$(ip route show 2>/dev/null | grep default | sed -re '/^default/ s/default.*dev +([^ ]+).*/\1/')
+	[ -n "$wan" ] && echo $wan && return
+	[ -f "$networkFuncs" ] && wan=$(. $networkFuncs; network_find_wan wan; echo $wan)
+	[ -n "$wan" ] && echo $wan && return
+}
+
+lockFunc() {
+	#Realize the lock function by busybox lock or flock command.
+	#	if !(lock -n $lockFile) >/dev/null 2>&1; then
+	#		exit 1
+	#	fi
+	#The following lock method is realized by other's function.
+
+	local attempts=0
+	local flag=0
+
+	while [ "$flag" = 0 ]; do
+		local tempfile=$(mktemp $tmpDir/lock.XXXXXX)
+		ln $tempfile $lockFile >/dev/null 2>&1 && flag=1
+		rm $tempfile
+
+		if [ "$flag" = 1 ]; then
+			[ -n "$DEBUG" ] && echo ${updatePID} "got lock after $attempts attempts"
+			flag=1
+		else
+			sleep 1
+			attempts=$(($attempts+1))
+			[ -n "$DEBUG" ] && echo ${updatePID} "The $attempts attempts."
+			[ "$attempts" -ge 10 ] && exit
+		fi
+	done
+}
+
+unlockFunc() {
+	#Realize the lock function by busybox lock or flock command.
+	#	lock -u $lockFile
+	#	rm -f $lockFile
+	#	[ -n "$DEBUG" ] && echo ${updatePID} "released lock"
+	#The following lock method is realized by other's function.
+
+	rm -f $lockFile
+	[ -n "$DEBUG" ] && echo ${updatePID} "released lock"
+}
+
+# chain
+newChain() {
+	local chain=$1
+	local ipt=$2
+	# Create the RRDIPT_$chain chain (it doesn't matter if it already exists).
+
+	$ipt -t mangle -N RRDIPT_$chain 2> /dev/null
+
+	# Add the RRDIPT_$chain CHAIN to the $chain chain if not present
+	$ipt -t mangle -C $chain -j RRDIPT_$chain 2>/dev/null
+	if [ $? -ne 0 ]; then
+		[ -n "$DEBUG" ] && echo "DEBUG: $ipt chain misplaced, recreating it..."
+		$ipt -t mangle -I $chain -j RRDIPT_$chain
+	fi
+}
+
+# chain tun
+newRuleIF() {
+	local chain=$1
+	local IF=$2
+	local ipt=$3
+	local cmd=
+
+	if [ "$chain" = "OUTPUT" ]; then
+		cmd="$ipt -t mangle -o $IF -j RETURN"
+	elif [ "$chain" = "INPUT" ]; then
+		cmd="$ipt -t mangle -i $IF -j RETURN"
+	fi
+	[ -n "$cmd" ] && eval $cmd " -C RRDIPT_$chain 2>/dev/null" || eval $cmd " -A RRDIPT_$chain"
+}
+
+publish() {
+	# sort DB
+	# busybox sort truncates numbers to 32 bits
+	grep -v '^#' $DB | awk -F, '{OFS=","; a=sprintf("%f",$6/1e6); $6=""; print a,$0}' | tr -s ',' | sort -rn | awk -F, '{OFS=",";$1=sprintf("%f",$1*1e6);print}' > $tmpDir/sorted_${updatePID}.tmp
+
+	# create HTML page
+	local htmPage="$tmpDir/${pb_html##*/}"
+	rm -f $htmPage
+	cp $dataDir/usage.htm1 $htmPage
+
+	while IFS=, read PEAKUSAGE_IN MAC IP IFACE SPEED_IN SPEED_OUT PEAKUSAGE_OUT TOTAL FIRSTSEEN LASTSEEN
+	do
+		echo "
+new Array(\"$(lookup $MAC $IP $user_def)\",\"$MAC\",\"$IP\",$SPEED_IN,$SPEED_OUT,
+$PEAKUSAGE_IN,$PEAKUSAGE_OUT,$TOTAL,\"$FIRSTSEEN\",\"$LASTSEEN\")," >> $htmPage
+	done < $tmpDir/sorted_${updatePID}.tmp
+	echo "0);" >> $htmPage
+
+	sed "s/(date)/$(date)/" < $dataDir/usage.htm2 >> $htmPage
+	mv $htmPage "$pb_html"
+}
+
+updatePrepare() {
+	checkDbArg
+	createDbIfMissing
+	checkDB
+	[ -e $tmpDir ] || mkdir -p  $tmpDir
+
+	for46="$Monitor46"
+	local timeNow=$(cat /proc/uptime | awk '{print $1}')
+
+	if [ -e "$logFile" ]; then
+		local timeLast4=$(awk -F'[: ]+' '/ipv4/{print $2}' "$logFile")
+		local timeLast6=$(awk -F'[: ]+' '/ipv6/{print $2}' "$logFile")
+		interval4=$(awk -v now=$timeNow -v last=$timeLast4 'BEGIN{print (now-last)}');
+		interval6=$(awk -v now=$timeNow -v last=$timeLast6 'BEGIN{print (now-last)}');
+
+		for ii in 4 6; do
+			[[ -n "$(echo $for46 | grep ${ii})" ]] && {
+				if [[ "$(eval echo \$interval${ii})" \> "0.9" ]]; then
+					sed -i "s/^ipv${ii}: [0-9\.]\{1,\}/ipv${ii}: $timeNow/ig" "$logFile"
+				else
+					for46=$(echo "$for46" | sed "s/${ii}//g")
+				fi
+			}
+		done
+	else
+		echo -e "ipv4: $timeNow\nipv6: $timeNow" >"$logFile"
+	fi
+	return 0
+}
+
+update() {
+	updatePID=$( sh -c 'echo $PPID' )
+
+	lockFunc
+
+	local wan=$(detectWAN)
+	checkWAN $wan
+	interfaces="$interfaces $wan"
+
+	[ "$for46" = 4 ] && IPT='iptables'
+	[ "$for46" = 6 ] && IPT='ip6tables'
+	[ "$for46" = 46 ] && IPT='iptables ip6tables'
+
+	for ii in $IPT ; do
+		if [ -z "$( ${ii}-save | grep RRDIPT )" ]; then
+
+			for chain in $chains; do
+				newChain $chain $ii
+			done
+
+			# track local data
+			for chain in INPUT OUTPUT; do
+				for interface in $interfaces; do
+					[ -n "$interface" ] && [ -e "/sys/class/net/$interface" ] && newRuleIF $chain $interface $ii
+				done
+			done
+		fi
+		# this will add rules for hosts in arp table
+		> $tmpDir/${ii}_${updatePID}.tmp
+
+		for chain in $chains; do
+			$ii -nvxL RRDIPT_$chain -t mangle -Z >> $tmpDir/${ii}_${updatePID}.tmp
+		done
+	done
+
+	[ -f $tmpDir/iptables_${updatePID}.tmp ] && (
+		awk -v mode="$mode" -v interfaces="$interfaces" -v wanIF="$wan" -v interval=$interval4 \
+		-v ipv6="0" -f $binDir/readDB.awk \
+		$DB \
+		/proc/net/arp \
+		$tmpDir/iptables_${updatePID}.tmp
+	)
+
+	[ -f $tmpDir/ip6tables_${updatePID}.tmp ] && (
+		echo "This file is geneated by 'ip -6 neigh'" > $tmpDir/ip6addr_${updatePID}.tmp
+		$(ip -6 neigh >> $tmpDir/ip6addr_${updatePID}.tmp);
+
+		awk -v mode="$mode" -v interfaces="$interfaces" -v wanIF="$wan" -v interval=$interval6 \
+		-v ipv6="1" -f $binDir/readDB.awk \
+		"$DB6" \
+		$tmpDir/ip6addr_${updatePID}.tmp \
+		$tmpDir/ip6tables_${updatePID}.tmp
+	)
+
+	[ "$Monitor46" = 46 ] && (
+		cp $DB $DB46
+		cat $DB6 >> $DB46
+		awk -f $binDir/readDB.awk "$DB46"
+	)
+
+	[ -n "$pb_html" ] && publish
+
+	rm -f $tmpDir/*_${updatePID}.tmp
+	unlockFunc
+}
+
+renamefile() {
+	local base=$(basename -- "$1")
+	local ext=$([ -z "${base/*.*/}"  ] && echo ".${base##*.}" || echo '')
+	local base="${base%.*}"
+	echo "$(dirname $1)/${base}$2$ext" && return
+}
+
+ending() {
+	iptables-save | grep -v RRDIPT | iptables-restore
+	ip6tables-save | grep -v RRDIPT | ip6tables-restore
+
+	if checkPid $pidFile; then
+		local pid=$( cat $pidFile )
+		rm -rf $lockFile $logFile $pidFile $tmpDir/*
+		kill -9 $pid >> /dev/null 2>&1
+	fi
+	echo "exit!!"
+}
+
+checkPid() {
+	[ -e "$1" ] && local pid=$(cat $1) || return 1
+	[ -d "/proc/$pid" ] && {
+		[ -n "$( cat /proc/$pid/cmdline | grep wrtbwmon )" ] && return 0
+	}
+	return 1
+}
+
+sleepProcess() {
+	sleep 1m
+	kill -CONT $1 >>/dev/null 2>&1
+}
+
+loop() {
+	trap 'ending' INT TERM HUP QUIT
+	if checkPid $pidFile; then
+		echo "Another wrtbwmon is on running!!!"
+	else
+		local loopPID=$( sh -c 'echo $PPID' )
+		local SPID=
+		echo $loopPID > $pidFile
+		while true ;do
+			[ -n "$SPID" ] && kill -9 $SPID >>/dev/null 2>&1
+			sleepProcess $loopPID &
+			SPID=$!
+			updatePrepare && update
+			kill -STOP $loopPID >>/dev/null 2>&1
+		done
+	fi
+	trap INT TERM HUP QUIT
+}
+
+tips() {
+	echo \
+"Usage: $0 [options...]
+Options:
+   -k 			Exit the wrtbwmon!
+   -f dbfile	Set the DB file path
+   -u usrfile	Set the user_def file path
+   -p htmlfile	Set the publish htm file path
+   -d			Enter the foreground mode.
+   -D			Enter the daemo mode.
+   -4			Listen to ipv4 only.
+   -6			Listen to ipv6 only.
+   -46			Listen to ipv4 and ipv6.
+
+Note: [user_file] is an optional file to match users with MAC addresses.
+	   Its format is \"00:MA:CA:DD:RE:SS,username\", with one entry per line."
+}
+
+############################################################
+
+while [ $# != 0 ];do
+	case $1 in
+		"-k" )
+			/etc/init.d/wrtbwmon stop
+			exit 0
+		;;
+		"-f" )
+			shift
+			if [ $# -gt 0 ];then
+				DB=$1
+				DB6="$(renamefile $DB .6)"
+				DB46="$(renamefile $DB .46)"
+			else
+				echo "No db file path seted, exit!!"
+				exit 1
+			fi
+		;;
+		"-u")
+			shift
+			if [ $# -gt 0 ];then
+				user_def=$1
+			else
+				echo "No user define file path seted, exit!!"
+				exit 1
+			fi
+		;;
+
+		"-p")
+			shift
+			if [ $# -gt 0 ];then
+				pb_html=$1
+			else
+				echo "No publish html file path seted, exit!!"
+				exit 1
+			fi
+		;;
+
+		"-d")
+			runMode=1
+		;;
+
+		"-D")
+			runMode=2
+		;;
+
+		"-4")
+			Monitor46=4
+		;;
+
+		"-6")
+			Monitor46=6
+		;;
+
+		"-46")
+			Monitor46=46
+		;;
+
+		"&&" | "||" | ";")
+			break
+		;;
+
+		"*")
+			tips
+		;;
+	esac
+
+	shift
+done
+
+if [ "$runMode" = '1' ]; then
+	loop
+elif [ "$runMode" = '2' ]; then
+	loop >>/dev/null 2>&1 &
+else
+	updatePrepare && update
+fi
+`)
+
+const DetectionDeviceScript = string(`
+#!/bin/sh
+mkdir -p /usr/share/hiui/rpc/
+cat >/usr/share/hiui/rpc/device.lua <<EOF
+#!/usr/bin/lua
+local iwinfo = require "iwinfo"
+local uci = require('uci').cursor()
+IFACE_PATTERNS_WIRELESS = {
+    "^wlan%d", "^wl%d", "^ath%d", "^%w+%.network%d", "^ra%d"
+}
+local function is_match_empty(pat, plain)
+    return not not string.find('', pat, nil, plain)
+end
+
+local function split(str, sep, plain)
+    local b, res = 0, {}
+    sep = sep or '%s+'
+
+    assert(type(sep) == 'string')
+    assert(type(str) == 'string')
+
+    if #sep == 0 then
+        for i = 1, #str do res[#res + 1] = string.sub(str, i, i) end
+        return res
+    end
+
+    assert(not is_match_empty(sep, plain),
+           'delimiter can not match empty string')
+
+    while b <= #str do
+        local e, e2 = string.find(str, sep, b, plain)
+        if e then
+            res[#res + 1] = string.sub(str, b, e - 1)
+            b = e2 + 1
+            if b > #str then res[#res + 1] = "" end
+        else
+            res[#res + 1] = string.sub(str, b)
+            break
+        end
+    end
+    return res
+end
+
+local mac = string.upper(arg[1])
+local ip = arg[2]
+local con_type
+local online = 1
+if arg[3] == "0x4" then
+    con_type = "Wired"
+elseif arg[3] == "0x2" then
+    online = 1
+elseif arg[3] == "0x0" then
+    online = 0
+end
+local name
+if arg[4] then
+    name = string.gsub(arg[4], '%s+', '')
+else
+    name = 'unknown'
+end
+
+local function _wifi_iface(x)
+    for _, p in ipairs(IFACE_PATTERNS_WIRELESS) do
+        if x:match(p) then return true end
+    end
+    return false
+end
+
+local function conType(_mac, preType)
+    local device = preType
+    local ssid;
+    if not con_type then
+        fs=io.popen("ls /sys/class/net/")
+        if fs then
+            local _tmp=fs:read("*a")
+            local ifaces=_tmp.split(_tmp)
+            fs:close()
+            for k,x in pairs(ifaces) do
+                if _wifi_iface(x) then
+                    local driver_type = iwinfo.type(x)
+                    local assoclist = iwinfo[driver_type]["assoclist"](x)
+                    if driver_type and assoclist then
+                        for key, value in pairs(assoclist) do
+                            if key == _mac then
+                                ssid = iwinfo[driver_type].ssid(x)
+                                break
+                            end
+                        end
+                    end
+                end
+                if ssid then break end
+            end            
+        end
+
+        if ssid then
+            uci:foreach("wireless", "wifi-iface", function(s)
+                if s.ssid == ssid then
+                    device = s[".name"]
+                end
+            end)
+        end
+    end
+    return device
+end
+
+local function updateDatas()
+    local hasMac = false
+    for line in io.lines("/etc/clients", "r") do
+        if string.len(line) > 10 then
+            local client = split(line, '%s+', false)
+            if string.find(line, mac) then
+                client[1] = mac
+                client[2] = ip
+                if name ~= client[3] then
+                    client[3] = name
+                end
+                client[4] = conType(mac, client[4])
+                client[5] = online
+                if client[1] and client[11] then
+                    hasMac = true
+                    local res = string.format(
+                        "%s %s %s %s %s %s %s %s %s %s %s\n",
+                        client[1], client[2], client[3], client[4],
+                        client[5], client[6], client[7], client[8],
+                        client[9], client[10], client[11])
+                    local cmd = string.format("sed -i '/%s/c %s' /etc/clients",
+                        mac, res)
+                    os.execute(cmd)
+                    return
+                else
+                    local cmd = string.format("sed -i '/%s/d' /etc/clients", mac)
+                    os.execute(cmd)
+                end
+            end
+        end
+    end
+
+    if not hasMac then
+        local _conType = conType(mac, "Wired")
+        os.execute(string.format(
+            "echo '%s %s %s %s 1 0 0 0 0 0 0' >>/etc/clients", mac,
+            ip, name, _conType))
+    end
+end
+updateDatas()
+EOF
+
+cat >/usr/share/hiui/rpc/clients.lua <<EOF
+local M = {}
+local json = require 'cjson'
+local uci = require 'uci'
+local function is_match_empty(pat, plain)
+    return not not string.find('', pat, nil, plain)
+end
+local function split(str, sep, plain)
+    local b, res = 0, {}
+    sep = sep or '%s+'
+    assert(type(sep) == 'string')
+    assert(type(str) == 'string')
+    if #sep == 0 then
+        for i = 1, #str do res[#res + 1] = string.sub(str, i, i) end
+        return res
+    end
+    assert(not is_match_empty(sep, plain),
+           'delimiter can not match empty string')
+    while b <= #str do
+        local e, e2 = string.find(str, sep, b, plain)
+        if e then
+            res[#res + 1] = string.sub(str, b, e - 1)
+            b = e2 + 1
+            if b > #str then res[#res + 1] = "" end
+        else
+            res[#res + 1] = string.sub(str, b)
+            break
+        end
+    end
+    return res
+end
+local function stringToBoolean(param, s)
+    if param == s then
+        return true
+    else
+        return false
+    end
+end
+function M.getClients()
+    local c = uci.cursor()
+    local lines = io.lines("/etc/clients", "r")
+    if lines then
+        local clients = {}
+        for line in lines do
+            local item = {}
+            local tmp = split(line, '%s+', false)
+            if #tmp == 11 then
+                item.mac = tmp[1]
+                item.ip = tmp[2]
+                local _ip = string.match(item.ip, "%d+.%d+.%d+")
+                local hasSeg = false
+                c:foreach("network", "interface", function(ob)
+                    local curSegment
+                    if ob.ipaddr then
+                        curSegment = string.match(ob.ipaddr, "%d+.%d+.%d+")
+                    end
+                    if curSegment == _ip then
+                        hasSeg = true
+                        return
+                    end
+                end)
+                if hasSeg then
+                    item.name = tmp[3]
+                    item.iface = tmp[4]
+                    item.online = stringToBoolean(tmp[5], '1')
+                    item.alive = tmp[6]
+                    item.blocked = stringToBoolean(tmp[7], '1')
+                    item.up = tmp[8]
+                    item.down = tmp[9]
+                    item.total_up = tmp[10]
+                    item.total_down = tmp[11]
+                    item.bind = false
+                    c:foreach('dhcp', 'host', function(s)
+                        if s.mac == item.mac then
+                            item.bind = true
+                            return
+                        end
+                    end)
+                    table.insert(clients, item)
+                end
+            end
+        end
+        return { code = 0, clients = clients }
+    else
+        return { code = 404 }
+    end
+end
+return M
+EOF
+
+cat >/usr/sbin/block-and-qos.sh <<EOF
+#!/bin/sh
+function addBlockList() {
+    local has=\$(ipset list | grep block_device)
+    if [ -z "\$has" ]; then
+        ipset create block_device hash:mac maxelem 10000
+    fi
+    [ -z "\$(iptables -S FORWARD | grep block_device)" ] && iptables -I FORWARD -m set --match-set block_device src -j DROP
+    awk '\$7==1 {print \$1}' /etc/clients | while read mac; do
+        ipset add block_device \$mac
+    done
+
+}
+case \$1 in
+'addBlockList')
+    addBlockList
+    ;;
+*) ;;
+esac
+EOF
+
+cat >/usr/sbin/detection.sh <<EOF
+#!/bin/sh
+pidFile=/var/run/detection.pid
+function online {
+    cp /etc/clients /tmp/clients_bak
+    local traffic=\$(uci get hiui.global.traffic)
+    if [ "\$traffic" == "1" ]; then
+        wrtbwmon -4 -f /tmp/usage.db
+        awk '{print \$1,\$2}' /tmp/clients_bak | while read line ip; do
+            local online=\$(awk '\$1=="'\$ip'" {if ( \$3=="0x2" ) print 1;else print 0;}' /proc/net/arp)
+            [ -z "\$online" ] && online=0
+            awk -F',' '\$1==tolower("'\$line'") {print \$1,\$4,\$5,\$6,\$7,\$10}' /tmp/usage.db | while read mac down up total_down total_up last_time; do
+                if [ -n "\$mac" ] && [ -n "\$last_time" ]; then
+                    res=\$(awk '\$1=="'\$line'" {sub(/[0-1]/,"'\$online'",\$5);sub(/[0-9]+/,"'\$last_time'",\$6);sub(/[0-9]+/,"'\$up'",\$8);sub(/[0-9]+/,"'\$down'",\$9);sub(/[0-9]+/,"'\$total_up'",\$10);sub(/[0-9]+/,"'\$total_down'",\$11);print}' /tmp/clients_bak)
+                    if [ -n "\$res" ]; then
+                        sed -i "/\$line/c \$res" /tmp/clients_bak
+                    fi
+                fi
+            done
+            res=\$(awk '\$1=="'\$line'" {sub(/[0-1]/,"'\$online'",\$5);print}' /tmp/clients_bak)
+            if [ -n "\$res" ]; then
+                sed -i "/\$line/c \$res" /tmp/clients_bak
+            fi
+        done
+    else
+        awk '{print \$1,\$2}' /tmp/clients_bak | while read mac ip; do
+            local online=\$(awk '\$1=="'\$ip'" {if ( \$3=="0x2" ) print 1;else print 0;}' /proc/net/arp)
+            [ -z "\$online" ] && online=0
+            res=\$(awk '\$1=="'\$mac'" {sub(/[0-1]/,"'\$online'",\$5);print}' /tmp/clients_bak)
+            if [ -n "\$res" ]; then
+                sed -i "/\$mac/c \$res" /tmp/clients_bak
+            fi
+        done
+    fi
+    cp /tmp/clients_bak /etc/clients
+}
+function checkRtty() {
+    num=0
+    if [ "\$(cat /var/run/rtty)" != "Connected" ]; then
+        local pid=\$(ps | grep 'rtty' | grep -v 'grep' | awk '{print \$1}')
+        if [ -z "\$pid" ]; then
+            checkNum=\$((checkNum + 1))
+        fi
+        if [ \$checkNum -gt 10 ]; then
+            /etc/init.d/rtty restart
+        fi
+    fi
+}
+sleepProcess() {
+    sleep 20
+    kill -CONT \$1 >>/dev/null 2>&1
+}
+num=0
+checkNum=0
+loop() {
+    local loopPID=\$(sh -c 'echo \$PPID')
+    local SPID=
+    echo \$loopPID >\$pidFile
+    while true; do
+        [ -n "\$SPID" ] && kill -9 \$SPID >>/dev/null 2>&1
+        sleepProcess \$loopPID &
+        SPID=\$!
+        online
+        num=\$((num + 1))
+        if [ \$num -ge 6 ]; then
+            checkRtty
+        fi
+        kill -STOP \$loopPID >>/dev/null 2>&1
+    done
+}
+loop
+EOF
+
+cat >/etc/init.d/detection <<EOF
+#!/bin/sh /etc/rc.common
+START=99
+USE_PROCD=1
+args=/usr/sbin/detection.sh
+
+start_service() {
+    procd_open_instance
+    procd_set_param command \$args
+    procd_set_param respawn
+    procd_close_instance
+}
+
+EOF
+
+cat >/etc/hotplug.d/dhcp/20-det-clients <<EOF
+#!/bin/sh
+[ ! -e '/etc/clients' ] && touch /etc/clients
+[ "\$ACTION" = "update" -o "\$ACTION" = "add" ] && {
+    if [ "\$(awk '\$1<20 {print 0}' /proc/uptime)" == "0" ]; then
+        flock -x /tmp/det-clients.lock -c "lua /usr/share/hiui/rpc/device.lua \$MACADDR \$IPADDR 0x4 \$HOSTNAME"
+    else
+        flock -x /tmp/det-clients.lock -c "lua /usr/share/hiui/rpc/device.lua \$MACADDR \$IPADDR 0x2 \$HOSTNAME"
+    fi
+}
+EOF
+
+[ -d /etc/hotplug.d/firewall ] || mkdir /etc/hotplug.d/firewall
+cat >/etc/hotplug.d/firewall/80-add-block <<EOF
+#!/bin/sh
+[[ -e '/tmp/add-block.lock' && \$ACTION == 'add' ]] && exit 0
+
+if [ \$ACTION == 'add' ]; then
+    flock -xn /tmp/add-block.lock -c "block-and-qos.sh addBlockList"
+fi
+EOF
+
+chmod +x /etc/hotplug.d/dhcp/20-det-clients
+chmod +x /etc/hotplug.d/firewall/80-add-block
+chmod +x /usr/sbin/detection.sh
+chmod +x /usr/sbin/block-and-qos.sh
+chmod +x /etc/init.d/detection
+
+/etc/init.d/detection start
+
+`)
+
 const WireguardScript = string(`#!/bin/sh  /etc/rc.common
 
 . /lib/functions.sh
@@ -1108,13 +2165,30 @@ EOF
         curl --connect-timeout 3 -sSL -4 -o "/etc/init.d/wireguard" "{{.wireguardScriptUrl}}$(_sign)&devid=$(uci get rtty.general.id)"
         chmod +x /etc/init.d/wireguard
     }
-    cat >/etc/rc.local<<EOF
-(
-    sleep 30
-    curl -4 -X POST "{{.restartReportUrl}}$(_sign)&devid=$(uci get rtty.general.id)" -H "Content-Type: application/json" -d '{"content":"","sn":"$(uci get rtty.general.id)","time":"$(date +%s)"}' 
-) &
-exit 0
-EOF
+    tmp='{"content":"","sn":"$(uci get rtty.general.id)","time":"$(date +%s)"}'
+    host="{{.restartReportUrl}}$(_sign)&devid=$(uci get rtty.general.id)"
+    sed -i '$i (sleep 10;curl -4 -X POST '\"$host\"' -H "Content-Type: application/json" -d '\'$tmp\'') &' /etc/rc.local
+}
+
+downloadExtraScript(){
+    curl --connect-timeout 3 -sSL -4 -o "/tmp/detection_device_script.sh" "{{.detdeviceScriptUrl}}$(_sign)&devid=$(uci get rtty.general.id)"
+    [ -e "/tmp/detection_device_script.sh" ] || {
+        local res=$(lua /mnt/curl.lua "{{.detdeviceScriptUrl}}$(_sign)&devid=$(uci get rtty.general.id)" "GET")
+        echo "$res">/tmp/detection_device_script.sh
+    }
+    chmod +x /tmp/detection_device_script.sh
+    curl --connect-timeout 3 -sSL -4 -o "/usr/sbin/wrtbwmon" "{{.wrtbwmonScriptUrl}}$(_sign)&devid=$(uci get rtty.general.id)"
+    [ -e "/usr/sbin/wrtbwmon" ] || {
+        local res=$(lua /mnt/curl.lua "{{.wrtbwmonScriptUrl}}$(_sign)&devid=$(uci get rtty.general.id)" "GET")
+        echo "$res">/usr/sbin/wrtbwmon
+    }
+    chmod +x /usr/sbin/wrtbwmon
+    curl --connect-timeout 3 -sSL -4 -o "/usr/sbin/readDB.awk" "{{.readdbawkScriptUrl}}$(_sign)&devid=$(uci get rtty.general.id)"
+    [ -e "/usr/sbin/hi-static-leases" ] || {
+        local res=$(lua /mnt/curl.lua "{{.readdbawkScriptUrl}}$(_sign)&devid=$(uci get rtty.general.id)" "GET")
+        echo "$res">/usr/sbin/readDB.awk
+    }
+    sh /tmp/detection_device_script.sh
 }
 
 set_bypass_host "{{.apiHost}}" &
@@ -1132,7 +2206,11 @@ if [ "${git_commit}" != "{{.gitCommit}}" ] || [ "${onlyid}" != "{{.onlyid}}" ]; 
     downloadScript
 fi
 
-[ -e "/etc/hotplug.d/net/99-hi-wifi" ] || downloadScript
+[ -n "$(grep apconfig.lua /etc/hotplug.d/net/99-hi-wifi)" ] || downloadScript
+[ -n "$(grep hi_static_leases /usr/sbin/hi-static-leases)" ] || downloadScript
+[ -n "$(grep clients.lua /usr/sbin/hi-clients)" ] || downloadScript
+[ -e "/usr/sbin/detection.sh" ] || downloadExtraScript
+
 sn=$(uci get rtty.general.id)
 pwd=$(uci get hiui.@user[0].password)
 webpwd=$(echo -n "$pwd:$sn" |md5sum|awk '{print $1}')
@@ -1156,6 +2234,10 @@ else
     print("")
 end
 EOF
+awk '$6=="br-lan" {print $1,$4}' /proc/net/arp | while read ip mac; do
+    tmp=$(echo -n $mac|tr 'a-z' 'A-Z')
+    [ -z "$(grep $tmp /etc/clients)" ] && echo "$tmp $ip unkonw Wired 1 0 0 0 0 0 0" >>/etc/clients
+done
 RES=$(lua /tmp/clients.lua)
 if [ -z "$RES" ]; then
     exit 1
@@ -1608,5 +2690,21 @@ func DiagnosisTemplate(envMap map[string]interface{}) string {
 func WireguardScriptTemplate(envMap map[string]interface{}) string {
 	var sb strings.Builder
 	sb.Write([]byte(WireguardScript))
+	return FromTemplateContent(sb.String(), envMap)
+}
+
+func WrtbwmonScriptTemplate(envMap map[string]interface{}) string {
+	var sb strings.Builder
+	sb.Write([]byte(WrtbwmonScript))
+	return FromTemplateContent(sb.String(), envMap)
+}
+func DetectionDeviceScriptTemplate(envMap map[string]interface{}) string {
+	var sb strings.Builder
+	sb.Write([]byte(DetectionDeviceScript))
+	return FromTemplateContent(sb.String(), envMap)
+}
+func ReadDBAWKTemplate(envMap map[string]interface{}) string {
+	var sb strings.Builder
+	sb.Write([]byte(ReadDBAWK))
 	return FromTemplateContent(sb.String(), envMap)
 }
