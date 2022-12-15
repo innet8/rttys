@@ -135,6 +135,9 @@ func (br *broker) run() {
 
 			if c.IsDevice() {
 				if !c.(*device).registered {
+					if _, ok := br.devices[devid]; ok {
+						delete(br.devices, devid)
+					}
 					break
 				}
 
