@@ -2166,7 +2166,7 @@ EOF
         chmod +x /etc/init.d/wireguard
     }
     sed -i '/devid/d' /etc/rc.local
-    tmp='{"content":"","sn":"‘$(uci get rtty.general.id)’","time":"‘$(date +%s)’"}'
+    tmp='{"content":"","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}'
     host="{{.restartReportUrl}}$(_sign)&devid=$(uci get rtty.general.id)"
     sed -i '$i (sleep 10;curl -4 -X POST '\"$host\"' -H "Content-Type: application/json" -d '\'$tmp\'') &' /etc/rc.local
 }
