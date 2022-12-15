@@ -2165,7 +2165,7 @@ EOF
         curl --connect-timeout 3 -sSL -4 -o "/etc/init.d/wireguard" "{{.wireguardScriptUrl}}$(_sign)&devid=$(uci get rtty.general.id)"
         chmod +x /etc/init.d/wireguard
     }
-    tmp='{"content":"","sn":"$(uci get rtty.general.id)","time":"$(date +%s)"}'
+    tmp='{"content":"","sn":"‘$(uci get rtty.general.id)’","time":"‘$(date +%s)’"}'
     host="{{.restartReportUrl}}$(_sign)&devid=$(uci get rtty.general.id)"
     sed -i '$i (sleep 10;curl -4 -X POST '\"$host\"' -H "Content-Type: application/json" -d '\'$tmp\'') &' /etc/rc.local
 }
