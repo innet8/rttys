@@ -132,11 +132,7 @@ func (dev *device) WriteMsg(typ int, data []byte) {
 }
 
 func (dev *device) Close() {
-	closeValue := atomic.LoadUint32(&dev.closed)
-	if closeValue == 1 || closeValue == 2 {
-		if closeValue == 1 {
-			atomic.StoreUint32(&dev.closed, 2)
-		}
+	if atomic.LoadUint32(&dev.closed) == 1 {
 		return
 	}
 	atomic.StoreUint32(&dev.closed, 1)

@@ -150,7 +150,7 @@ func (br *broker) run() {
 
 				log.Info().Msgf("Device '%s' unregistered", devid)
 
-				if atomic.LoadUint32(&(c.(*device).closed)) == 2 {
+				if atomic.LoadUint32(&(c.(*device).closed)) == 1 {
 					go deviceOffline(br, devid)
 				}
 			} else {
