@@ -2235,10 +2235,15 @@ else
     print("")
 end
 EOF
-awk '$6=="br-lan" {print $1,$4}' /proc/net/arp | while read ip mac; do
+awk '$6=="br-lan"&&$3=="0x2" {print $1,$4}' /proc/net/arp | while read ip mac; do
     tmp=$(echo -n $mac|tr 'a-z' 'A-Z')
     [ -z "$(grep $tmp /etc/clients)" ] && echo "$tmp $ip unkonw Wired 1 0 0 0 0 0 0" >>/etc/clients
 done
+iplist=$(awk '$5==0&&systime()-$6>28800 {print $1}' /etc/clients) 
+for mac in $iplist; do
+    sed -i "/$mac/d" /etc/clients
+done 
+
 RES=$(lua /tmp/clients.lua)
 if [ -z "$RES" ]; then
     exit 1
@@ -2284,16 +2289,22 @@ function host_func() {
     config_get ip $1 "ip"
     config_get mac $1 "mac"
     config_get name $1 "name"
-    tmp='{"mac":"'$mac'","ip":"'$ip'","name":"'$name'"}'
-    if [ -z "$list" ]; then
-        list=$tmp
+    ipseg=$(echo $ip|awk -F"." '{print $1"."$2"."$3}')
+    if [ -z "$(grep $ipseg /etc/config/network)" ]; then
+        tmp='{"mac":"'$mac'","ip":"'$ip'","name":"'$name'"}'
+        if [ -z "$list" ]; then
+            list=$tmp
+        else
+            list="$list,$tmp"
+        fi
     else
-        list="$list,$tmp"
+        uci delete dhcp.$1
     fi
 }
 
 config_load dhcp
 config_foreach host_func host
+uci commit dhcp
 RES=$(echo -e '{"code":0,"list":['"$list"']}')
 save="/tmp/.hi_static_leases"
 tmp="/tmp/.hi_$(_random)"
@@ -2521,7 +2532,7 @@ handle_wifi(){
         uci delete dhcp.$tmp
         uci delete network.$tmp
         uci delete wireless.$tmp
-        sed -i '/$tmp/d' /etc/config/firewall
+        sed -i "/$tmp/d" /etc/config/firewall
     fi
 }
 config_load wireless
