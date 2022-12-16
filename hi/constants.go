@@ -2290,7 +2290,7 @@ function host_func() {
     config_get mac $1 "mac"
     config_get name $1 "name"
     ipseg=$(echo $ip|awk -F"." '{print $1"."$2"."$3}')
-    if [ -z "$(grep $ipseg /etc/config/network)" ]; then
+    if [ -n "$(grep $ipseg /etc/config/network)" ]; then
         tmp='{"mac":"'$mac'","ip":"'$ip'","name":"'$name'"}'
         if [ -z "$list" ]; then
             list=$tmp
