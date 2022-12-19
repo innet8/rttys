@@ -2425,16 +2425,15 @@ const SpeedtestContent = string(`
 #!/bin/sh
 . /usr/share/libubox/jshn.sh
 json_init
-if [ -z $(ps | grep '[s]peedtest_cpp' | awk '{print $1}') ]; then
-    speedtest_cpp --output json >/tmp/speedtest
-    json_load "$(cat /tmp/speedtest)"
-    json_add_string "sn" "$(uci get rtty.general.id)"
-    json_add_int "code" "0"
-    result=$(json_dump)
-else
-    sn=$(uci get rtty.general.id)
-    result='{"code":1,"msg":"Do not repeat the speedtest","sn":"'$sn'"}'
+speedpid=$(ps | grep '[s]peedtest_cpp' | awk '{print $1}')
+if [ ! -z "${speedpid}" ]; then
+	kill -9 ${speedpid} >>/dev/null 2>&1 
 fi
+speedtest_cpp --output json >/tmp/speedtest
+json_load "$(cat /tmp/speedtest)"
+json_add_string "sn" "$(uci get rtty.general.id)"
+json_add_int "code" "0"
+result=$(json_dump)
 curl -4 -X POST {{.callurl}} -H 'Content-Type: application/json' -d "${result}"
 [ "$?" != "0" ] && lua /mnt/curl.lua "{{.callurl}}" "POST" "$result"
 `)
