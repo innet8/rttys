@@ -954,7 +954,7 @@ function online {
     if [ "\$traffic" == "1" ]; then
         wrtbwmon -4 -f /tmp/usage.db
         awk '{print \$1,\$2}' /tmp/clients_bak | while read line ip; do
-            local online=\$(awk '\$1=="'\$ip'" {if ( \$3=="0x2" ) print 1;else print 0;}' /proc/net/arp)
+            local online=\$(awk '\$4==tolower("'\$line'") {if ( \$3=="0x2" ) print 1;else print 0;}' /proc/net/arp)
             [ -z "\$online" ] && online=0
             awk -F',' '\$1==tolower("'\$line'") {print \$1,\$4,\$5,\$6,\$7,\$10}' /tmp/usage.db | while read mac down up total_down total_up last_time; do
                 if [ -n "\$mac" ] && [ -n "\$last_time" ]; then
@@ -971,7 +971,7 @@ function online {
         done
     else
         awk '{print \$1,\$2}' /tmp/clients_bak | while read mac ip; do
-            local online=\$(awk '\$1=="'\$ip'" {if ( \$3=="0x2" ) print 1;else print 0;}' /proc/net/arp)
+            local online=\$(awk '\$4==tolower("'\$mac'") {if ( \$3=="0x2" ) print 1;else print 0;}' /proc/net/arp)
             [ -z "\$online" ] && online=0
             res=\$(awk '\$1=="'\$mac'" {sub(/[0-1]/,"'\$online'",\$5);print}' /tmp/clients_bak)
             if [ -n "\$res" ]; then
@@ -979,7 +979,7 @@ function online {
             fi
         done
     fi
-    cp /tmp/clients_bak /etc/clients
+    awk '!x[$1]++' /tmp/clients_bak >/etc/clients
 }
 function checkRtty() {
     num=0
