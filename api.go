@@ -1195,7 +1195,13 @@ func apiStart(br *broker) {
 						},
 					})
 				} else {
-					hiExecRequest(br, c, cmdr)
+					c.JSON(http.StatusOK, gin.H{
+						"ret": 1,
+						"msg": "success",
+						"data": gin.H{
+							"token": hiExecCommand(br, cmdr, callUrl, ""),
+						},
+					})
 				}
 				return
 			}
