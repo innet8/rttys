@@ -1261,13 +1261,25 @@ func apiStart(br *broker) {
 		callUrl := jsoniter.Get(content, "call_url").ToString()
 		path := jsoniter.Get(content, "path").ToString()
 		if action == "ipk" {
-			c.JSON(http.StatusOK, gin.H{
-				"ret": 1,
-				"msg": "success",
-				"data": gin.H{
-					"token": hiDeviceIpkUpgrade(br, devid, path, callUrl),
-				},
-			})
+			report := fmt.Sprintf("%s/hi/base/report/version", br.cfg.HiApiUrl)
+			cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.IpkUpgradeCmd(path,report))
+			if terr != nil {
+				c.JSON(http.StatusOK, gin.H{
+					"ret": 0,
+					"msg": "创建执行任务失败",
+					"data": gin.H{
+						"error": terr.Error(),
+					},
+				})
+			} else {
+				c.JSON(http.StatusOK, gin.H{
+					"ret": 1,
+					"msg": "success",
+					"data": gin.H{
+						"token": hiExecCommand(br, cmdr, callUrl, ""),
+					},
+				})
+			}
 			return
 		}
 		if action == "firmware" {

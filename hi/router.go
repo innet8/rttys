@@ -36,12 +36,11 @@ type DeleteWifiModal struct {
 	Wifinets []string `json:"wifinet"`
 }
 
-func IpkUpgradeCmd(path string) string {
-	var cmds []string
-	cmds = append(cmds, "#!/bin/sh")
-	cmds = append(cmds, fmt.Sprintf("curl -4 -s -o /tmp/software.ipk '%s' >/dev/null", path))
-	cmds = append(cmds, "opkg install /tmp/software.ipk")
-	return strings.Join(cmds, "\n")
+func IpkUpgradeCmd(remotePath string, verUrl string) string {
+	var envMap = make(map[string]interface{})
+	envMap["remotePath"] = remotePath
+	envMap["verUrl"] = verUrl
+	return IpkRemoteUpgradeTemplate(envMap)
 }
 
 func FirmwareUpgradeCmd(path string) string {

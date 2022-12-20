@@ -334,20 +334,6 @@ func hiDeviceFirmwareUpgrade(br *broker, devid string, path string, callback str
 	return hiExecBefore(br, db, devid, hi.FirmwareUpgradeCmd(path), callback)
 }
 
-// ipk软件升级
-func hiDeviceIpkUpgrade(br *broker, devid string, path string, callback string) string {
-	if len(br.cfg.HiApiUrl) == 0 {
-		log.Info().Msgf("api url is empty")
-		return ""
-	}
-	db, err := hi.InstanceDB(br.cfg.DB)
-	if err != nil {
-		return ""
-	}
-	defer closeDB(db)
-	return hiExecBefore(br, db, devid, hi.IpkUpgradeCmd(path), callback)
-}
-
 // 执行之前
 func hiExecBefore(br *broker, db *gorm.DB, devid, cmd, callback string) string {
 	onlyid := devidGetOnlyid(br, devid)
