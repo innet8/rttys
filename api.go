@@ -1711,7 +1711,8 @@ func apiStart(br *broker) {
 
 		versionType := jsoniter.Get(content, "type").ToString()
 		description := jsoniter.Get(content, "description").ToString()
-		if versionType != "firmware" && versionType != "ipk" {
+
+		if !hi.InArray(versionType, []string{"firmware", "ipk", "rtty"}) {
 			c.JSON(http.StatusOK, gin.H{
 				"ret":  0,
 				"msg":  "版本类型错误",
