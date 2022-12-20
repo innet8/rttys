@@ -709,11 +709,11 @@ func apiStart(br *broker) {
 
 	})
 
-	// 上报接口 action=dhcp|wifi|static_leases|restarted
+	// 上报接口 action=dhcp|wifi|static_leases|restarted|version
 	r.POST("/hi/base/report/:action", func(c *gin.Context) {
 		action := c.Param("action")
 
-		if !hi.InArray(action, []string{"dhcp", "wifi", "static_leases", "restarted", "webpwd"}) {
+		if !hi.InArray(action, []string{"dhcp", "wifi", "static_leases", "restarted", "webpwd", "version"}) {
 			c.Status(http.StatusBadRequest)
 			return
 		}
@@ -742,25 +742,12 @@ func apiStart(br *broker) {
 			return
 		}
 
-		// 更新固件、web版本信息
-		if action == "dhcp" {
+		// 更新固件、web、rtty版本信息
+		if action == "dhcp" || action == "version" {
 			ver := jsoniter.Get(content, "ver").ToString()
 			webVer := jsoniter.Get(content, "webVer").ToString()
-			if ver != "" || webVer != "" {
-				var deviceData hi.DeviceModel
-				db.Table("hi_device").Where(map[string]interface{}{
-					"devid": devid,
-				}).Last(&deviceData)
-				if deviceData.ID != 0 {
-					if ver != "" {
-						deviceData.Version = ver
-					}
-					if webVer != "" {
-						deviceData.WebVersion = webVer
-					}
-					db.Table("hi_device").Save(&deviceData)
-				}
-			}
+			rttyVer := jsoniter.Get(content, "rttyVer").ToString()
+			hiDeviceSaveVersion(br, devid, ver, webVer, rttyVer)
 		}
 		// web密码
 		if action == "webpwd" {
@@ -776,7 +763,7 @@ func apiStart(br *broker) {
 				}
 			}
 		}
-
+		// 上报重启
 		if action == "restarted" {
 			var deviceData hi.DeviceModel
 			db.Table("hi_device").Where(map[string]interface{}{
@@ -1262,7 +1249,7 @@ func apiStart(br *broker) {
 		path := jsoniter.Get(content, "path").ToString()
 		if action == "ipk" {
 			report := fmt.Sprintf("%s/hi/base/report/version", br.cfg.HiApiUrl)
-			cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.IpkUpgradeCmd(path,report))
+			cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.IpkUpgradeCmd(path, report))
 			if terr != nil {
 				c.JSON(http.StatusOK, gin.H{
 					"ret": 0,

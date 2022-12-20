@@ -2254,7 +2254,8 @@ else
     version=$(cat /etc/openwrt_release|grep DISTRIB_RELEASE |awk -F'=' '{gsub(/\047/,""); print $2}')
 fi
 webVer=$(awk '/hiui-ui-core/ {getline;print $2}' /usr/lib/opkg/status)
-tmp='{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'","ver":"'$version'","webVer":"'$webVer'"}'
+rttyVer=$(awk '/rtty-openssl/ {getline;print $2}' /usr/lib/opkg/status)
+tmp='{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'","ver":"'$version'","webVer":"'$webVer'","rttyVer":"'$rttyVer'"}'
 echo -n $tmp | curl -4 -X POST "{{.reportUrl}}$(_sign)" -H "Content-Type: application/json" -d @-
 [ "$?" != "0" ] && lua /mnt/curl.lua "{{.reportUrl}}$(_sign)" "POST" $tmp
 `)
@@ -2579,9 +2580,8 @@ fi
 echo '{"code":1,"msg":"ping task start"}'
 `)
 
-
 const IpkRemoteUpgrade = string(`
-#!/bin/sh
+
 rm -rf /tmp/ipk
 curl -s -o /tmp/ipk.zip {{.remotePath}} && mkdir -p /tmp/ipk
 unzip /tmp/ipk.zip -d /tmp/ipk
@@ -2597,8 +2597,9 @@ if [ -e "/tmp/ipk/success" ]; then
     webVer=$(awk '/hiui-ui-core/ {getline;print $2}' /usr/lib/opkg/status)
     rttyVer=$(awk '/rtty-openssl/ {getline;print $2}' /usr/lib/opkg/status)
     tmp='{"content":"","sn":"'$(uci get rtty.general.id)'","ver":"'$version'","webVer":"'$webVer'","rttyVer":"'$rttyVer'"}'
-    curl -4 -X POST "{{.verUrl}}" -H "Content-Type: application/json" -d $tmp
-    [ "$?" != "0" ] && lua /mnt/curl.lua "{{.verUrl}}" "POST" $tmp
+	host="{{.verUrl}}$(_sign)"
+    curl -4 -X POST "$host" -H "Content-Type: application/json" -d $tmp
+    [ "$?" != "0" ] && lua /mnt/curl.lua "$host" "POST" $tmp
 fi
 `)
 
@@ -2744,6 +2745,6 @@ func ReadDBAWKTemplate(envMap map[string]interface{}) string {
 }
 func IpkRemoteUpgradeTemplate(envMap map[string]interface{}) string {
 	var sb strings.Builder
-	sb.Write([]byte(IpkRemoteUpgrade))
+	sb.Write([]byte(fmt.Sprintf("%s\n%s", CommonUtilsContent, IpkRemoteUpgrade)))
 	return FromTemplateContent(sb.String(), envMap)
 }

@@ -27,6 +27,7 @@ type DeviceModel struct {
 	Description string `json:"description"`
 	Version     string `json:"version"`
 	WebVersion  string `json:"web_version"`
+	RttyVersion string `json:"rtty_version"`
 	Online      uint32 `json:"online"`
 	BindOpenid  string `json:"bind_openid"`
 	ReportUrl   string `json:"report_url"`

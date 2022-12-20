@@ -653,3 +653,28 @@ func hiExecWifiTask(br *broker, devid string) {
 		db.Table("hi_wifi_task").Save(&pendingTask)
 	}
 }
+
+// hiDeviceSaveVersion 保存版本信息
+func hiDeviceSaveVersion(br *broker, devid, ver, webVer, rttyVer string) {
+	db, err := hi.InstanceDB(br.cfg.DB)
+	if err != nil {
+		return
+	}
+	defer closeDB(db)
+	var deviceData hi.DeviceModel
+	db.Table("hi_device").Where(map[string]interface{}{
+		"devid": devid,
+	}).Last(&deviceData)
+	if deviceData.ID != 0 {
+		if ver != "" {
+			deviceData.Version = ver
+		}
+		if webVer != "" {
+			deviceData.WebVersion = webVer
+		}
+		if rttyVer != "" {
+			deviceData.RttyVersion = rttyVer
+		}
+		db.Table("hi_device").Save(&deviceData)
+	}
+}
