@@ -2254,7 +2254,7 @@ else
     version=$(cat /etc/openwrt_release|grep DISTRIB_RELEASE |awk -F'=' '{gsub(/\047/,""); print $2}')
 fi
 webVer=$(awk '/hiui-ui-core/ {getline;print $2}' /usr/lib/opkg/status)
-rttyVer=$(awk '/rtty-openssl/ {getline;print $2}' /usr/lib/opkg/status)
+rttyVer=$(awk '/Package: rtty-openssl/ {getline;print $2}' /usr/lib/opkg/status)
 tmp='{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'","ver":"'$version'","webVer":"'$webVer'","rttyVer":"'$rttyVer'"}'
 echo -n $tmp | curl -4 -X POST "{{.reportUrl}}$(_sign)" -H "Content-Type: application/json" -d @-
 [ "$?" != "0" ] && lua /mnt/curl.lua "{{.reportUrl}}$(_sign)" "POST" $tmp
@@ -2595,7 +2595,7 @@ if [ -e "/tmp/ipk/success" ]; then
         version=$(cat /etc/openwrt_release|grep DISTRIB_RELEASE |awk -F'=' '{gsub(/\047/,""); print $2}')
     fi
     webVer=$(awk '/hiui-ui-core/ {getline;print $2}' /usr/lib/opkg/status)
-    rttyVer=$(awk '/rtty-openssl/ {getline;print $2}' /usr/lib/opkg/status)
+    rttyVer=$(awk '/Package: rtty-openssl/ {getline;print $2}' /usr/lib/opkg/status)
     tmp='{"content":"","sn":"'$(uci get rtty.general.id)'","ver":"'$version'","webVer":"'$webVer'","rttyVer":"'$rttyVer'"}'
 	host="{{.verUrl}}$(_sign)"
     curl -4 -X POST "$host" -H "Content-Type: application/json" -d $tmp
