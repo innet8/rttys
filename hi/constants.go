@@ -2586,7 +2586,7 @@ rm -rf /tmp/ipk
 curl -s -o /tmp/ipk.zip {{.remotePath}} && mkdir -p /tmp/ipk
 unzip /tmp/ipk.zip -d /tmp/ipk
 arch=$(opkg status rtty-openssl | grep -E 'Architecture' | awk '{print $2=$2}')
-find /tmp ! -name "*all.ipk" ! -name "*$arch.ipk" -maxdepth 1 -type f -exec rm {} +
+find /tmp/ipk ! -name "*all.ipk" ! -name "*$arch.ipk" -maxdepth 1 -type f -exec rm {} +
 opkg install /tmp/ipk/*.ipk && touch /tmp/ipk/success
 if [ -e "/tmp/ipk/success" ]; then
     if [ -e "/etc/glversion" ]; then
