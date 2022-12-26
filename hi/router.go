@@ -47,7 +47,7 @@ func FirmwareUpgradeCmd(path string) string {
 	var cmds []string
 	cmds = append(cmds, "#!/bin/sh")
 	cmds = append(cmds, fmt.Sprintf("curl -4 -s -o /tmp/firmware.img '%s' >/dev/null", path))
-	cmds = append(cmds, "sysupgrade /tmp/firmware.img -y")
+	cmds = append(cmds, "sysupgrade /tmp/firmware.img ")
 	return strings.Join(cmds, "\n")
 }
 
