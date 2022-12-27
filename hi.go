@@ -439,7 +439,11 @@ func hiExecRequest(br *broker, c *gin.Context, cmdr *hi.CmdrModel) {
 
 	_, ok := br.devices[cmdr.Devid]
 	if !ok {
-		cmdErrReply(rttyCmdErrOffline, req)
+		if req.c != nil {
+			cmdErrReply(rttyCmdErrOffline, req)
+		} else {
+			req.cancel()
+		}
 		return
 	}
 
