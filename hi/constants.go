@@ -983,12 +983,12 @@ function online {
 }
 function checkRtty() {
     num=0
-    if [ "\$(cat /var/run/rtty)" != "Connected" ]; then
+    if [ "\$(cat /var/run/rtty)" != "Connected" ] || [ -z "$(ps | grep 'rtty' | grep -v 'grep')" ]; then
         local pid=\$(ps | grep 'rtty' | grep -v 'grep' | awk '{print \$1}')
         if [ -z "\$pid" ]; then
             checkNum=\$((checkNum + 1))
         fi
-        if [ \$checkNum -gt 10 ]; then
+        if [ \$checkNum -gt 2 ]; then
             /etc/init.d/rtty restart
         fi
     fi
