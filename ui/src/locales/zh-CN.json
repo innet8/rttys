@@ -67,5 +67,7 @@
   "Delete success": "删除成功",
   "Delete offline devices": "删除离线设备",
   "There are no offline devices in selected devices": "所选设备中无离线设备",
-  "Invalid address": "无效的地址"
+  "Invalid address": "无效的地址",
+  "Copy - Ctrl+C": "复制 - Ctrl+C",
+  "Paste - Ctrl+V": "粘贴 - Ctrl+V"
 }

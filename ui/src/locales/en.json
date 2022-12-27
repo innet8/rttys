@@ -66,5 +66,7 @@
   "Delete success": "Delete success",
   "Delete offline devices": "Delete offline devices",
   "There are no offline devices in selected devices": "There are no offline devices in selected devices",
-  "Invalid address": "Invalid address"
+  "Invalid address": "Invalid address",
+  "Copy - Ctrl+C": "Copy - Ctrl+C",
+  "Paste - Ctrl+V": "Paste - Ctrl+V"
 }

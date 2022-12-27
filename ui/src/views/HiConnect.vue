@@ -41,8 +41,8 @@ export default {
     data() {
         return {
             contextmenus: [
-                {name: 'copy', caption: this.$t('Copy - Ctrl+Insert')},
-                {name: 'paste', caption: this.$t('Paste - Shift+Insert')},
+                {name: 'copy', caption: this.$t('Copy - Ctrl+C')},
+                {name: 'paste', caption: this.$t('Paste - Ctrl+V')},
                 {name: 'clear', caption: this.$t('Clear Scrollback')},
                 {name: 'font+', caption: this.$t('Font Size+')},
                 {name: 'font-', caption: this.$t('Font Size-')}
@@ -194,19 +194,18 @@ export default {
             const overlayAddon = new OverlayAddon();
             term.loadAddon(overlayAddon);
 
-            this.term.attachCustomKeyEventHandler((e) => {
-                const keyArray = ['F5', 'F11', 'F12']
+            term.attachCustomKeyEventHandler((e) => {
+                const keyArray = ['F5', 'F11', 'F12'];
                 if (keyArray.indexOf(e.key) > -1) {
-                    return false
+                    return false;
                 }
                 if (e.ctrlKey) {
                     if (e.key === 'v') {
-                        document.execCommand('copy')
-                        return false
-                    }
-                    else if (e.key === 'c' && terminal.term.hasSelection()) {
-                        document.execCommand('copy')
-                        return false
+                        document.execCommand('copy');
+                        return false;
+                    } else if (e.key === 'c' && term.hasSelection()) {
+                        document.execCommand('copy');
+                        return false;
                     }
                 }
             });
