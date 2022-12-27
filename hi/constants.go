@@ -979,7 +979,7 @@ function online {
             fi
         done
     fi
-    awk '!x[$1]++' /tmp/clients_bak >/etc/clients
+    awk '!x[\$1]++' /tmp/clients_bak >/etc/clients
 }
 function checkRtty() {
     num=0
