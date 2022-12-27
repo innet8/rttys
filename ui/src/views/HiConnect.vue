@@ -194,6 +194,23 @@ export default {
             const overlayAddon = new OverlayAddon();
             term.loadAddon(overlayAddon);
 
+            this.term.attachCustomKeyEventHandler((e) => {
+                const keyArray = ['F5', 'F11', 'F12']
+                if (keyArray.indexOf(e.key) > -1) {
+                    return false
+                }
+                if (e.ctrlKey) {
+                    if (e.key === 'v') {
+                        document.execCommand('copy')
+                        return false
+                    }
+                    else if (e.key === 'c' && terminal.term.hasSelection()) {
+                        document.execCommand('copy')
+                        return false
+                    }
+                }
+            });
+
             term.open(this.$refs['terminal']);
             term.focus();
 
