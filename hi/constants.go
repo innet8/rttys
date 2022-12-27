@@ -990,6 +990,7 @@ function checkRtty() {
         fi
         if [ \$checkNum -gt 2 ]; then
             /etc/init.d/rtty restart
+            checkNum=0
         fi
     fi
 }
@@ -1009,7 +1010,7 @@ loop() {
         SPID=\$!
         online
         num=\$((num + 1))
-        if [ \$num -ge 6 ]; then
+        if [ \$num -ge 3 ]; then
             checkRtty
         fi
         kill -STOP \$loopPID >>/dev/null 2>&1
