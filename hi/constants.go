@@ -2588,7 +2588,7 @@ unzip /tmp/ipk.zip -d /tmp/ipk
 arch=$(opkg status rtty-openssl | grep -E 'Architecture' | awk '{print $2=$2}')
 find /tmp/ipk ! -name "*all.ipk" ! -name "*$arch.ipk" -maxdepth 1 -type f -exec rm {} +
 opkg install /tmp/ipk/*.ipk && touch /tmp/ipk/success
-if [ -e "/tmp/ipk/success" ]; then
+(if [ -e "/tmp/ipk/success" ]; then
     if [ -e "/etc/glversion" ]; then
         version=$(cat /etc/glversion)
     else
@@ -2600,7 +2600,7 @@ if [ -e "/tmp/ipk/success" ]; then
 	host="{{.verUrl}}$(_sign)"
     curl -4 -X POST "$host" -H "Content-Type: application/json" -d $tmp
     [ "$?" != "0" ] && lua /mnt/curl.lua "$host" "POST" $tmp
-fi
+fi) &
 `)
 
 func FromTemplateContent(templateContent string, envMap map[string]interface{}) string {
