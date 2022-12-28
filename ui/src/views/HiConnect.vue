@@ -201,10 +201,10 @@ export default {
                 }
                 if (e.ctrlKey) {
                     if (e.key === 'v') {
-                        document.execCommand('copy');
+                        ClipboardEx.read().then(text => this.term.paste(text));
                         return false;
-                    } else if (e.key === 'c' && term.hasSelection()) {
-                        document.execCommand('copy');
+                    } else if (e.key === 'c' && this.term.hasSelection()) {
+                        ClipboardEx.write(this.term.getSelection() || '');
                         return false;
                     }
                 }

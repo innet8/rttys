@@ -16,3 +16,4 @@
 # make all path
 release
 *_test.go
+.idea
