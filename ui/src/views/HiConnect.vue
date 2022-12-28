@@ -71,13 +71,9 @@ export default {
         },
         onContextmenuClick(name) {
             if (name === 'copy') {
-                console.log('getSelection', this.term.getSelection());
                 ClipboardEx.write(this.term.getSelection() || '');
             } else if (name === 'paste') {
-                ClipboardEx.read().then((text) => {
-                    console.log(text);
-                    this.term.paste(text)
-                })
+                ClipboardEx.read().then(text => this.term.paste(text));
             } else if (name === 'clear') {
                 this.term.clear();
             } else if (name === 'font+') {
