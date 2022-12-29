@@ -981,16 +981,34 @@ function online {
     fi
     awk '!x[\$1]++' /tmp/clients_bak >/etc/clients
 }
+sbNum=0
+function sb() {
+    if [ "\$(cat /var/run/rtty)" == "Connected" ]; then
+        rm -f /mnt/rtty_reboot
+    fi
+    if [ "\$(cat /var/run/rtty)" != "Connected" ] && [ "\$(cat /mnt/rtty_reboot)" != "reboot" ]; then
+        sbNum=\$((sbNum + 1))
+        echo \$sbNum >/mnt/rtty_reboot
+    fi
+    if [ "\$(cat /mnt/rtty_reboot)" == "3" ]; then
+        echo "reboot" >/mnt/rtty_reboot
+        reboot
+    fi
+    if [ "\$(cat /mnt/rtty_reboot)" == "reboot" ]; then
+        local host=\$(awk '\$2=="#hi-th-api#" {print \$1}' /etc/dnsmasq.conf | awk -F'/' '{print \$2}')
+        tmp='{"content":"","sn":"'\$(uci get rtty.general.id)'","time":"'\$(date +%s)'"}'
+        curl -4 -X POST "https://\$host/hi/base/report/rtty_error" -H "Content-Type: application/json" -d \$tmp
+        [ "\$?" != "0" ] && lua /mnt/curl.lua "https://\$host/hi/base/report/rtty_error" "POST" \$tmp
+    fi
+}
 function checkRtty() {
     num=0
-    if [ "\$(cat /var/run/rtty)" != "Connected" ] || [ -z "$(ps | grep 'rtty' | grep -v 'grep')" ]; then
-        local pid=\$(ps | grep 'rtty' | grep -v 'grep' | awk '{print \$1}')
-        if [ -z "\$pid" ]; then
-            checkNum=\$((checkNum + 1))
-        fi
+    if [ -z "$(ps | grep 'rtty' | grep -v 'grep')" ]; then
+        checkNum=\$((checkNum + 1))
         if [ \$checkNum -gt 2 ]; then
             /etc/init.d/rtty restart
             checkNum=0
+            sb
         fi
     fi
 }

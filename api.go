@@ -736,6 +736,16 @@ func apiStart(br *broker) {
 		result := hi.ApiResultCheck(hi.Base64Decode(resultContent))
 		devid := jsoniter.Get(content, "sn").ToString()
 		rtime := jsoniter.Get(content, "time").ToUint32()
+		// 上报重启
+		if action == "rtty_error" {
+			var deviceData hi.DeviceModel
+			db.Table("hi_device").Where(map[string]interface{}{
+				"devid": devid,
+			}).Last(&deviceData)
+			hiReport(br, deviceData, "rtty_error", "")
+			c.String(http.StatusOK, "success")
+			return
+		}
 
 		if !verifySign(c, db, devid) {
 			c.Status(http.StatusBadRequest)
