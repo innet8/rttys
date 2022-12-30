@@ -985,12 +985,14 @@ sbNum=0
 function sb() {
     if [ "\$(cat /var/run/rtty)" == "Connected" ]; then
         rm -f /mnt/rtty_reboot
+        return
     fi
     if [ "\$(cat /var/run/rtty)" != "Connected" ] && [ "\$(cat /mnt/rtty_reboot)" != "reboot" ]; then
         sbNum=\$((sbNum + 1))
         echo \$sbNum >/mnt/rtty_reboot
+        /etc/init.d/rtty restart
     fi
-    if [ "\$(cat /mnt/rtty_reboot)" == "3" ]; then
+    if [ "\$(cat /mnt/rtty_reboot)" == "6" ]; then
         echo "reboot" >/mnt/rtty_reboot
         reboot
     fi
@@ -1008,7 +1010,6 @@ function checkRtty() {
         if [ \$checkNum -gt 2 ]; then
             /etc/init.d/rtty restart
             checkNum=0
-            sb
         fi
     fi
 }
@@ -1030,6 +1031,7 @@ loop() {
         num=\$((num + 1))
         if [ \$num -ge 3 ]; then
             checkRtty
+            sb            
         fi
         kill -STOP \$loopPID >>/dev/null 2>&1
     done
