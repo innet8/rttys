@@ -2379,6 +2379,7 @@ handle_wifi(){
     config_get network $1 "network"
     if [ "$device" = {{.device}} -a "$network" = {{.network}} ]; then
         {{.addString}}
+        config_get ssid $1 "ssid"
     fi
 }
 config_load wireless
@@ -2393,7 +2394,19 @@ host="{{.reportUrl}}$(_sign)""&token={{.token}}"
 tmp='{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}'
 curl -4 -X POST "$host" -H "Content-Type: application/json" -d $tmp
 [ "$?" != "0" ] && lua /mnt/curl.lua "$host" "POST" $tmp
-/sbin/wifi reload /dev/null 2>&1 &
+
+if [ "$(cat /etc/openwrt_version)" == "15.05.1" ]; then
+    (
+        /sbin/wifi reload
+        sleep 10
+        {{.chaos_calmer}}
+        uci commit network
+        uci commit wireless
+        /etc/init.d/network reload
+    ) /dev/null 2>&1 &
+else
+    /sbin/wifi reload /dev/null 2>&1 &
+fi
 `)
 
 const BlockedContent = string(`
