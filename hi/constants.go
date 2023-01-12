@@ -2501,6 +2501,8 @@ wifi reload
 if [ "$(cat /etc/openwrt_version)" == "15.05.1" ]; then
     sleep 20
     {{.chaos_calmer}}
+else
+    {{.openwrt}}
 fi
 uci commit network
 uci commit wireless
