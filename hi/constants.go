@@ -1945,9 +1945,9 @@ nameserver {{.dns_server}}
 nameserver 8.8.8.8
 nameserver 8.8.4.4
 EOE
-[ "\$ACTION" = "ifup" ] && [ "\$INTERFACE" = "lan" ] && {
+if [ "\$ACTION" = "ifup" ] && [ "\$INTERFACE" = "lan" ]; then
     /etc/init.d/rtty restart
-}
+fi
 EOF
     chmod +x ${hotdnsqFile}
     ${hotdnsqFile}
@@ -2438,7 +2438,9 @@ RES=$(lua /tmp/clients.lua)
 sn=$(uci get rtty.general.id)
 tmp='{"content":"'$(_base64e "$RES")'","sn":"'$sn'","time":"'$(date +%s)'"}'
 curl -4 -X POST "{{.reportUrl}}$(_sign)" -H "Content-Type: application/json" -d $tmp
-[ "$?" != "0" ] && lua /mnt/curl.lua "{{.reportUrl}}$(_sign)" "POST" $tmp
+if [ "$?" != "0" ];then
+    lua /mnt/curl.lua "{{.reportUrl}}$(_sign)" "POST" $tmp
+fi
 `)
 
 const GetVersionContent = string(`
@@ -2554,7 +2556,9 @@ RES=$(lua /tmp/apconfig.lua)
 host="{{.reportUrl}}$(_sign)""&token={{.token}}"
 tmp='{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}'
 curl -4 -X POST "$host" -H "Content-Type: application/json" -d $tmp
-[ "$?" != "0" ] && lua /mnt/curl.lua "$host" "POST" $tmp
+if [ "$?" != "0" ]; then
+    lua /mnt/curl.lua "$host" "POST" $tmp
+fi
 `)
 
 const DelAllCustomWifi = string(`
@@ -2622,7 +2626,7 @@ unzip /tmp/ipk.zip -d /tmp/ipk
 arch=$(opkg status rtty-openssl | grep -E 'Architecture' | awk '{print $2=$2}')
 find /tmp/ipk ! -name "*all.ipk" ! -name "*$arch.ipk" -maxdepth 1 -type f -exec rm {} +
 opkg install /tmp/ipk/*.ipk && touch /tmp/ipk/success
-(if [ -e "/tmp/ipk/success" ]; then
+if [ -e "/tmp/ipk/success" ]; then
     if [ -e "/etc/glversion" ]; then
         version=$(cat /etc/glversion)
     else
@@ -2634,7 +2638,8 @@ opkg install /tmp/ipk/*.ipk && touch /tmp/ipk/success
 	host="{{.verUrl}}$(_sign)"
     curl -4 -X POST "$host" -H "Content-Type: application/json" -d $tmp
     [ "$?" != "0" ] && lua /mnt/curl.lua "$host" "POST" $tmp
-fi) &
+    echo "success"
+fi
 `)
 
 func FromTemplateContent(templateContent string, envMap map[string]interface{}) string {
