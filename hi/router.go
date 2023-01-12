@@ -151,6 +151,9 @@ func EditWifiCmd(wifi WifiModel, reportUrl, token string) string {
 	if wifi.Disabled != "" {
 		cmds = append(cmds, fmt.Sprintf("uci set wireless.$1.disabled=%s", wifi.Disabled))
 	}
+	if wifi.Device != "" {
+		cmds = append(cmds, fmt.Sprintf("uci set wireless.$1.device=%s", wifi.Device))
+	}
 	chaos_calmer = append(chaos_calmer, "device=$(cat $(grep -l \"ssid=${ssid}$\" /var/run/*.conf ) | awk -F= '$1==\"interface\" {print $2}')")
 	chaos_calmer = append(chaos_calmer, fmt.Sprintf("uci set network.%s.ifname=$device", wifi.Name))
 	chaos_calmer = append(chaos_calmer, fmt.Sprintf("uci set wireless.%s.ifname=$device", wifi.Name))
@@ -158,7 +161,6 @@ func EditWifiCmd(wifi WifiModel, reportUrl, token string) string {
 	envMap["addString"] = strings.Join(cmds, "\n")
 	envMap["chaos_calmer"] = strings.Join(chaos_calmer, "\n")
 	envMap["name"] = wifi.Name
-	envMap["device"] = wifi.Device
 	envMap["reportUrl"] = reportUrl
 	envMap["token"] = token
 	return EditWifiTemplate(envMap)
