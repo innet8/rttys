@@ -157,8 +157,8 @@ func EditWifiCmd(wifi WifiModel, reportUrl, token string) string {
 	var envMap = make(map[string]interface{})
 	envMap["addString"] = strings.Join(cmds, "\n")
 	envMap["chaos_calmer"] = strings.Join(chaos_calmer, "\n")
+	envMap["name"] = wifi.Name
 	envMap["device"] = wifi.Device
-	envMap["network"] = wifi.Network
 	envMap["reportUrl"] = reportUrl
 	envMap["token"] = token
 	return EditWifiTemplate(envMap)
