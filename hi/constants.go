@@ -2375,16 +2375,10 @@ if [ -e "/var/run/delwifi.lock" ] || [ -e "/var/run/addwifi.lock" ]; then
     exit 1
 fi
 handle_wifi(){
-    config_get device $1 "device"
-    config_get network $1 "network"
-    if [ "$device" = {{.device}} -a "$network" = {{.network}} ]; then
-        {{.addString}}
-        config_get ssid $1 "ssid"
-    fi
+    {{.addString}}
+    ssid=$(uci get wireless.$1.ssid)
 }
-config_load wireless
-config_foreach handle_wifi wifi-iface
-{{.ex}}
+handle_wifi {{.name}}
 uci commit wireless
 _base64e() {
     echo -n "$1" | base64 | tr -d "\n"
@@ -2403,9 +2397,9 @@ if [ "$(cat /etc/openwrt_version)" == "15.05.1" ]; then
         uci commit network
         uci commit wireless
         /etc/init.d/network reload
-    ) /dev/null 2>&1 &
+    ) >/dev/null 2>&1 &
 else
-    /sbin/wifi reload /dev/null 2>&1 &
+    /sbin/wifi reload >/dev/null 2>&1 &
 fi
 `)
 

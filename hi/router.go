@@ -13,6 +13,7 @@ type StaticLeasesModel struct {
 }
 
 type WifiModel struct {
+	Name       string `json:".name"`
 	Device     string `json:"device"`
 	Ssid       string `json:"ssid"`
 	Key        string `json:"key"`
@@ -134,7 +135,6 @@ func ApiResultCheck(result string) string {
 // EditWifiCmd wifi修改
 func EditWifiCmd(wifi WifiModel, reportUrl, token string) string {
 	var cmds []string
-	var ex []string
 	var chaos_calmer []string
 	if wifi.Ssid != "" {
 		cmds = append(cmds, fmt.Sprintf("uci set wireless.$1.ssid=%s", wifi.Ssid))
@@ -148,18 +148,14 @@ func EditWifiCmd(wifi WifiModel, reportUrl, token string) string {
 	if wifi.Hidden != "" {
 		cmds = append(cmds, fmt.Sprintf("uci set wireless.$1.hidden=%s", wifi.Hidden))
 	}
-	if wifi.Channel != "" {
-		ex = append(ex, fmt.Sprintf("uci set wireless.%s.channel=%s", wifi.Device, wifi.Channel))
-	}
 	if wifi.Disabled != "" {
 		cmds = append(cmds, fmt.Sprintf("uci set wireless.$1.disabled=%s", wifi.Disabled))
 	}
 	chaos_calmer = append(chaos_calmer, "device=$(cat $(grep -l \"ssid=${ssid}$\" /var/run/*.conf ) | awk -F= '$1==\"interface\" {print $2}')")
-	chaos_calmer = append(chaos_calmer, fmt.Sprintf("uci set network.%s.ifname=$device", wifi.Network))
-	chaos_calmer = append(chaos_calmer, fmt.Sprintf("uci set wireless.%s.ifname=$device", wifi.Network))
+	chaos_calmer = append(chaos_calmer, fmt.Sprintf("uci set network.%s.ifname=$device", wifi.Name))
+	chaos_calmer = append(chaos_calmer, fmt.Sprintf("uci set wireless.%s.ifname=$device", wifi.Name))
 	var envMap = make(map[string]interface{})
 	envMap["addString"] = strings.Join(cmds, "\n")
-	envMap["ex"] = strings.Join(ex, "\n")
 	envMap["chaos_calmer"] = strings.Join(chaos_calmer, "\n")
 	envMap["device"] = wifi.Device
 	envMap["network"] = wifi.Network
