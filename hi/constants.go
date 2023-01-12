@@ -1791,9 +1791,9 @@ wireguard_start() {
     uci commit wireguard
     if [ -n "$(wg)" ]; then
         if [ -z "$(grep -rn wireguard_wan /etc/config/firewall)" ]; then
-            /etc/init.d/wireguard restart
+            /etc/init.d/wireguard restart >/dev/null 2>&1
         else
-            [ "$(wireguard_hotup)" = "no" ] && /etc/init.d/wireguard downup
+            [ "$(wireguard_hotup)" = "no" ] && /etc/init.d/wireguard downup >/dev/null 2>&1
         fi
         wireguard_confirm downup
     else
@@ -1802,7 +1802,7 @@ wireguard_start() {
         fi
         uci set wireguard.@proxy[0].enable="1"
         uci commit wireguard
-        /etc/init.d/wireguard start
+        /etc/init.d/wireguard start >/dev/null 2>&1
         wireguard_confirm start
     fi
 }
@@ -1811,11 +1811,11 @@ wireguard_confirm() {
     (
         sleep 5
         if [ -z "$(wg)" ]; then
-            /etc/init.d/wireguard $1
+            /etc/init.d/wireguard $1 >/dev/null 2>&1
         else
             local endpoint=$(uci get wireguard.@peers[0].end_point | awk -F':' '{print $1}')
             if [ -z "$(route -n |grep $endpoint)" ]; then
-                /etc/init.d/wireguard downup
+                /etc/init.d/wireguard downup >/dev/null 2>&1
             fi
         fi
     ) >/dev/null 2>&1 &
