@@ -164,10 +164,10 @@ func EditWifiCmd(wifi WifiModel, reportUrl, token string) string {
 	return EditWifiTemplate(envMap)
 }
 
-func SpeedtestCmd(callurl string) string {
+func SpeedTestCmd(callurl string) string {
 	var envMap = make(map[string]interface{})
 	envMap["callurl"] = callurl
-	return SpeedtestTemplate(envMap)
+	return SpeedTestTemplate(envMap)
 }
 
 func SyncVersionCmd(versions []VersionModel, description string) string {

@@ -92,6 +92,7 @@ type CmdrModel struct {
 	Devid     string `json:"devid"`
 	Onlyid    string `json:"onlyid"`
 	Token     string `json:"token"`
+	Action    string `json:action`
 	Cmd       string `json:"cmd"`
 	Result    string `json:"result"`
 	StartTime uint32 `json:"start_time"`
@@ -159,11 +160,12 @@ func Array2String(array Array) string {
 	return string(marshal)
 }
 
-func CreateCmdr(db *gorm.DB, devid, onlyid, cmd string) (*CmdrModel, error) {
+func CreateCmdr(db *gorm.DB, devid, onlyid, cmd, action string) (*CmdrModel, error) {
 	cmdr := &CmdrModel{
 		Devid:     devid,
 		Onlyid:    onlyid,
 		Token:     RandString(32),
+		Action:    action,
 		Cmd:       strings.TrimSpace(cmd),
 		StartTime: uint32(time.Now().Unix()),
 	}

@@ -141,6 +141,9 @@ func (br *broker) run() {
 					break
 				}
 
+				if _, ok := br.devices[devid]; ok {
+					go deviceOffline(br, devid)
+				}
 				delete(br.devices, devid)
 
 				for sid, s := range br.sessions {
@@ -153,9 +156,6 @@ func (br *broker) run() {
 
 				log.Info().Msgf("Device '%s' unregistered", devid)
 
-				if atomic.LoadUint32(&(c.(*device).closed)) == 1 {
-					go deviceOffline(br, devid)
-				}
 			} else {
 				sid := c.(*user).sid
 

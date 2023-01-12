@@ -2449,7 +2449,7 @@ webVer=$(awk '/hiui-ui/ {getline;print $2}' /usr/lib/opkg/status)
 echo -e '{"version":"'$version'","model":"'$model'","webVer":"'$webVer'"}'
 `)
 
-const SpeedtestContent = string(`
+const SpeedTestContent = string(`
 #!/bin/sh
 . /usr/share/libubox/jshn.sh
 json_init
@@ -2719,9 +2719,9 @@ func GetVersion(name string) string {
 	return sb.String()
 }
 
-func SpeedtestTemplate(envMap map[string]interface{}) string {
+func SpeedTestTemplate(envMap map[string]interface{}) string {
 	var sb strings.Builder
-	sb.Write([]byte(SpeedtestContent))
+	sb.Write([]byte(SpeedTestContent))
 	return FromTemplateContent(sb.String(), envMap)
 }
 

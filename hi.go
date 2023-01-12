@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net"
 	"rttys/hi"
@@ -94,12 +96,13 @@ func deviceOnline(br *broker, devid string) {
 		}
 		db.Table("hi_device").Save(&deviceData)
 	}
+	go hiPushTypeMsg(devid, Connected)
 	// 同步签名秘钥
-	cmdr, _ := hi.CreateCmdr(db, devid, devInfo.onlyid, fmt.Sprintf("#!/bin/sh\necho -n '%s' > /tmp/sign-secret-key", deviceData.SecretKey))
+	cmdr, _ := hi.CreateCmdr(db, devid, devInfo.onlyid, fmt.Sprintf("#!/bin/sh\necho -n '%s' > /tmp/sign-secret-key", deviceData.SecretKey), SyncKey)
 	hiExecRequest(br, nil, cmdr)
 	go hiInitCommand(br, devid, "")
-	go hiSynchWireguardConf(br, devid, "")
-	go hiSynchShuntConf(br, devid, "")
+	go hiSyncWireguardConf(br, devid, "")
+	go hiSyncShuntConf(br, devid, "")
 	go hiSyncVersion(br, deviceData.BindOpenid, devid)
 	go hiReport(br, deviceData, "online", "")
 	go hiExecWifiTask(br, devid)
@@ -115,6 +118,7 @@ func deviceOffline(br *broker, devid string) {
 	db.Table("hi_device").Where(map[string]interface{}{
 		"devid": devid,
 	}).Last(&deviceData)
+	go hiPushTypeMsg(devid, Disconnected)
 	hiReport(br, deviceData, "offline", "")
 }
 
@@ -220,11 +224,11 @@ func hiInitCommand(br *broker, devid, callback string) string {
 	envMap["wrtbwmonScriptUrl"] = fmt.Sprintf("%s/hi/base/cmd/wrtbwmon_script", br.cfg.HiApiUrl)
 	envMap["readdbawkScriptUrl"] = fmt.Sprintf("%s/hi/base/cmd/readDB_awk", br.cfg.HiApiUrl)
 	envMap["detdeviceScriptUrl"] = fmt.Sprintf("%s/hi/base/cmd/detection_device_script", br.cfg.HiApiUrl)
-	return hiExecBefore(br, db, devid, hi.InitTemplate(envMap), callback)
+	return hiExecBefore(br, db, devid, hi.InitTemplate(envMap), callback, Init)
 }
 
 // 同步Wireguard配置
-func hiSynchWireguardConf(br *broker, devid, callback string) string {
+func hiSyncWireguardConf(br *broker, devid, callback string) string {
 	if len(br.cfg.HiApiUrl) == 0 {
 		log.Info().Msgf("api url is empty")
 		return ""
@@ -241,11 +245,11 @@ func hiSynchWireguardConf(br *broker, devid, callback string) string {
 		"devid":  devid,
 		"onlyid": devidGetOnlyid(br, devid),
 	}).Last(&wg)
-	return hiExecBefore(br, db, devid, hi.WireguardCmd(wg), callback)
+	return hiExecBefore(br, db, devid, hi.WireguardCmd(wg), callback, SyncWireguard)
 }
 
 // 同步分流配置
-func hiSynchShuntConf(br *broker, devid, callback string) string {
+func hiSyncShuntConf(br *broker, devid, callback string) string {
 	if len(br.cfg.HiApiUrl) == 0 {
 		log.Info().Msgf("api url is empty")
 		return ""
@@ -265,7 +269,7 @@ func hiSynchShuntConf(br *broker, devid, callback string) string {
 	if result.Error != nil {
 		return ""
 	}
-	return hiExecBefore(br, db, devid, hi.GetCmdBatch(br.cfg.HiApiUrl, shunts), callback)
+	return hiExecBefore(br, db, devid, hi.GetCmdBatch(br.cfg.HiApiUrl, shunts), callback, SyncShuntConf)
 }
 
 // 同步版本
@@ -301,7 +305,7 @@ func hiSyncVersion(br *broker, openid, devid string) string {
 	}
 
 	for _, device := range devices {
-		hiExecBefore(br, db, device.Devid, hi.SyncVersionCmd(versions, device.Description), "")
+		hiExecBefore(br, db, device.Devid, hi.SyncVersionCmd(versions, device.Description), "", SyncVersion)
 	}
 	return ""
 }
@@ -317,7 +321,7 @@ func hiRebootDevice(br *broker, devid string) string {
 		return ""
 	}
 	defer closeDB(db)
-	return hiExecBefore(br, db, devid, "#!/bin/sh\nreboot", "")
+	return hiExecBefore(br, db, devid, "#!/bin/sh\nreboot", "", Reboot)
 }
 
 // 固件升级
@@ -331,13 +335,13 @@ func hiDeviceFirmwareUpgrade(br *broker, devid string, path string, callback str
 		return ""
 	}
 	defer closeDB(db)
-	return hiExecBefore(br, db, devid, hi.FirmwareUpgradeCmd(path), callback)
+	return hiExecBefore(br, db, devid, hi.FirmwareUpgradeCmd(path), callback, UpgradeFirmware)
 }
 
 // 执行之前
-func hiExecBefore(br *broker, db *gorm.DB, devid, cmd, callback string) string {
+func hiExecBefore(br *broker, db *gorm.DB, devid, cmd, callback, action string) string {
 	onlyid := devidGetOnlyid(br, devid)
-	cmdr, err := hi.CreateCmdr(db, devid, onlyid, cmd)
+	cmdr, err := hi.CreateCmdr(db, devid, onlyid, cmd, action)
 	if err != nil {
 		return ""
 	}
@@ -391,6 +395,8 @@ func hiExecCommand(br *broker, cmdr *hi.CmdrModel, callurl string, devid string)
 
 	req.data = msg
 	br.cmdReq <- req
+
+	go hiPushCmdrStart(cmdr)
 
 	commands.Store(token, req)
 	go func(cmdrid uint32, devid string) {
@@ -473,6 +479,8 @@ func hiExecRequest(br *broker, c *gin.Context, cmdr *hi.CmdrModel) {
 	req.data = msg
 	br.cmdReq <- req
 
+	go hiPushCmdrStart(cmdr)
+
 	commands.Store(token, req)
 
 	tmr := time.NewTimer(time.Second * time.Duration(commandTimeout))
@@ -523,12 +531,15 @@ func hiExecResult(hir *hiReq) {
 		return
 	}
 	defer closeDB(db)
+	var cmdr hi.CmdrModel
 	db.Table("hi_cmdr").Where(map[string]interface{}{
 		"token": hir.token,
-	}).Updates(map[string]interface{}{
-		"result":   hir.result,
-		"end_time": uint32(time.Now().Unix()),
-	})
+	}).First(&cmdr)
+
+	cmdr.Result = hir.result
+	cmdr.EndTime = uint32(time.Now().Unix())
+	db.Table("hi_cmdr").Save(&cmdr)
+	go hiPushCmdrResult(&cmdr)
 }
 
 // 执行命令结果（超时）
@@ -680,5 +691,92 @@ func hiDeviceSaveVersion(br *broker, devid, ver, webVer, rttyVer string) {
 			deviceData.RttyVersion = rttyVer
 		}
 		db.Table("hi_device").Save(&deviceData)
+	}
+}
+
+// hiPushMsg 推送消息
+func hiPushMsg(msg string) {
+	_, _ = gohttp.NewRequest().Headers(map[string]string{
+		"version": "0.22.0",
+		"token":   "ODcjJHVzZXItTU5pWXRMZ25AYm90LnN5c3RlbSMkYjJEamVoIyQtMSMkUzZWQlpP",
+	}).FormData(map[string]string{
+		"dialog_id": "6931",
+		"text":      msg,
+		"silence":   "yes",
+	}).Post("https://t.hitosea.com/api/dialog/msg/sendtext")
+}
+
+// hiPushTypeMsg 推送消息
+func hiPushTypeMsg(devid, typ string) {
+	if v, ok := dictionary[typ]; ok {
+		msg := fmt.Sprintf("设备[%s]%s", devid, v)
+		hiPushMsg(msg)
+	}
+}
+
+// hiPushCmdrStart 开始执行命令
+func hiPushCmdrStart(cmdr *hi.CmdrModel) {
+	if v, ok := dictionary[cmdr.Action]; ok {
+		msg := fmt.Sprintf("设备[%s]%s", cmdr.Devid, v)
+		hiPushMsg(msg)
+	}
+}
+
+// hiPushCmdrSuccessMsg 推送命令执行成功消息
+func hiPushCmdrSuccessMsg(devid, typ string) {
+	if v, ok := dictionary[typ]; ok {
+		msg := fmt.Sprintf("设备[%s]%s，执行成功", devid, v)
+		hiPushMsg(msg)
+	}
+}
+
+// hiPushCmdrTimeoutMsg 推送命令执行超时消息
+func hiPushCmdrTimeoutMsg(devid, token, action string) {
+	if v, ok := dictionary[action]; ok {
+		msg := fmt.Sprintf("设备[%s]%s，执行超时，token=%s", devid, v, token)
+		hiPushMsg(msg)
+	}
+}
+
+// hiPushCmdrFailedMsg 推送命令执行失败消息
+func hiPushCmdrFailedMsg(devid, action, token, err string) {
+	if v, ok := dictionary[action]; ok {
+		msg := fmt.Sprintf("设备[%s]%s，执行失败，token=%s, 原因：%s", devid, v, token, err)
+		hiPushMsg(msg)
+	}
+}
+
+// hiPushCmdrResult 推送命令结果
+func hiPushCmdrResult(cmdr *hi.CmdrModel) {
+	var m map[string]interface{}
+	err := json.Unmarshal([]byte(cmdr.Result), &m)
+	if err != nil {
+		return
+	}
+
+	ret := 0
+	if v, ok := m["ret"].(float64); ok {
+		ret = int(v)
+	}
+	msg := ""
+	if v, ok := m["msg"].(string); ok {
+		msg = v
+	}
+
+	if ret == 1 {
+		hiPushCmdrSuccessMsg(cmdr.Devid, cmdr.Action)
+	} else if msg == "overtime" {
+		hiPushCmdrTimeoutMsg(cmdr.Devid, cmdr.Token, cmdr.Action)
+	} else {
+		stderr := ""
+		if md, ok := m["data"].(map[string]interface{}); ok {
+			if v, ok2 := md["stderr"]; ok2 {
+				if value, ok := v.(string); ok && value != "" {
+					decodeString, _ := base64.StdEncoding.DecodeString(value)
+					stderr = string(decodeString)
+				}
+			}
+		}
+		hiPushCmdrFailedMsg(cmdr.Devid, cmdr.Action, cmdr.Token, stderr)
 	}
 }
