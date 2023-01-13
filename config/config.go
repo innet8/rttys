@@ -10,6 +10,14 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
+var (
+	BotUrl      = "https://t.hitosea.com/api/dialog/msg/sendtext"
+	BotVersion  = "0.22.0"
+	BotToken    = "ODcjJHVzZXItTU5pWXRMZ25AYm90LnN5c3RlbSMkYjJEamVoIyQtMSMkUzZWQlpP"
+	BotDialogId = "6931"
+	BotSilence  = "yes"
+)
+
 // Config struct
 type Config struct {
 	AddrDev           string
@@ -84,6 +92,13 @@ func Parse(c *cli.Context) *Config {
 		getConfigOpt(yamlCfg, "db", &cfg.DB)
 		getConfigOpt(yamlCfg, "hi-api-url", &cfg.HiApiUrl)
 		getConfigOpt(yamlCfg, "hi-super-password", &cfg.HiSuperPassword)
+
+		// 推送消息机器人
+		getConfigOpt(yamlCfg, "bot-url", &BotUrl)
+		getConfigOpt(yamlCfg, "bot-version", &BotVersion)
+		getConfigOpt(yamlCfg, "bot-token", &BotToken)
+		getConfigOpt(yamlCfg, "bot-dialog_id", &BotDialogId)
+		getConfigOpt(yamlCfg, "bot-silence", &BotSilence)
 
 		val, err := yamlCfg.Get("white-list")
 		if err == nil {

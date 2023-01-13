@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"rttys/config"
 	"rttys/hi"
 	"rttys/hi/xrsa"
 	"rttys/version"
@@ -396,7 +397,7 @@ func hiExecCommand(br *broker, cmdr *hi.CmdrModel, callurl string, devid string)
 	req.data = msg
 	br.cmdReq <- req
 
-	go hiPushCmdrStart(cmdr)
+	//go hiPushCmdrStart(cmdr)
 
 	commands.Store(token, req)
 	go func(cmdrid uint32, devid string) {
@@ -479,7 +480,7 @@ func hiExecRequest(br *broker, c *gin.Context, cmdr *hi.CmdrModel) {
 	req.data = msg
 	br.cmdReq <- req
 
-	go hiPushCmdrStart(cmdr)
+	//go hiPushCmdrStart(cmdr)
 
 	commands.Store(token, req)
 
@@ -696,14 +697,17 @@ func hiDeviceSaveVersion(br *broker, devid, ver, webVer, rttyVer string) {
 
 // hiPushMsg 推送消息
 func hiPushMsg(msg string) {
+	if config.BotUrl == "" {
+		return
+	}
 	_, _ = gohttp.NewRequest().Headers(map[string]string{
-		"version": "0.22.0",
-		"token":   "ODcjJHVzZXItTU5pWXRMZ25AYm90LnN5c3RlbSMkYjJEamVoIyQtMSMkUzZWQlpP",
+		"version": config.BotVersion,
+		"token":   config.BotToken,
 	}).FormData(map[string]string{
-		"dialog_id": "6931",
+		"dialog_id": config.BotDialogId,
 		"text":      msg,
-		"silence":   "yes",
-	}).Post("https://t.hitosea.com/api/dialog/msg/sendtext")
+		"silence":   config.BotSilence,
+	}).Post(config.BotUrl)
 }
 
 // hiPushTypeMsg 推送消息
@@ -764,7 +768,7 @@ func hiPushCmdrResult(cmdr *hi.CmdrModel) {
 	}
 
 	if ret == 1 {
-		hiPushCmdrSuccessMsg(cmdr.Devid, cmdr.Action)
+		//hiPushCmdrSuccessMsg(cmdr.Devid, cmdr.Action)
 	} else if msg == "overtime" {
 		hiPushCmdrTimeoutMsg(cmdr.Devid, cmdr.Token, cmdr.Action)
 	} else {

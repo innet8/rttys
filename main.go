@@ -165,6 +165,22 @@ func main() {
 	if len(os.Getenv("RTTYS_SUPER_PASSWORD")) > 0 {
 		hiSuperPassword = os.Getenv("RTTYS_SUPER_PASSWORD")
 	}
+	// 推送消息机器人
+	if len(os.Getenv("RTTYS_BOT_URL")) > 0 {
+		config.BotUrl = os.Getenv("RTTYS_BOT_URL")
+	}
+	if len(os.Getenv("RTTYS_BOT_VERSION")) > 0 {
+		config.BotVersion = os.Getenv("RTTYS_BOT_VERSION")
+	}
+	if len(os.Getenv("RTTYS_BOT_TOKEN")) > 0 {
+		config.BotToken = os.Getenv("RTTYS_BOT_TOKEN")
+	}
+	if len(os.Getenv("RTTYS_BOT_DIALOG_ID")) > 0 {
+		config.BotDialogId = os.Getenv("RTTYS_BOT_DIALOG_ID")
+	}
+	if len(os.Getenv("RTTYS_BOT_SILENCE")) > 0 {
+		config.BotSilence = os.Getenv("RTTYS_BOT_SILENCE")
+	}
 
 	app := &cli.App{
 		Name:    "rttys",
