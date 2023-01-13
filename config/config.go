@@ -11,11 +11,11 @@ import (
 )
 
 var (
-	BotUrl      = "https://t.hitosea.com/api/dialog/msg/sendtext"
-	BotVersion  = "0.22.0"
-	BotToken    = "ODcjJHVzZXItTU5pWXRMZ25AYm90LnN5c3RlbSMkYjJEamVoIyQtMSMkUzZWQlpP"
-	BotDialogId = "6931"
-	BotSilence  = "yes"
+	BotUrl      = ""
+	BotVersion  = ""
+	BotToken    = ""
+	BotDialogId = ""
+	BotSilence  = ""
 )
 
 // Config struct
