@@ -1735,7 +1735,7 @@ const ShuntBatchAdded = string(`
 exec_shunt_url() {
     local url=$1
     local save=$2
-    local tmp="/tmp/.hi_$(_random)"
+    tmp="/tmp/.hi_$(cat /proc/sys/kernel/random/uuid | cut -c1-8)"
     curl -sSL -4 -o "${tmp}" "${url}"
     if [ ! -f "${tmp}" ]; then
         echo "Failed download exec file '$url'"
