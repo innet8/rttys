@@ -2334,20 +2334,10 @@ config_load dhcp
 config_foreach host_func host
 uci commit dhcp
 RES=$(echo -e '{"code":0,"list":['"$list"']}')
-save="/tmp/.hi_static_leases"
-tmp="/tmp/.hi_$(_random)"
-cat >${tmp} <<-EOF
-${RES}
-EOF
-if [ ! -f "${save}" ] || [ "$(_filemd5 ${save})" != "$(_filemd5 ${tmp})" ]; then
-    tmp='{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}'
-    RES=$(curl --connect-timeout 3 -4 -X POST "{{.reportUrl}}$(_sign)" -H "Content-Type: application/json" -d $tmp)
-    [ "${RES}" != "success" ] && RES=$(lua /mnt/curl.lua "{{.reportUrl}}$(_sign)" "POST" $tmp)
-    if [ "${RES}" = "success" ]; then
-        mv "${tmp}" "$save"
-    fi
-fi
-rm -f ${tmp}
+tmp='{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}'
+RES=$(curl --connect-timeout 3 -4 -X POST "{{.reportUrl}}$(_sign)" -H "Content-Type: application/json" -d $tmp)
+[ "${RES}" != "success" ] && lua /mnt/curl.lua "{{.reportUrl}}$(_sign)" "POST" $tmp
+echo 'success'
 `)
 
 const SetStaticLeasesContent = string(`
