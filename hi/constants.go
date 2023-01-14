@@ -2508,8 +2508,6 @@ handle_firewall(){
 config_load firewall
 config_foreach handle_firewall zone
 uci commit firewall
-/etc/init.d/firewall reload
-/etc/init.d/network reload
 rm -f /var/run/addwifi.lock
 _base64e() {
     echo -n "$1" | base64 | tr -d "\n"
@@ -2526,6 +2524,8 @@ for i in 1 2 3 4 5; do
 	fi
 	sleep 3
 done
+/etc/init.d/firewall reload
+/etc/init.d/network reload
 `)
 
 const DelWifiContent = string(`
