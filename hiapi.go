@@ -1396,27 +1396,34 @@ func otherWiFi2(br *broker) gin.HandlerFunc {
 		token := utils.GenUniqueID(action)
 		report := fmt.Sprintf("%s/hi/base/report/wifi", br.cfg.HiApiUrl)
 		callbackUrl := jsoniter.Get(content, "call_url").ToString()
+
 		var cmdr *hi.CmdrModel
 		var terr error
 		//根据action执行不同的动作
 		if action == "create" { //新增wifi命令
-			var addWifi hi.AddWifiModel
-			if err := json.Unmarshal(content, &addWifi); err == nil {
-				addWifis := []hi.AddWifiModel{
-					addWifi,
-				}
-				cmdr, terr = hi.CreateCmdr(db, devid, onlyid, hi.AddWifiCmd(addWifis, report, token), AddWifi)
-				if terr != nil {
-					c.JSON(http.StatusOK, gin.H{
-						"ret": 0,
-						"msg": "添加失败",
-						"data": gin.H{
-							"error": terr.Error(),
-						},
-					})
-					return
-				}
+			wifiContent := jsoniter.Get(content, "wifis").ToString()
+			var addWifis []hi.AddWifiModel
+			err := json.Unmarshal([]byte(wifiContent), &addWifis)
+			if err != nil {
+				c.JSON(http.StatusOK, gin.H{
+					"ret":  0,
+					"msg":  "参数错误",
+					"data": gin.H{},
+				})
+				return
 			}
+			cmdr, terr = hi.CreateCmdr(db, devid, onlyid, hi.AddWifiCmd(addWifis, report, token), AddWifi)
+			if terr != nil {
+				c.JSON(http.StatusOK, gin.H{
+					"ret": 0,
+					"msg": "添加失败",
+					"data": gin.H{
+						"error": terr.Error(),
+					},
+				})
+				return
+			}
+
 		} else if action == "delete" { //执行删除wifi命令
 			var deleteWifi hi.DeleteWifiModal
 			err := json.Unmarshal(content, &deleteWifi)
