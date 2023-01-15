@@ -199,6 +199,7 @@ func AddWifiCmd(models []AddWifiModel, report, token string) string {
 	var firewall []string
 	var chaos_calmer []string
 	var openwrt []string
+	var ipSegment []string
 	for _, model := range models {
 		wireless = append(wireless, fmt.Sprintf("uci set wireless.%s=wifi-iface", model.Wifinet))
 		wireless = append(wireless, fmt.Sprintf("uci set wireless.%s.device=%s", model.Wifinet, model.Device))
@@ -207,6 +208,7 @@ func AddWifiCmd(models []AddWifiModel, report, token string) string {
 		wireless = append(wireless, fmt.Sprintf("uci set wireless.%s.encryption=%s", model.Wifinet, model.Encryption))
 		wireless = append(wireless, fmt.Sprintf("uci set wireless.%s.key='%s'", model.Wifinet, model.Key))
 		wireless = append(wireless, fmt.Sprintf("uci set wireless.%s.network=%s", model.Wifinet, model.Wifinet))
+		ipSegment = append(network, fmt.Sprintf("[ -n \"$(echo %s | awk -F'.' '{print $1\".\"$2\".\"$3}')\" ] && exit 0", model.IpSegment))
 		network = append(network, fmt.Sprintf("uci set network.%s=interface", model.Wifinet))
 		network = append(network, fmt.Sprintf("uci set network.%s.proto=static", model.Wifinet))
 		network = append(network, fmt.Sprintf("uci set network.%s.ipaddr=%s", model.Wifinet, model.IpSegment))
@@ -226,6 +228,7 @@ func AddWifiCmd(models []AddWifiModel, report, token string) string {
 	var envMap = make(map[string]interface{})
 	envMap["reportUrl"] = report
 	envMap["token"] = token
+	envMap["ipSegment"] = strings.Join(ipSegment, "\n")
 	envMap["wireless"] = strings.Join(wireless, "\n")
 	envMap["network"] = strings.Join(network, "\n")
 	envMap["chaos_calmer"] = strings.Join(chaos_calmer, "\n")

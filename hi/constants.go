@@ -2478,24 +2478,23 @@ if [ -e "/var/run/addwifi.lock" ]; then
     echo '{"code":102,"msg":"wifi adding"}'
     exit 1
 fi
+{{.ipSegment}}
 touch /var/run/addwifi.lock
-ipseg=$(echo {{.ipSegment}} | awk -F'.' '{print $1"."$2"."$3}')
-[ -n "$(grep $ipseg /etc/config/network)" ] && {
-    echo '{"code":101,"msg":"ip segment already exist"}'
-    exit 1
-}
 {{.wireless}}
 uci commit wireless
-wifi reload
 {{.network}}
 if [ "$(cat /etc/openwrt_version)" == "15.05.1" ]; then
+    wifi reload
     sleep 20
     {{.chaos_calmer}}
+    uci commit network
+    uci commit wireless
 else
     {{.openwrt}}
+    uci commit network
+    uci commit wireless
+    wifi reload
 fi
-uci commit network
-uci commit wireless
 {{.dhcp}}
 uci commit dhcp
 handle_firewall(){
