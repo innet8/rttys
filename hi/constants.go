@@ -1768,7 +1768,7 @@ for file in $(ls /tmp/hicloud/shunt 2>/dev/null); do
     if [[ "${file}" =~ .*\.sh$ ]] && [[ ! "${array[@]}" =~ ":${file}" ]]; then
         bash +x /tmp/hicloud/shunt/${file} remove
         pathname="$(echo ${file} | sed 's/\.sh$//')"
-        # rm -f /tmp/hicloud/shunt/${pathname}.* &> /dev/null
+        rm -f /tmp/hicloud/shunt/${pathname}.* &> /dev/null
     fi
 done
 
