@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -24,6 +25,8 @@ import (
 
 	"github.com/nahid/gohttp"
 )
+
+var shuntCmdMd5 sync.Map
 
 // 设备ID取设备信息
 func devidGetDev(br *broker, devid string) *device {
@@ -270,7 +273,20 @@ func hiSyncShuntConf(br *broker, devid, callback string) string {
 	if result.Error != nil {
 		return ""
 	}
-	return hiExecBefore(br, db, devid, hi.GetCmdBatch(br.cfg.HiApiUrl, shunts), callback, SyncShuntConf)
+	// 同样的分流命令，不重复执行
+	cmd := hi.GetCmdBatch(br.cfg.HiApiUrl, shunts)
+	cmdMd5 := hi.StringMd5(cmd)
+	if v, ok := shuntCmdMd5.Load(devid); ok {
+		md5 := v.(string)
+		if md5 == cmdMd5 {
+			return ""
+		} else {
+			shuntCmdMd5.Store(devid, cmdMd5)
+		}
+	} else {
+		shuntCmdMd5.Store(devid, cmdMd5)
+	}
+	return hiExecBefore(br, db, devid, cmd, callback, SyncShuntConf)
 }
 
 // 同步版本
