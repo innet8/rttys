@@ -27,6 +27,8 @@ import (
 )
 
 var shuntCmdMd5 sync.Map
+var connectedMap = make(map[string]int)
+var disconnectedMap = make(map[string]int)
 
 // 设备ID取设备信息
 func devidGetDev(br *broker, devid string) *device {
@@ -588,6 +590,20 @@ func hiReport(br *broker, device hi.DeviceModel, typ, content string) {
 		return
 	}
 
+	// 上线后，判断是否需要重新下发wg配置
+	if typ == "online" {
+		var wg hi.WgModel
+		db.Table("hi_wg").Where(map[string]interface{}{
+			"status": "use",
+			"devid":  device.Devid,
+		}).Last(&wg)
+		onlineData := map[string]interface{}{
+			"reset_wg": wg.ID > 0 && wg.Onlyid == "",
+		}
+		tmpBytes, _ := json.Marshal(onlineData)
+		content = string(tmpBytes)
+	}
+
 	// about encrypt
 	//bs, err := json.Marshal(map[string]interface{}{
 	//	"ip":   device.IP,
@@ -728,8 +744,38 @@ func hiPushMsg(msg string) {
 
 // hiPushTypeMsg 推送消息
 func hiPushTypeMsg(devid, typ string) {
+
 	if v, ok := dictionary[typ]; ok {
-		msg := fmt.Sprintf("设备[%s]%s", devid, v)
+		appendString := ""
+
+		// 上线、下线显示次数
+		if typ == Connected || typ == Disconnected {
+			todayKey := devid + time.Now().Format("20060102")
+			yesterdayKey := devid + time.Now().AddDate(0, 0, -1).Format("20060102")
+			if typ == Connected {
+				if _, ok1 := connectedMap[yesterdayKey]; ok1 {
+					delete(connectedMap, yesterdayKey)
+				}
+				todayConnectedCount := 0
+				if c, ok2 := connectedMap[todayKey]; ok2 {
+					todayConnectedCount = c
+				}
+				connectedMap[todayKey] = todayConnectedCount + 1
+				appendString = fmt.Sprintf("（今日第%d次）", connectedMap[todayKey])
+			} else if typ == Disconnected {
+				if _, ok1 := disconnectedMap[yesterdayKey]; ok1 {
+					delete(disconnectedMap, yesterdayKey)
+				}
+				todayDisconnectedCount := 0
+				if c, ok2 := disconnectedMap[todayKey]; ok2 {
+					todayDisconnectedCount = c
+				}
+				disconnectedMap[todayKey] = todayDisconnectedCount + 1
+				appendString = fmt.Sprintf("（今日第%d次）", disconnectedMap[todayKey])
+			}
+		}
+
+		msg := fmt.Sprintf("设备[%s]%s%s", devid, v, appendString)
 		hiPushMsg(msg)
 	}
 }
