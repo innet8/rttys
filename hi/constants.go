@@ -2557,7 +2557,7 @@ const DelAllCustomWifi = string(`
 . /lib/functions.sh
 handle_wifi(){
     local tmp=$1
-    if [ -n "$(echo $tmp||grep -E 'wlan[0-9]{10}')" ]; then
+    if [ -n "$(echo $tmp|grep -E 'wlan[0-9]{10}')" ]; then
         uci delete dhcp.$tmp
         uci delete network.$tmp
         uci delete wireless.$tmp
