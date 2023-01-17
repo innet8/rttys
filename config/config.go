@@ -16,6 +16,10 @@ var (
 	BotToken    = ""
 	BotDialogId = ""
 	BotSilence  = ""
+
+	RedisHost     = ""
+	RedisPort     = ""
+	RedisPassword = ""
 )
 
 // Config struct
@@ -99,6 +103,10 @@ func Parse(c *cli.Context) *Config {
 		getConfigOpt(yamlCfg, "bot-token", &BotToken)
 		getConfigOpt(yamlCfg, "bot-dialog_id", &BotDialogId)
 		getConfigOpt(yamlCfg, "bot-silence", &BotSilence)
+
+		getConfigOpt(yamlCfg, "redis-host", &RedisHost)
+		getConfigOpt(yamlCfg, "redis-port", &RedisPort)
+		getConfigOpt(yamlCfg, "redis-password", &RedisPassword)
 
 		val, err := yamlCfg.Get("white-list")
 		if err == nil {

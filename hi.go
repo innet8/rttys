@@ -103,9 +103,6 @@ func deviceOnline(br *broker, devid string) {
 		db.Table("hi_device").Save(&deviceData)
 	}
 	go hiPushTypeMsg(devid, Connected)
-	// 同步签名秘钥
-	cmdr, _ := hi.CreateCmdr(db, devid, devInfo.onlyid, fmt.Sprintf("#!/bin/sh\necho -n '%s' > /tmp/sign-secret-key", deviceData.SecretKey), SyncKey)
-	hiExecRequest(br, nil, cmdr)
 	go hiInitCommand(br, devid, "")
 	go hiSyncWireguardConf(br, devid, "")
 	go hiSyncShuntConf(br, devid, "")
@@ -191,18 +188,13 @@ func userAuth(c *gin.Context, db *gorm.DB, devid string) (*hi.UserModel, error) 
 	return userData, nil
 }
 
-// verifySign 验证签名
-func verifySign(c *gin.Context, db *gorm.DB, devid string) bool {
+// hiVerifySign 验证签名
+func hiVerifySign(br *broker, c *gin.Context) bool {
 	nonce := c.Query("nonce")
 	ts := c.Query("ts")
 	ver := c.Query("ver")
-	var deviceData hi.DeviceModel
-	db.Table("hi_device").Where(map[string]string{"devid": devid}).Find(&deviceData)
-	if deviceData.ID != 0 {
-		calcMd5 := hi.StringMd5(fmt.Sprintf("nonce=%s&ts=%s&ver=%s%s", nonce, ts, ver, deviceData.SecretKey))
-		return strings.ToUpper(calcMd5) == strings.ToUpper(c.Query("sign"))
-	}
-	return false
+	calcMd5 := hi.StringMd5(fmt.Sprintf("nonce=%s&ts=%s&ver=%s%s", nonce, ts, ver, br.cfg.Token))
+	return strings.ToUpper(calcMd5) == strings.ToUpper(c.Query("sign"))
 }
 
 // 初始化执行
@@ -464,11 +456,7 @@ func hiExecRequest(br *broker, c *gin.Context, cmdr *hi.CmdrModel) {
 
 	_, ok := br.devices[cmdr.Devid]
 	if !ok {
-		if req.c != nil {
-			cmdErrReply(rttyCmdErrOffline, req)
-		} else {
-			req.cancel()
-		}
+		cmdErrReply(rttyCmdErrOffline, req)
 		return
 	}
 
@@ -750,29 +738,16 @@ func hiPushTypeMsg(devid, typ string) {
 
 		// 上线、下线显示次数
 		if typ == Connected || typ == Disconnected {
-			todayKey := devid + time.Now().Format("20060102")
-			yesterdayKey := devid + time.Now().AddDate(0, 0, -1).Format("20060102")
-			if typ == Connected {
-				if _, ok1 := connectedMap[yesterdayKey]; ok1 {
-					delete(connectedMap, yesterdayKey)
-				}
-				todayConnectedCount := 0
-				if c, ok2 := connectedMap[todayKey]; ok2 {
-					todayConnectedCount = c
-				}
-				connectedMap[todayKey] = todayConnectedCount + 1
-				appendString = fmt.Sprintf("（今日第%d次）", connectedMap[todayKey])
-			} else if typ == Disconnected {
-				if _, ok1 := disconnectedMap[yesterdayKey]; ok1 {
-					delete(disconnectedMap, yesterdayKey)
-				}
-				todayDisconnectedCount := 0
-				if c, ok2 := disconnectedMap[todayKey]; ok2 {
-					todayDisconnectedCount = c
-				}
-				disconnectedMap[todayKey] = todayDisconnectedCount + 1
-				appendString = fmt.Sprintf("（今日第%d次）", disconnectedMap[todayKey])
+			key := devid + time.Now().Format("20060102") + typ
+			cli, err := hi.RedisCli()
+			if err != nil {
+				return
 			}
+			defer cli.Close()
+			count, _ := strconv.Atoi(cli.Get(key).Val())
+			count += 1
+			cli.Set(key, count, time.Hour*24)
+			appendString = fmt.Sprintf("（今日第%d次）", count)
 		}
 
 		msg := fmt.Sprintf("设备[%s]%s%s", devid, v, appendString)

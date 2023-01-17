@@ -182,6 +182,17 @@ func main() {
 		config.BotSilence = os.Getenv("RTTYS_BOT_SILENCE")
 	}
 
+	// redis 配置
+	if len(os.Getenv("REDIS_HOST")) > 0 {
+		config.RedisHost = os.Getenv("REDIS_HOST")
+	}
+	if len(os.Getenv("REDIS_PORT")) > 0 {
+		config.RedisPort = os.Getenv("REDIS_PORT")
+	}
+	if len(os.Getenv("REDIS_PASSWORD")) > 0 {
+		config.RedisPassword = os.Getenv("REDIS_PASSWORD")
+	}
+
 	app := &cli.App{
 		Name:    "rttys",
 		Usage:   "The server side for rtty",

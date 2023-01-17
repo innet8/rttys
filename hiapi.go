@@ -125,7 +125,7 @@ func baseCmd(br *broker) gin.HandlerFunc {
 		}
 		defer closeDB(db)
 
-		if !verifySign(c, db, c.Query("devid")) {
+		if !hiVerifySign(br, c) {
 			c.Status(http.StatusBadRequest)
 			return
 		}
@@ -206,7 +206,7 @@ func baseReport(br *broker) gin.HandlerFunc {
 			return
 		}
 
-		if !verifySign(c, db, devid) {
+		if !hiVerifySign(br, c) {
 			c.Status(http.StatusBadRequest)
 			return
 		}
@@ -1158,7 +1158,7 @@ func otherCmdr(br *broker) gin.HandlerFunc {
 		}
 		defer closeDB(db)
 
-		if !verifySign(c, db, c.Query("devid")) {
+		if !hiVerifySign(br, c) {
 			c.Status(http.StatusBadRequest)
 			return
 		}
