@@ -189,8 +189,9 @@ func main() {
 	if len(os.Getenv("REDIS_PORT")) > 0 {
 		config.RedisPort = os.Getenv("REDIS_PORT")
 	}
-	if len(os.Getenv("REDIS_PASSWORD")) > 0 {
-		config.RedisPassword = os.Getenv("REDIS_PASSWORD")
+	redisPwd := os.Getenv("REDIS_PASSWORD")
+	if redisPwd != "" && redisPwd != "null" {
+		config.RedisPassword = redisPwd
 	}
 
 	app := &cli.App{
