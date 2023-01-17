@@ -27,8 +27,6 @@ import (
 )
 
 var shuntCmdMd5 sync.Map
-var connectedMap = make(map[string]int)
-var disconnectedMap = make(map[string]int)
 
 // 设备ID取设备信息
 func devidGetDev(br *broker, devid string) *device {
