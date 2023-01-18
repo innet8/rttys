@@ -2001,6 +2001,8 @@ set_bypass_host() {
     local hotRouteFile="/etc/hotplug.d/iface/${byId}-hi-bypass-route"
     local hotdnsqFile="/etc/hotplug.d/iface/${byId}-hi-bypass-dnsmasq"
     local hotiptaFile="/etc/hotplug.d/firewall/${byId}-hi-bypass-iptables"
+    local old2="$(cat ${domainFile} | grep "ipset=/${host}/")"
+    local old1="$(cat /etc/dnsmasq.conf | grep "${host}")"
 
     local gatewayIP=$(ip route show 1/0 | head -n1 | sed -e 's/^default//' | awk '{print $2}' | awk -F. '$1<=255&&$2<=255&&$3<=255&&$4<=255{print $1"."$2"."$3"."$4}')
     if [ -z "$gatewayIP" ]; then
@@ -2017,11 +2019,9 @@ set_bypass_host() {
     mkdir -p /etc/hotplug.d/firewall/
 
     if [ -z "$(cat /etc/dnsmasq.conf | grep 'conf-dir=/etc/dnsmasq.d')" ]; then
-        sed -i /conf-dir=/d /etc/dnsmasq.conf
         echo 'conf-dir=/etc/dnsmasq.d' >> /etc/dnsmasq.conf
     fi
     if [ -z "$(cat /etc/dnsmasq.conf | grep 'resolv-file=/etc/resolv.dnsmasq.conf')" ]; then
-        sed -i /resolv-file=/d /etc/dnsmasq.conf
         echo 'resolv-file=/etc/resolv.dnsmasq.conf' >> /etc/dnsmasq.conf
     fi
 
@@ -2113,7 +2113,9 @@ EOF
     else
         echo "ipset=/${host}/${thName}" >> ${domainFile}
     fi
-    /etc/init.d/dnsmasq restart
+    if [ "$old1" != "$(cat /etc/dnsmasq.conf |grep ${host})" ] || [ "$old2" != "$(cat ${domainFile} |grep ${host})" ]; then
+        /etc/init.d/dnsmasq restart
+    fi
     sleep 5
     nslookup "${host}" "127.0.0.1"
     (sleep 5;nslookup "${host}" "127.0.0.1") > /dev/null 2>&1 &
