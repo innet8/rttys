@@ -92,7 +92,7 @@ type CmdrModel struct {
 	Devid     string `json:"devid"`
 	Onlyid    string `json:"onlyid"`
 	Token     string `json:"token"`
-	Action    string `json:action`
+	Action    string `json:"action"`
 	Cmd       string `json:"cmd"`
 	Result    string `json:"result"`
 	StartTime uint32 `json:"start_time"`
@@ -111,6 +111,19 @@ type WifiTaskModel struct {
 	CallbackUrl string `json:"callback_url"`
 	CreatedAt   uint32 `json:"created_at"`
 	UpdatedAt   uint32 `json:"updated_at"`
+}
+
+type MessageModel struct {
+	ID          uint32 `json:"id"`
+	Devid       string `json:"devid"`
+	Action      string `json:"action"`
+	Token       string `json:"token"`
+	ErrMsg      string `json:"err_msg"`
+	Status      uint32 `json:"status"`
+	NumberIndex uint32 `json:"number_index"`
+	CreatedAt   uint32 `json:"created_at"`
+	UpdatedAt   uint32 `json:"updated_at"`
+	PushedAt    uint32 `json:"pushed_at"`
 }
 
 func InstanceDB(str string) (*gorm.DB, error) {

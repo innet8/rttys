@@ -63,6 +63,13 @@ var (
 	}
 )
 
+const (
+	StatusStart = iota
+	StatusSuccess
+	StatusTimeout
+	StatusFail
+)
+
 // createUser 创建用户
 func createUser(br *broker) gin.HandlerFunc {
 	return func(c *gin.Context) {

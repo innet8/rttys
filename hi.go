@@ -100,7 +100,7 @@ func deviceOnline(br *broker, devid string) {
 		}
 		db.Table("hi_device").Save(&deviceData)
 	}
-	go hiPushTypeMsg(devid, Connected)
+	go hiSaveMessage(br.cfg.DB, devid, Connected, "", "", false)
 	go hiInitCommand(br, devid, "")
 	go hiSyncWireguardConf(br, devid, "")
 	go hiSyncShuntConf(br, devid, "")
@@ -119,7 +119,7 @@ func deviceOffline(br *broker, devid string) {
 	db.Table("hi_device").Where(map[string]interface{}{
 		"devid": devid,
 	}).Last(&deviceData)
-	go hiPushTypeMsg(devid, Disconnected)
+	go hiSaveMessage(br.cfg.DB, devid, Disconnected, "", "", false)
 	hiReport(br, deviceData, "offline", "")
 }
 
@@ -544,7 +544,7 @@ func hiExecResult(hir *hiReq) {
 	cmdr.Result = hir.result
 	cmdr.EndTime = uint32(time.Now().Unix())
 	db.Table("hi_cmdr").Save(&cmdr)
-	go hiPushCmdrResult(&cmdr)
+	go hiPushCmdrResult(hir.db, &cmdr)
 }
 
 // 执行命令结果（超时）
@@ -728,65 +728,99 @@ func hiPushMsg(msg string) {
 	}).Post(config.BotUrl)
 }
 
-// hiPushTypeMsg 推送消息
-func hiPushTypeMsg(devid, typ string) {
+// hiSaveMessage 保存到消息表
+func hiSaveMessage(dbCfg string, devid, action, token, errMsg string, timeout bool) {
+	if _, ok := dictionary[action]; ok {
+		db, err := hi.InstanceDB(dbCfg)
+		if err != nil {
+			return
+		}
+		defer closeDB(db)
 
-	if v, ok := dictionary[typ]; ok {
-		appendString := ""
-
-		// 上线、下线显示次数
-		if typ == Connected || typ == Disconnected {
-			key := devid + time.Now().Format("20060102") + typ
-			cli, err := hi.RedisCli()
-			if err != nil {
-				return
-			}
-			defer cli.Close()
-			count, _ := strconv.Atoi(cli.Get(key).Val())
-			count += 1
-			cli.Set(key, count, time.Hour*24)
-			appendString = fmt.Sprintf("（今日第%d次）", count)
+		status := StatusSuccess
+		if timeout { // 超时
+			status = StatusTimeout
+		}
+		if errMsg != "" { // 执行失败
+			status = StatusFail
 		}
 
-		msg := fmt.Sprintf("设备[%s]%s%s", devid, v, appendString)
-		hiPushMsg(msg)
+		today := time.Now()
+		startTime := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, today.Location()).Unix()
+		endTime := time.Date(today.Year(), today.Month(), today.Day(), 23, 59, 59, 0, today.Location()).Unix()
+		var lastMsg hi.MessageModel
+		db.Table("hi_messages").Where(map[string]interface{}{
+			"devid":  devid,
+			"action": action,
+			"status": status,
+		}).Where("created_at BETWEEN ? AND ?", startTime, endTime).Last(&lastMsg)
+		message := hi.MessageModel{
+			Devid:       devid,
+			Action:      action,
+			Token:       token,
+			ErrMsg:      errMsg,
+			Status:      uint32(status),
+			CreatedAt:   uint32(today.Unix()),
+			NumberIndex: 1,
+		}
+		if lastMsg.ID > 0 {
+			message.NumberIndex = lastMsg.NumberIndex + 1
+		}
+		db.Table("hi_messages").Save(&message)
 	}
 }
 
-// hiPushCmdrStart 开始执行命令
-func hiPushCmdrStart(cmdr *hi.CmdrModel) {
-	if v, ok := dictionary[cmdr.Action]; ok {
-		msg := fmt.Sprintf("设备[%s]%s", cmdr.Devid, v)
-		hiPushMsg(msg)
+// hiPushMessages 定时发送消息
+func hiPushMessages(dbCfg string) {
+	db, err := hi.InstanceDB(dbCfg)
+	if err != nil {
+		return
 	}
-}
+	defer closeDB(db)
 
-// hiPushCmdrSuccessMsg 推送命令执行成功消息
-func hiPushCmdrSuccessMsg(devid, typ string) {
-	if v, ok := dictionary[typ]; ok {
-		msg := fmt.Sprintf("设备[%s]%s，执行成功", devid, v)
-		hiPushMsg(msg)
-	}
-}
+	ts := time.Now().Unix()
+	var messages []hi.MessageModel
+	tx := db.Table("hi_messages").Where("pushed_at = 0")
+	tx.Order("id asc").Find(&messages)
 
-// hiPushCmdrTimeoutMsg 推送命令执行超时消息
-func hiPushCmdrTimeoutMsg(devid, token, action string) {
-	if v, ok := dictionary[action]; ok {
-		msg := fmt.Sprintf("设备[%s]%s，执行超时，token=%s", devid, v, token)
-		hiPushMsg(msg)
+	if len(messages) == 0 {
+		return
 	}
-}
 
-// hiPushCmdrFailedMsg 推送命令执行失败消息
-func hiPushCmdrFailedMsg(devid, action, token, err string) {
-	if v, ok := dictionary[action]; ok {
-		msg := fmt.Sprintf("设备[%s]%s，执行失败，token=%s, 原因：%s", devid, v, token, err)
-		hiPushMsg(msg)
+	groupMessages := make(map[string][]hi.MessageModel)
+	for _, message := range messages {
+		key := fmt.Sprintf("%s_%s_%d", message.Devid, message.Action, message.Status)
+		if message.Action == "connected" || message.Action == "disconnected" {
+			key = fmt.Sprintf("%s_%s", message.Devid, "connect_status")
+		}
+		groupMessages[key] = append(groupMessages[key], message)
 	}
+
+	for _, groupMessage := range groupMessages {
+		var msgs []string
+		for _, pushingMsg := range groupMessage {
+			timeString := time.Unix(int64(pushingMsg.CreatedAt), 0).Format("2006-01-02 15:04:05")
+			if pushingMsg.Action == Connected || pushingMsg.Action == Disconnected {
+				msgs = append(msgs, fmt.Sprintf("设备[%s]%s（时间：%s，今日第%d次）", pushingMsg.Devid, dictionary[pushingMsg.Action], timeString, pushingMsg.NumberIndex))
+			} else if pushingMsg.Status == StatusTimeout {
+				msgs = append(msgs, fmt.Sprintf("设备[%s]%s，执行超时，token=%s（时间：%s）", pushingMsg.Devid, dictionary[pushingMsg.Action], pushingMsg.Token, timeString))
+			} else if pushingMsg.Status == StatusFail {
+				msgs = append(msgs, fmt.Sprintf("设备[%s]%s，执行失败，token=%s, 原因：%s（时间：%s）", pushingMsg.Devid, dictionary[pushingMsg.Action], pushingMsg.Token, pushingMsg.ErrMsg, timeString))
+			}
+		}
+		if len(msgs) > 0 {
+			hiPushMsg(strings.Join(msgs, "\n"))
+		}
+	}
+
+	tx.Updates(map[string]interface{}{
+		"updated_at": ts,
+		"pushed_at":  ts,
+	})
 }
 
 // hiPushCmdrResult 推送命令结果
-func hiPushCmdrResult(cmdr *hi.CmdrModel) {
+func hiPushCmdrResult(db string, cmdr *hi.CmdrModel) {
 	var m map[string]interface{}
 	err := json.Unmarshal([]byte(cmdr.Result), &m)
 	if err != nil {
@@ -805,17 +839,29 @@ func hiPushCmdrResult(cmdr *hi.CmdrModel) {
 	if ret == 1 {
 		//hiPushCmdrSuccessMsg(cmdr.Devid, cmdr.Action)
 	} else if msg == "overtime" {
-		hiPushCmdrTimeoutMsg(cmdr.Devid, cmdr.Token, cmdr.Action)
+		hiSaveMessage(db, cmdr.Devid, cmdr.Action, cmdr.Token, "", true)
 	} else {
 		stderr := ""
 		if md, ok := m["data"].(map[string]interface{}); ok {
 			if v, ok2 := md["stderr"]; ok2 {
-				if value, ok := v.(string); ok && value != "" {
+				if value, ok3 := v.(string); ok3 && value != "" {
 					decodeString, _ := base64.StdEncoding.DecodeString(value)
 					stderr = string(decodeString)
 				}
 			}
 		}
-		hiPushCmdrFailedMsg(cmdr.Devid, cmdr.Action, cmdr.Token, stderr)
+		hiSaveMessage(db, cmdr.Devid, cmdr.Action, cmdr.Token, stderr, false)
+	}
+}
+
+// hiTimingPushMessages 定时推送消息
+func hiTimingPushMessages(cfg *config.Config) {
+	hiPushMessages(cfg.DB)
+	t := time.NewTicker(2 * time.Minute)
+	for {
+		select {
+		case <-t.C:
+			hiPushMessages(cfg.DB)
+		}
 	}
 }

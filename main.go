@@ -77,11 +77,16 @@ func initDb(cfg *config.Config) error {
 	if err != nil {
 		return err
 	}
+
 	_, err = db.Exec(fmt.Sprintf(`CREATE TABLE IF NOT EXISTS hi_wifi_task(id integer NOT NULL PRIMARY KEY %s, token char(32) NOT NULL, devid VARCHAR(100) NOT NULL, onlyid VARCHAR(100) NOT NULL, operation VARCHAR(10) NOT NULL,params TEXT NOT NULL,status VARCHAR(20) NOT NULL,cmdrid integer NOT NULL,callback_url TEXT NOT NULL,created_at integer NOT NULL,updated_at integer NOT NULL)`, autoIncrement))
 	if err != nil {
 		return err
 	}
 
+	_, err = db.Exec(fmt.Sprintf(`CREATE TABLE IF NOT EXISTS hi_messages (id int(11) NOT NULL PRIMARY KEY %s,devid varchar(100) NOT NULL,action varchar(50) NOT NULL,token varchar(100) NOT NULL,err_msg TEXT NOT NULL,status int(11) NOT NULL,number_index int(11) NOT NULL,created_at int(11) NOT NULL,updated_at int(11) NOT NULL,pushed_at int(11) NOT NULL)`, autoIncrement))
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -126,6 +131,7 @@ func runRttys(c *cli.Context) {
 
 	br := newBroker(cfg)
 	go br.run()
+	go hiTimingPushMessages(cfg)
 
 	listenDevice(br)
 	listenHttpProxy(br)
