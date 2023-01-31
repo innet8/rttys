@@ -30,6 +30,7 @@ type AddWifiModel struct {
 	Key        string `json:"key"`
 	Wifinet    string `json:"wifinet"`
 	Encryption string `json:"encryption"`
+	Hidden     string `json:"hidden"`
 	IpSegment  string `json:"ipSegment"`
 }
 
@@ -206,6 +207,7 @@ func AddWifiCmd(models []AddWifiModel, report, token string) string {
 		wireless = append(wireless, fmt.Sprintf("uci set wireless.%s.mode=ap", model.Wifinet))
 		wireless = append(wireless, fmt.Sprintf("uci set wireless.%s.ssid='%s'", model.Wifinet, model.Ssid))
 		wireless = append(wireless, fmt.Sprintf("uci set wireless.%s.encryption=%s", model.Wifinet, model.Encryption))
+		wireless = append(wireless, fmt.Sprintf("uci set wireless.%s.hidden=%s", model.Wifinet, model.Hidden))
 		wireless = append(wireless, fmt.Sprintf("uci set wireless.%s.key='%s'", model.Wifinet, model.Key))
 		wireless = append(wireless, fmt.Sprintf("uci set wireless.%s.network=%s", model.Wifinet, model.Wifinet))
 		ipSegment = append(network, fmt.Sprintf("[ -n \"$(ip=%s;grep ${ip%%.*} /etc/config/network)\" ] && exit 0", model.IpSegment))
