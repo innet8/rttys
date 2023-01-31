@@ -1940,29 +1940,19 @@ set_hotdnsq() {
     hotdnsqFile=/etc/hotplug.d/iface/99-hi-wireguard-dnsmasq
     cat > ${hotdnsqFile} <<-EOF
 #!/bin/sh
-cat > /etc/resolv.dnsmasq.conf <<-EOE
-nameserver {{.dns_server}}
-nameserver 8.8.8.8
-nameserver 8.8.4.4
-EOE
+echo "nameserver {{.dns_server}}" > /etc/resolv.dnsmasq.conf 
 if [ "\$ACTION" = "ifup" ] && [ "\$INTERFACE" = "lan" ]; then
     /etc/init.d/rtty restart
 fi
 EOF
     chmod +x ${hotdnsqFile}
     ${hotdnsqFile}
+    cp /etc/resolv.dnsmasq.conf /etc/resolv.dnsmasq.backup 
 }
 
 clear_hotdnsq() {
     rm -f /etc/hotplug.d/iface/99-hi-wireguard-dnsmasq
-    local gatewayIP=$(ip route show 1/0 | head -n1 | sed -e 's/^default//' | awk '{print $2}' | awk -F. '$1<=255&&$2<=255&&$3<=255&&$4<=255{print $1"."$2"."$3"."$4}')
-    if [ -n "${gatewayIP}" ]; then
-        cat > /etc/resolv.dnsmasq.conf <<-EOE
-nameserver ${gatewayIP}
-nameserver 8.8.8.8
-nameserver 8.8.4.4
-EOE
-    fi
+    cp /etc/resolv.dnsmasq.backup /etc/resolv.dnsmasq.conf 
 }
 `)
 
@@ -2247,7 +2237,6 @@ webpwd=$(echo -n "$pwd:$sn" |md5sum|awk '{print $1}')
 tmp='{"webpwd":"'$webpwd'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}' 
 curl --connect-timeout 3 -4 -X POST "{{.webpwdReportUrl}}" -H "Content-Type: application/json" -d $tmp
 [ "$?" != "0" ] && lua /mnt/curl.lua "{{.webpwdReportUrl}}" "POST" $tmp
-/etc/hotplug.d/dhcp/99-hi-dhcp &
 /etc/hotplug.d/net/99-hi-wifi &
 /usr/sbin/hi-static-leases &
 /usr/sbin/hi-clients &
