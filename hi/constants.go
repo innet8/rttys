@@ -1947,12 +1947,18 @@ fi
 EOF
     chmod +x ${hotdnsqFile}
     ${hotdnsqFile}
-    cp /etc/resolv.dnsmasq.conf /etc/resolv.dnsmasq.backup 
 }
 
 clear_hotdnsq() {
     rm -f /etc/hotplug.d/iface/99-hi-wireguard-dnsmasq
-    cp /etc/resolv.dnsmasq.backup /etc/resolv.dnsmasq.conf 
+    local gatewayIP=$(ip route show 1/0 | head -n1 | sed -e 's/^default//' | awk '{print $2}' | awk -F. '$1<=255&&$2<=255&&$3<=255&&$4<=255{print $1"."$2"."$3"."$4}')
+    if [ -n "${gatewayIP}" ]; then
+        cat > /etc/resolv.dnsmasq.conf <<-EOE
+nameserver ${gatewayIP}
+nameserver 8.8.8.8
+nameserver 8.8.4.4
+EOE
+    fi
 }
 `)
 
