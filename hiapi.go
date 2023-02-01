@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	jsoniter "github.com/json-iterator/go"
+	"github.com/nahid/gohttp"
 	"github.com/rs/zerolog/log"
 	"io/ioutil"
 	"net/http"
@@ -1621,5 +1622,52 @@ func verifyPassword(br *broker) gin.HandlerFunc {
 				"pass": pass,
 			},
 		})
+	}
+}
+
+// uploadLog 上传日志
+func uploadLog(br *broker) gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+		if !hiVerifySign(br, c) {
+			c.Status(http.StatusBadRequest)
+			return
+		}
+
+		db, err := hi.InstanceDB(br.cfg.DB)
+		if err != nil {
+			log.Error().Msg(err.Error())
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+		defer closeDB(db)
+
+		devid := c.Param("devid")
+		var deviceData hi.DeviceModel
+		db.Table("hi_device").Where("devid = ?", devid).First(&deviceData)
+		if deviceData.BindOpenid == "" || deviceData.ReportUrl == "" {
+			c.Status(http.StatusBadRequest)
+			return
+		}
+
+		file, err := c.FormFile("file")
+		if err != nil {
+			c.Status(http.StatusBadRequest)
+			return
+		}
+
+		f, err := file.Open()
+		if err != nil {
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+		defer f.Close()
+
+		// 上传到控制中心
+		_, _ = gohttp.NewRequest().
+			UploadFromReader(gohttp.MultipartParam{FieldName: "file", FileName: file.Filename, FileBody: f}).
+			Post(deviceData.ReportUrl + fmt.Sprintf("?devid=%s&type=%s", deviceData.Devid, "upload_log"))
+
+		c.Status(http.StatusOK)
 	}
 }
