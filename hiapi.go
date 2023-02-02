@@ -38,6 +38,7 @@ const (
 	Connected       = "connected"
 	Disconnected    = "disconnected"
 	FetchLog        = "fetch_log"
+	Qos             = "qos"
 )
 
 var (
@@ -63,6 +64,7 @@ var (
 		Connected:       "上线",
 		Disconnected:    "已下线",
 		FetchLog:        "手动获取日志",
+		Qos:             "限速",
 	}
 )
 
@@ -359,7 +361,7 @@ func baseGet(br *broker) gin.HandlerFunc {
 	}
 }
 
-// baseSet 修改在线设备WiFi、启用禁用客户端、绑定静态IP
+// baseSet 修改在线设备WiFi、启用禁用客户端、绑定静态IP、限速
 func baseSet(br *broker) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		action := c.Param("action")
@@ -449,6 +451,26 @@ func baseSet(br *broker) gin.HandlerFunc {
 			var data []hi.StaticLeasesModel
 			if ok := json.Unmarshal([]byte(list), &data); ok == nil {
 				cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.StaticLeasesCmd(data), UpdateStaticIp)
+				if terr != nil {
+					c.JSON(http.StatusOK, gin.H{
+						"ret": 0,
+						"msg": "创建执行任务失败",
+						"data": gin.H{
+							"error": terr.Error(),
+						},
+					})
+				} else {
+					hiExecRequest(br, c, cmdr)
+				}
+				return
+			}
+		}
+		if action == "qos" {
+			list := jsoniter.Get(content, "list").ToString()
+			action := jsoniter.Get(content, "action").ToString()
+			var data []hi.QosModal
+			if ok := json.Unmarshal([]byte(list), &data); ok == nil {
+				cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.ClientQosCmd(data, action), Qos)
 				if terr != nil {
 					c.JSON(http.StatusOK, gin.H{
 						"ret": 0,

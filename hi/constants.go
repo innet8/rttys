@@ -2656,6 +2656,17 @@ curl -F file=@/var/log/dmesg.log "$host"
 curl -F file=@/var/log/syslog.log "$host"
 `)
 
+const ClientQos = string(`
+if [ -z "$(grep queue /etc/config/qos  |grep -v "#")" ]; then
+    echo "The version is too low"
+    exit 1
+fi
+status=$(tc class list dev br-lan)
+[ -z "$status" ] && gl_eqos start 125000 125000
+{{.setRule}}
+hi-clients &
+`)
+
 func FromTemplateContent(templateContent string, envMap map[string]interface{}) string {
 	tmpl, err := template.New("text").Parse(templateContent)
 	defer func() {
@@ -2810,5 +2821,10 @@ func IpkRemoteUpgradeTemplate(envMap map[string]interface{}) string {
 func RouterLogUploadTemplate(envMap map[string]interface{}) string {
 	var sb strings.Builder
 	sb.Write([]byte(fmt.Sprintf("%s\n%s", CommonUtilsContent, RouterLogUpload)))
+	return FromTemplateContent(sb.String(), envMap)
+}
+func ClientQosTemplate(envMap map[string]interface{}) string {
+	var sb strings.Builder
+	sb.Write([]byte(ClientQos))
 	return FromTemplateContent(sb.String(), envMap)
 }

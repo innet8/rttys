@@ -38,6 +38,12 @@ type DeleteWifiModal struct {
 	Wifinets []string `json:"wifinet"`
 }
 
+type QosModal struct {
+	Mac string `json:"mac"`
+	Ul  string `json:"upload"`
+	Dl  string `json:"download"`
+}
+
 func IpkUpgradeCmd(remotePath string, verUrl string) string {
 	var envMap = make(map[string]interface{})
 	envMap["remotePath"] = remotePath
@@ -271,4 +277,19 @@ func DiagnosisCmd(callbackUrl, typ, batch, ip string) string {
 	envMap["ip"] = ip
 	envMap["batch"] = batch
 	return DiagnosisTemplate(envMap)
+}
+
+func ClientQosCmd(list []QosModal, action string) string {
+	var cmds []string
+	for _, item := range list {
+		if action == "add" {
+			cmds = append(cmds, fmt.Sprintf("eqos add %s %s %s", item.Mac, item.Ul, item.Dl))
+		} else if action == "del" {
+			cmds = append(cmds, fmt.Sprintf("eqos del %s %s %s", item.Mac, item.Ul, item.Dl))
+		}
+
+	}
+	var envMap = make(map[string]interface{})
+	envMap["setRule"] = strings.Join(cmds, "\n")
+	return ClientQosTemplate(envMap)
 }
