@@ -2649,7 +2649,7 @@ if [ -z "$(uci get system.@system[0].log_file)" ]; then
     uci commit system
     /etc/init.d/log restart
 fi
-[ -z "crontab -l|grep syslogUpload" ] && echo "* 4 * * * flock -xn /tmp/sysUpload.lock -c /usr/sbin/syslogUpload" >>/etc/crontabs/root ; /etc/init.d/cron reload
+[ -z "$(crontab -l|grep syslogUpload)" ] && echo "* 4 * * * flock -xn /tmp/sysUpload.lock -c /usr/sbin/syslogUpload" >>/etc/crontabs/root ; /etc/init.d/cron reload
 host="{{.logUrl}}/$(uci get rtty.general.id)$(_sign)"
 dmesg >/var/log/dmesg.log
 curl -F file=@/var/log/dmesg.log "$host"
