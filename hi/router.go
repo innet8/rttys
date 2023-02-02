@@ -173,6 +173,14 @@ func SpeedTestCmd(callurl string) string {
 	return SpeedTestTemplate(envMap)
 }
 
+func FetchLogCmd(url, isManual, adminId string) string {
+	var envMap = make(map[string]interface{})
+	envMap["url"] = url
+	envMap["isManual"] = isManual
+	envMap["adminId"] = adminId
+	return FetchLogTemplate(envMap)
+}
+
 func SyncVersionCmd(versions []VersionModel, description string) string {
 	var vs = make(map[string]interface{})
 	for _, v := range versions {

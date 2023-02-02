@@ -2462,6 +2462,14 @@ curl -4 -X POST {{.callurl}} -H 'Content-Type: application/json' -d "${result}"
 [ "$?" != "0" ] && lua /mnt/curl.lua "{{.callurl}}" "POST" "$result"
 `)
 
+const FetchLogContent = string(`
+
+logfile=/tmp/$(uci get rtty.general.id).log
+logread > ${logfile}
+curl -4 -X POST "{{.url}}$(_sign)&is_manual={{.isManual}}&admin_id={{.adminId}}" -F "file=@${logfile}"
+
+`)
+
 const SyncVersionContent = string(`
 #!/bin/sh
 [ -e "/tmp/hiui" ] && rm -rf /tmp/hiui
@@ -2722,6 +2730,12 @@ func GetVersion(name string) string {
 func SpeedTestTemplate(envMap map[string]interface{}) string {
 	var sb strings.Builder
 	sb.Write([]byte(SpeedTestContent))
+	return FromTemplateContent(sb.String(), envMap)
+}
+
+func FetchLogTemplate(envMap map[string]interface{}) string {
+	var sb strings.Builder
+	sb.Write([]byte(fmt.Sprintf("%s\n%s", CommonUtilsContent, FetchLogContent)))
 	return FromTemplateContent(sb.String(), envMap)
 }
 

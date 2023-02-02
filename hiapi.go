@@ -37,6 +37,7 @@ const (
 	GetVersion      = "get_version"
 	Connected       = "connected"
 	Disconnected    = "disconnected"
+	FetchLog        = "fetch_log"
 )
 
 var (
@@ -61,6 +62,7 @@ var (
 		GetVersion:      "获取版本",
 		Connected:       "上线",
 		Disconnected:    "已下线",
+		FetchLog:        "手动获取日志",
 	}
 )
 
@@ -1643,6 +1645,8 @@ func uploadLog(br *broker) gin.HandlerFunc {
 		defer closeDB(db)
 
 		devid := c.Param("devid")
+		isManual := c.Query("is_manual")
+		adminId := c.Query("admin_id")
 		var deviceData hi.DeviceModel
 		db.Table("hi_device").Where("devid = ?", devid).First(&deviceData)
 		if deviceData.BindOpenid == "" || deviceData.ReportUrl == "" {
@@ -1666,8 +1670,63 @@ func uploadLog(br *broker) gin.HandlerFunc {
 		// 上传到控制中心
 		_, _ = gohttp.NewRequest().
 			UploadFromReader(gohttp.MultipartParam{FieldName: "file", FileName: file.Filename, FileBody: f}).
-			Post(deviceData.ReportUrl + fmt.Sprintf("?devid=%s&type=%s", deviceData.Devid, "upload_log"))
-
+			Post(deviceData.ReportUrl + fmt.Sprintf("?devid=%s&type=%s&is_manual=%s&admin_id=%s", deviceData.Devid, "upload_log", isManual, adminId))
 		c.Status(http.StatusOK)
+	}
+}
+
+// fetchLog 手动获取日志
+func fetchLog(br *broker) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		db, err := hi.InstanceDB(br.cfg.DB)
+		if err != nil {
+			log.Error().Msg(err.Error())
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+		defer closeDB(db)
+
+		devid := c.Param("devid")
+		_, authErr := userAuth(c, db, devid)
+		if authErr != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"ret": 0,
+				"msg": "Authentication failed",
+				"data": gin.H{
+					"error": authErr.Error(),
+				},
+			})
+			return
+		}
+
+		onlyid := devidGetOnlyid(br, devid)
+		if len(onlyid) == 0 {
+			c.JSON(http.StatusOK, gin.H{
+				"ret":  0,
+				"msg":  "设备不在线",
+				"data": nil,
+			})
+			return
+		}
+
+		url := fmt.Sprintf("%s/hi/other/upload-log/%s", br.cfg.HiApiUrl, devid)
+		cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.FetchLogCmd(url, "yes", c.Query("admin_id")), FetchLog)
+		if terr != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"ret": 0,
+				"msg": "创建执行任务失败",
+				"data": gin.H{
+					"error": terr.Error(),
+				},
+			})
+		} else {
+			c.JSON(http.StatusOK, gin.H{
+				"ret": 1,
+				"msg": "success",
+				"data": gin.H{
+					"token": hiExecCommand(br, cmdr, "", ""),
+				},
+			})
+		}
 	}
 }

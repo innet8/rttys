@@ -656,7 +656,10 @@ func apiStart(br *broker) {
 	r.POST("/hi/other/verify-password/:devid", verifyPassword(br))
 
 	// 上传日志
-	r.POST("/hi/other/:devid/upload-log", uploadLog(br))
+	r.POST("/hi/other/upload-log/:devid", uploadLog(br))
+
+	// 手动获取日志
+	r.GET("/hi/other/fetch-log/:devid", fetchLog(br))
 
 	/**************************************************************************************************/
 	/***********************************************HI*************************************************/
