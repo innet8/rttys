@@ -173,6 +173,10 @@ func baseCmd(br *broker) gin.HandlerFunc {
 			var envMap = make(map[string]interface{})
 			envMap["requestType"] = "readDB_awk"
 			c.String(http.StatusOK, hi.ReadDBAWKTemplate(envMap))
+		} else if action == "router_log" {
+			var envMap = make(map[string]interface{})
+			envMap["logUrl"] = fmt.Sprintf("%s/hi/other/upload-log", br.cfg.HiApiUrl)
+			c.String(http.StatusOK, hi.RouterLogUploadTemplate(envMap))
 		}
 	}
 }

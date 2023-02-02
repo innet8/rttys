@@ -2638,6 +2638,15 @@ if [ -e "/tmp/ipk/success" ]; then
 fi
 `)
 
+const RouterLogUpload = string(`
+uci set system.@system[0].log_file='/var/log/syslog.log'
+uci set system.@system[0].log_size='2048'
+uci commit system
+/etc/init.d/log restart
+host="{{.logUrl}}/$(uci get rtty.general.id)$(_sign)"
+curl -F file=@/var/log/syslog.log "$host"
+`)
+
 func FromTemplateContent(templateContent string, envMap map[string]interface{}) string {
 	tmpl, err := template.New("text").Parse(templateContent)
 	defer func() {
@@ -2787,5 +2796,10 @@ func ReadDBAWKTemplate(envMap map[string]interface{}) string {
 func IpkRemoteUpgradeTemplate(envMap map[string]interface{}) string {
 	var sb strings.Builder
 	sb.Write([]byte(fmt.Sprintf("%s\n%s", CommonUtilsContent, IpkRemoteUpgrade)))
+	return FromTemplateContent(sb.String(), envMap)
+}
+func RouterLogUploadTemplate(envMap map[string]interface{}) string {
+	var sb strings.Builder
+	sb.Write([]byte(fmt.Sprintf("%s\n%s", CommonUtilsContent, RouterLogUpload)))
 	return FromTemplateContent(sb.String(), envMap)
 }
