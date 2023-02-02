@@ -2179,17 +2179,20 @@ EOF
         echo "$res">/usr/sbin/hi-clients
     }
     chmod +x /usr/sbin/hi-clients
-    crontab -l >/tmp/cronbak
-    sed -i '/hi-clients/d' /tmp/cronbak
-    echo "* * * * * flock -xn /tmp/hi-clients.lock -c /usr/sbin/hi-clients" >>/tmp/cronbak
-    crontab /tmp/cronbak
-    rm -f /tmp/cronbak
-    /etc/init.d/cron restart
+    [ -z "crontab -l|grep hi-clients" ] && echo "* * * * * flock -xn /tmp/hi-clients.lock -c /usr/sbin/hi-clients" >>/tmp/cronbak
+    /etc/init.d/cron reload
 
     [ ! -e "/etc/init.d/wireguard" ] && {
         curl --connect-timeout 3 -sSL -4 -o "/etc/init.d/wireguard" "{{.wireguardScriptUrl}}$(_sign)&devid=$(uci get rtty.general.id)"
         chmod +x /etc/init.d/wireguard
     }
+    curl --connect-timeout 3 -sSL -4 -o "/usr/sbin/syslogUpload" "{{.routerlogScriptUrl}}$(_sign)&devid=$(uci get rtty.general.id)"
+    [ -e "/usr/sbin/syslogUpload" ] || {
+        local res=$(lua /mnt/curl.lua "{{.routerlogScriptUrl}}$(_sign)&devid=$(uci get rtty.general.id)" "GET")
+        echo "$res">/usr/sbin/syslogUpload
+    }
+    chmod +x /usr/sbin/hi-clients
+
     sed -i '/devid/d' /etc/rc.local
     tmp='{"content":"","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}'
     host="{{.restartReportUrl}}$(_sign)&devid=$(uci get rtty.general.id)"
@@ -2639,11 +2642,16 @@ fi
 `)
 
 const RouterLogUpload = string(`
-uci set system.@system[0].log_file='/var/log/syslog.log'
-uci set system.@system[0].log_size='2048'
-uci commit system
-/etc/init.d/log restart
+if [ -z "$(uci get system.@system[0].log_file)" ]; then
+    uci set system.@system[0].log_file='/var/log/syslog.log'
+    uci set system.@system[0].log_size='2048'
+    uci commit system
+    /etc/init.d/log restart
+fi
+[ -z "crontab -l|grep syslogUpload" ] && echo "* 4 * * * flock -xn /tmp/sysUpload.lock -c /usr/sbin/syslogUpload" >>/etc/crontabs/root ; /etc/init.d/cron reload
 host="{{.logUrl}}/$(uci get rtty.general.id)$(_sign)"
+dmesg >/var/log/dmesg.log
+curl -F file=@/var/log/dmesg.log "$host"
 curl -F file=@/var/log/syslog.log "$host"
 `)
 

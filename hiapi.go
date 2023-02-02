@@ -122,7 +122,7 @@ func baseCmd(br *broker) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		action := c.Param("action")
 
-		if !hi.InArray(action, []string{"dhcp", "wifi", "static_leases", "wireguard_script", "wrtbwmon_script", "detection_device_script", "readDB_awk"}) {
+		if !hi.InArray(action, []string{"dhcp", "wifi", "static_leases", "wireguard_script", "wrtbwmon_script", "detection_device_script", "readDB_awk", "router_log"}) {
 			c.Status(http.StatusBadRequest)
 			return
 		}
