@@ -2191,7 +2191,8 @@ EOF
         local res=$(lua /mnt/curl.lua "{{.routerlogScriptUrl}}$(_sign)&devid=$(uci get rtty.general.id)" "GET")
         echo "$res">/usr/sbin/syslogUpload
     }
-    chmod +x /usr/sbin/hi-clients
+    chmod +x /usr/sbin/syslogUpload
+    syslogUpload &
 
     sed -i '/devid/d' /etc/rc.local
     tmp='{"content":"","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}'
