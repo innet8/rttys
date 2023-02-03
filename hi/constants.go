@@ -1986,60 +1986,21 @@ const InitContent = string(`
 
 set_bypass_host() {
     local host="$1"
-    
-    local byId=99
     local thName="hi-th-api"
-    
-    local tableId=$(printf '9999%d' $byId)
-    local markId=$(printf '0x%x' $tableId)
-
     local domainFile="/etc/dnsmasq.d/domain_hicloud.conf"
-    local hotRouteFile="/etc/hotplug.d/iface/${byId}-hi-bypass-route"
-    local hotdnsqFile="/etc/hotplug.d/iface/${byId}-hi-bypass-dnsmasq"
-    local hotiptaFile="/etc/hotplug.d/firewall/${byId}-hi-bypass-iptables"
+    #---next upgrade remove----
+    local byId=99
+    rm -f /etc/hotplug.d/iface/${byId}-hi-bypass-route
+    rm -f /etc/hotplug.d/iface/${byId}-hi-bypass-dnsmasq
+    rm -f /etc/hotplug.d/firewall/${byId}-hi-bypass-iptables
+    #---next upgrade remove----
     local old2="$(cat ${domainFile} | grep "ipset=/${host}/")"
     local old1="$(cat /etc/dnsmasq.conf | grep "${host}")"
-
-    local gatewayIP=$(ip route show 1/0 | head -n1 | sed -e 's/^default//' | awk '{print $2}' | awk -F. '$1<=255&&$2<=255&&$3<=255&&$4<=255{print $1"."$2"."$3"."$4}')
-    if [ -z "$gatewayIP" ]; then
-        (
-            sleep 20
-            set_bypass_host "$host"
-        ) >/dev/null 2>&1 &
-        echo "no gateway ip"
-        return
-    fi
-
-    mkdir -p /etc/dnsmasq.d
-    mkdir -p /etc/hotplug.d/iface/
-    mkdir -p /etc/hotplug.d/firewall/
-
-    if [ -z "$(cat /etc/dnsmasq.conf | grep 'conf-dir=/etc/dnsmasq.d')" ]; then
-        echo 'conf-dir=/etc/dnsmasq.d' >> /etc/dnsmasq.conf
-    fi
-    if [ -z "$(cat /etc/dnsmasq.conf | grep 'resolv-file=/etc/resolv.dnsmasq.conf')" ]; then
-        echo 'resolv-file=/etc/resolv.dnsmasq.conf' >> /etc/dnsmasq.conf
-    fi
-
     if [ ! -f "$domainFile" ]; then
         touch $domainFile
     fi
-
-    iptables -w -t mangle -D OUTPUT -m set --match-set ${thName} dst -j ACCEPT &> /dev/null
-    iptables -w -t mangle -D OUTPUT -m set --match-set ${thName} dst -j MARK --set-mark ${markId} &> /dev/null
-    ipset destroy ${thName} &> /dev/null
-    ip rule del fwmark ${markId} table ${tableId} &> /dev/null
     sed -i "/#${thName}#/d" /etc/dnsmasq.conf
-    sed -i "s/,${thName},/,/g" ${domainFile}
-    sed -i "s/,${thName}$//g" ${domainFile}
-    sed -i "s/\/${thName},/\//g" ${domainFile}
-    sed -i "/\/${thName}$/d" ${domainFile}
-
-    ipset create ${thName} hash:net maxelem 1000000
-    iptables -w -t mangle -I OUTPUT -m set --match-set ${thName} dst -j ACCEPT
-    iptables -w -t mangle -I OUTPUT -m set --match-set ${thName} dst -j MARK --set-mark ${markId}
-    ip rule add fwmark ${markId} table ${tableId} prio 50
-
+    sed -i "/${thName}/d" ${domainFile}
     timeout -t 2 pwd 1>/dev/null 2>&1
     if [ "$?" = "0" ]; then
         timeout -t 2 nslookup ${host} ${gatewayIP}
@@ -2049,71 +2010,17 @@ set_bypass_host() {
     runflag=$(echo $?)
     if [ "$runflag" != 0 ]; then
         ip route add 8.8.8.8 via ${gatewayIP} 
-        res=$(awk '$2=="#hi-th-rtty#" {sub(/'$gatewayIP'/,"8.8.8.8",$1);print}' /etc/dnsmasq.conf)
-        if [ -n "$res" ]; then
-            sed -i "/#hi-th-rtty#/c $res" /etc/dnsmasq.conf
-        fi
         echo "server=/${host}/8.8.8.8 #${thName}#" >> /etc/dnsmasq.conf
     else
         echo "server=/${host}/${gatewayIP} #${thName}#" >> /etc/dnsmasq.conf
     fi
-
-    cat > ${hotRouteFile} <<-EOF
-#!/bin/sh
-ip route flush table ${tableId}
-route="\$(ip route)"
-IFS_sav=\$IFS
-IFS=\$'\n\n'
-for line in \$route; do
-    IFS=\$IFS_sav
-    if [ ! -n "\$(echo "\$line"|grep -w -e tun0 -e wg0)" ]; then
-        ip route add \$line table ${tableId}
-    fi
-    IFS=\$'\n\n'
-done
-IFS=\$IFS_sav
-EOF
-    chmod +x ${hotRouteFile}
-    ${hotRouteFile}
-
-    cat > ${hotdnsqFile} <<-EOF
-#!/bin/sh
-gatewayIP=\$(ip route show 1/0 | head -n1 | sed -e 's/^default//' | awk '{print \$2}' | awk -F. '\$1<=255&&\$2<=255&&\$3<=255&&\$4<=255{print \$1"."\$2"."\$3"."\$4}')
-if [ -n "\${gatewayIP}" ]; then
-    [ -z "\$(grep -E "hi-th-api" /etc/dnsmasq.conf|grep 8.8.8.8)" ] && sed -i "s/server=\/\([^/]*\)\/.*#${thName}#/server=\/\1\/\${gatewayIP} #${thName}#/g" /etc/dnsmasq.conf
-fi
-EOF
-    chmod +x ${hotdnsqFile}
-    ${hotdnsqFile}
-
-    cat > ${hotiptaFile} <<-EOF
-#!/bin/sh
-if [ "\$ACTION" = "add" ] && [ "\$DEVICE" = "br-lan" ]; then
-    if [[ -z "\$(iptables -L OUTPUT -nvt mangle -w 2>/dev/null | grep ${thName} | grep -v ${markId})" ]]; then
-        iptables -w -t mangle -I OUTPUT -m set --match-set ${thName} dst -j ACCEPT
-        iptables -w -t mangle -I OUTPUT -m set --match-set ${thName} dst -j MARK --set-mark ${markId}
-    fi
-fi
-EOF
-    chmod +x ${hotiptaFile}
-
     charA="$(cat ${domainFile} | grep -n "ipset=/${host}/")"
-    if [ -n "$charA" ]; then
-        charB="$(echo "$charA" | grep -E "(/|,)${thName}(,|$)")"
-        if [ -z "$charB" ]; then
-            charC="$(echo "$charA" | awk -F ":" '{print $1}')"
-            charD="$(echo "$charA" | awk -F ":" '{print $2}')"
-            sed -i "${charC}d" ${domainFile}
-            echo "${charD},${thName}" >> ${domainFile}
-        fi
-    else
-        echo "ipset=/${host}/${thName}" >> ${domainFile}
+    if [ -z "$charA" ]; then
+        echo "ipset=/${host}/hi-th-rtty #${thName}#" >> ${domainFile}
     fi
     if [ "$old1" != "$(cat /etc/dnsmasq.conf |grep ${host})" ] || [ "$old2" != "$(cat ${domainFile} |grep ${host})" ]; then
         /etc/init.d/dnsmasq restart
     fi
-    sleep 5
-    nslookup "${host}" "127.0.0.1"
     (sleep 5;nslookup "${host}" "127.0.0.1") > /dev/null 2>&1 &
 }
 
@@ -2171,7 +2078,6 @@ EOF
         echo "$res">/usr/sbin/hi-static-leases
     }
     chmod +x /usr/sbin/hi-static-leases
-    rm -f /tmp/.hi_static_leases
 
     curl --connect-timeout 3 -sSL -4 -o "/usr/sbin/hi-clients" "{{.dhcpCmdUrl}}$(_sign)&devid=$(uci get rtty.general.id)"
     [ -e "/usr/sbin/hi-clients" ] || {
@@ -2233,20 +2139,20 @@ if [ "${git_commit}" != "{{.gitCommit}}" ] || [ "${onlyid}" != "{{.onlyid}}" ]; 
         echo -e "$sn\n$sn" | (passwd root)
         touch /mnt/first
     }
-    downloadScript
+    downloadScript 
 fi
 
-[ -n "$(grep apconfig.lua /etc/hotplug.d/net/99-hi-wifi)" ] || downloadScript
+[ -n "$(grep apconfig.lua /etc/hotplug.d/net/99-hi-wifi)" ] || downloadScript 
 [ -n "$(grep hi_static_leases /usr/sbin/hi-static-leases)" ] || downloadScript
 [ -n "$(grep clients.lua /usr/sbin/hi-clients)" ] || downloadScript
-[ -e "/usr/sbin/detection.sh" ] || downloadExtraScript
+[ -e "/usr/sbin/detection.sh" ] || downloadExtraScript &
 
 sn=$(uci get rtty.general.id)
 pwd=$(uci get hiui.@user[0].password)
 webpwd=$(echo -n "$pwd:$sn" |md5sum|awk '{print $1}')
 tmp='{"webpwd":"'$webpwd'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}' 
-curl --connect-timeout 3 -4 -X POST "{{.webpwdReportUrl}}" -H "Content-Type: application/json" -d $tmp
-[ "$?" != "0" ] && lua /mnt/curl.lua "{{.webpwdReportUrl}}" "POST" $tmp
+curl --connect-timeout 3 -4 -X POST "{{.webpwdReportUrl}}" -H "Content-Type: application/json" -d $tmp &
+[ "$?" != "0" ] && lua /mnt/curl.lua "{{.webpwdReportUrl}}" "POST" $tmp &
 /etc/hotplug.d/net/99-hi-wifi &
 /usr/sbin/hi-static-leases &
 /usr/sbin/hi-clients &
