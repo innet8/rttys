@@ -1996,6 +1996,15 @@ set_bypass_host() {
     #---next upgrade remove----
     local old2="$(cat ${domainFile} | grep "ipset=/${host}/")"
     local old1="$(cat /etc/dnsmasq.conf | grep "${host}")"
+    local gatewayIP=$(ip route show 1/0 | head -n1 | sed -e 's/^default//' | awk '{print $2}' | awk -F. '$1<=255&&$2<=255&&$3<=255&&$4<=255{print $1"."$2"."$3"."$4}')
+    if [ -z "$gatewayIP" ]; then
+        (
+            sleep 20
+            set_bypass_host "$host"
+        ) >/dev/null 2>&1 &
+        echo "no gateway ip"
+        return
+    fi
     if [ ! -f "$domainFile" ]; then
         touch $domainFile
     fi
