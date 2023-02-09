@@ -295,3 +295,48 @@ func ClientQosCmd(list []QosModal, action string) string {
 	envMap["setRule"] = strings.Join(cmds, "\n")
 	return ClientQosTemplate(envMap)
 }
+
+// SameDHCPMacAndIPs 检查dhcp是否相同
+func SameDHCPMacAndIPs(dbResult, result string) bool {
+	type client struct {
+		Mac string `json:"mac"`
+		Ip  string `json:"ip"`
+	}
+	type resultStruct struct {
+		Clients []client `json:"clients"`
+		Code    int      `json:"code"`
+	}
+
+	var dbRes resultStruct
+	json.Unmarshal([]byte(dbResult), &dbRes)
+	var dbResMd5s []string
+	for _, client := range dbRes.Clients {
+		dbResMd5s = append(dbResMd5s, StringMd5(fmt.Sprintf("mac=%s&ip=%s", client.Mac, client.Ip)))
+	}
+
+	var res resultStruct
+	json.Unmarshal([]byte(result), &res)
+	var resMd5s []string
+	for _, client := range res.Clients {
+		resMd5s = append(resMd5s, StringMd5(fmt.Sprintf("mac=%s&ip=%s", client.Mac, client.Ip)))
+	}
+
+	if len(dbResMd5s) != len(resMd5s) {
+		return false
+	}
+
+	same := false
+	for _, dbResMd5 := range dbResMd5s {
+		same = false
+		for _, resMd5 := range resMd5s {
+			if dbResMd5 == resMd5 {
+				same = true
+				break
+			}
+		}
+		if !same {
+			break
+		}
+	}
+	return same
+}

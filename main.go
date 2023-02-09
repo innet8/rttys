@@ -132,6 +132,7 @@ func runRttys(c *cli.Context) {
 	br := newBroker(cfg)
 	go br.run()
 	go hiTimingPushMessages(cfg)
+	go hiTimingDeleteData(cfg)
 
 	listenDevice(br)
 	listenHttpProxy(br)

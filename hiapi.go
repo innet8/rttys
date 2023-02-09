@@ -286,13 +286,32 @@ func baseReport(br *broker) gin.HandlerFunc {
 				"devid": devid,
 			}).Where("time > ?", rtime).Count(&count)
 			if count == 0 {
-				db.Table("hi_info").Create(&hi.InfoModel{
-					Devid:  devid,
-					Onlyid: devidGetOnlyid(br, devid),
-					Type:   action,
-					Result: result,
-					Time:   rtime,
-				})
+				createInfo := false
+				if action == "dhcp" {
+					var dhcp hi.InfoModel
+					db.Table("hi_info").Where(map[string]interface{}{
+						"type":  action,
+						"devid": devid,
+					}).Last(&dhcp)
+					// 数据库中不存在dhcp信息，或者最新一条是一个小时前的，或者和新上报不一样，则添加
+					if dhcp.ID == 0 || dhcp.Time < rtime-3600 || !hi.SameDHCPMacAndIPs(dhcp.Result, result) {
+						createInfo = true
+					} else {
+						dhcp.Result = result
+						dhcp.Time = rtime
+						db.Table("hi_info").Save(&dhcp)
+					}
+					go hiDeleteDHCP14DaysBefore(br.cfg.DB, devid)
+				}
+				if action != "dhcp" || createInfo {
+					db.Table("hi_info").Create(&hi.InfoModel{
+						Devid:  devid,
+						Onlyid: devidGetOnlyid(br, devid),
+						Type:   action,
+						Result: result,
+						Time:   rtime,
+					})
+				}
 			}
 
 			// 上报网速等信息

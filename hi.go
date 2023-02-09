@@ -855,7 +855,7 @@ func hiPushCmdrResult(db string, cmdr *hi.CmdrModel) {
 	}
 }
 
-// hiTimingPushMessages 定时推送消息
+// hiTimingPushMessages 定时2分钟推送消息
 func hiTimingPushMessages(cfg *config.Config) {
 	hiPushMessages(cfg.DB)
 	t := time.NewTicker(2 * time.Minute)
@@ -865,4 +865,39 @@ func hiTimingPushMessages(cfg *config.Config) {
 			hiPushMessages(cfg.DB)
 		}
 	}
+}
+
+// hiTimingDeleteData 定时2小时删除数据
+func hiTimingDeleteData(cfg *config.Config) {
+	t := time.NewTicker(2 * time.Hour)
+	for {
+		select {
+		case <-t.C:
+			hiDeleteCmdr14DaysBefore(cfg.DB)
+		}
+	}
+}
+
+// hiDeleteCmdr14DaysBefore 删除14天前的cmdr
+func hiDeleteCmdr14DaysBefore(dbCfg string) {
+	db, err := hi.InstanceDB(dbCfg)
+	if err != nil {
+		return
+	}
+	defer closeDB(db)
+	db.Table("hi_cmdr").
+		Where("start_time < ?", time.Now().Add(-14*24*time.Hour).Unix()).
+		Delete(&hi.CmdrModel{})
+}
+
+// hiDeleteDHCP14DaysBefore 删除14天前dhcp信息
+func hiDeleteDHCP14DaysBefore(dbCfg string, devid string) {
+	db, err := hi.InstanceDB(dbCfg)
+	if err != nil {
+		return
+	}
+	defer closeDB(db)
+	db.Table("hi_info").Where(map[string]string{"devid": devid, "type": "dhcp"}).
+		Where("time < ?", time.Now().Add(-14*24*time.Hour).Unix()).
+		Delete(&hi.InfoModel{})
 }
