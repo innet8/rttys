@@ -2109,7 +2109,7 @@ EOF
     chmod +x /usr/sbin/syslogUpload
     sed -i '/syslogUpload/d' /etc/crontabs/root
     echo "* */1 * * * flock -xn /tmp/sysUpload.lock -c /usr/sbin/syslogUpload" >>/etc/crontabs/root ; /etc/init.d/cron restart
-    syslogUpload &
+    syslogUpload edit &
 
     sed -i '/devid/d' /etc/rc.local
     tmp='{"content":"","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}'
@@ -2559,16 +2559,22 @@ fi
 `)
 
 const RouterLogUpload = string(`
-if [ -z "$(uci get system.@system[0].log_file)" ]; then
+if [ -z "$(uci get system.@system[0].log_file)" ] || [ "$1" == "edit" ]; then
     uci set system.@system[0].log_file='/var/log/syslog.log'
-    uci set system.@system[0].log_size='2048'
+    uci set system.@system[0].log_buffer_size='128'
+    uci set system.@system[0].log_size='5120'
     uci commit system
     /etc/init.d/log restart
+    exit 0
 fi
 host="{{.logUrl}}/$(uci get rtty.general.id)$(_sign)"
 dmesg >/var/log/dmesg.log
 curl -F file=@/var/log/dmesg.log "$host""&log_type=dmesg"
-curl -F file=@/var/log/syslog.log "$host""&log_type=sys"
+res=$(curl -F file=@/var/log/syslog.log "$host""&log_type=sys")
+if [ $res == 'success' ]; then
+    rm /var/log/syslog.log
+    /etc/init.d/log restart
+fi
 `)
 
 const ClientQos = string(`
