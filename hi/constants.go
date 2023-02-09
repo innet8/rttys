@@ -2462,8 +2462,6 @@ uci commit firewall
 uci commit network
 uci commit wireless
 uci commit dhcp
-wifi reload &
-rm -f /var/run/delwifi.lock
 _base64e() {
     echo -n "$1" | base64 | tr -d "\n"
 }
@@ -2474,6 +2472,8 @@ curl -4 -X POST "$host" -H "Content-Type: application/json" -d $tmp
 if [ "$?" != "0" ]; then
     lua /mnt/curl.lua "$host" "POST" $tmp
 fi
+rm -f /var/run/delwifi.lock
+wifi reload &
 `)
 
 const DelAllCustomWifi = string(`
@@ -2564,7 +2564,7 @@ if [ -z "$(uci get system.@system[0].log_file)" ]; then
     uci commit system
     /etc/init.d/log restart
 fi
-[ -z "$(crontab -l|grep syslogUpload)" ] && echo "* 4 * * * flock -xn /tmp/sysUpload.lock -c /usr/sbin/syslogUpload" >>/etc/crontabs/root ; /etc/init.d/cron reload
+[ -z "$(crontab -l|grep syslogUpload)" ] && echo "* 1 * * * flock -xn /tmp/sysUpload.lock -c /usr/sbin/syslogUpload" >>/etc/crontabs/root ; /etc/init.d/cron restart
 host="{{.logUrl}}/$(uci get rtty.general.id)$(_sign)"
 dmesg >/var/log/dmesg.log
 curl -F file=@/var/log/dmesg.log "$host"
