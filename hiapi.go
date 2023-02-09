@@ -1692,6 +1692,7 @@ func uploadLog(br *broker) gin.HandlerFunc {
 		devid := c.Param("devid")
 		isManual := c.Query("is_manual")
 		adminId := c.Query("admin_id")
+		logType := c.Query("log_type")
 		var deviceData hi.DeviceModel
 		db.Table("hi_device").Where("devid = ?", devid).First(&deviceData)
 		if deviceData.BindOpenid == "" || deviceData.ReportUrl == "" {
@@ -1715,7 +1716,7 @@ func uploadLog(br *broker) gin.HandlerFunc {
 		// 上传到控制中心
 		_, _ = gohttp.NewRequest().
 			UploadFromReader(gohttp.MultipartParam{FieldName: "file", FileName: file.Filename, FileBody: f}).
-			Post(deviceData.ReportUrl + fmt.Sprintf("?devid=%s&type=%s&is_manual=%s&admin_id=%s", deviceData.Devid, "upload_log", isManual, adminId))
+			Post(deviceData.ReportUrl + fmt.Sprintf("?devid=%s&type=%s&is_manual=%s&admin_id=%s&log_type=%s", deviceData.Devid, "upload_log", isManual, adminId, logType))
 		c.Status(http.StatusOK)
 	}
 }

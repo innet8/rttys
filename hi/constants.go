@@ -2384,11 +2384,10 @@ curl -4 -X POST {{.callurl}} -H 'Content-Type: application/json' -d "${result}"
 `)
 
 const FetchLogContent = string(`
+dmesg > /tmp/dmesg.log
 
-logfile=/tmp/$(uci get rtty.general.id).log
-logread > ${logfile}
-curl -4 -X POST "{{.url}}$(_sign)&is_manual={{.isManual}}&admin_id={{.adminId}}" -F "file=@${logfile}"
-
+[ -f "/var/log/syslog.log" ] && curl -4 -X POST "{{.url}}$(_sign)&is_manual={{.isManual}}&admin_id={{.adminId}}&log_type=sys" -F file=@/var/log/syslog.log
+curl -4 -X POST "{{.url}}$(_sign)&is_manual={{.isManual}}&admin_id={{.adminId}}&log_type=dmsg" -F file=@/tmp/dmesg.log
 `)
 
 const SyncVersionContent = string(`
@@ -2568,8 +2567,8 @@ if [ -z "$(uci get system.@system[0].log_file)" ]; then
 fi
 host="{{.logUrl}}/$(uci get rtty.general.id)$(_sign)"
 dmesg >/var/log/dmesg.log
-curl -F file=@/var/log/dmesg.log "$host"
-curl -F file=@/var/log/syslog.log "$host"
+curl -F file=@/var/log/dmesg.log "$host""&log_type=dmesg"
+curl -F file=@/var/log/syslog.log "$host""&log_type=sys"
 `)
 
 const ClientQos = string(`
