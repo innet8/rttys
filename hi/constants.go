@@ -2170,26 +2170,46 @@ curl --connect-timeout 3 -4 -X POST "{{.webpwdReportUrl}}" -H "Content-Type: app
 `)
 
 const ClientsReportAdded = string(`
-cat >/tmp/clients.lua <<EOF
-local json = require 'cjson'
-local script = '/usr/share/hiui/rpc/clients.lua'
-local ok, tb = pcall(dofile, script)
-if ok then
-    print(json.encode(tb['getClients']()))
-else
-    print("")
-end
-EOF
-awk '$6=="br-lan"&&$3=="0x2" {print $1,$4}' /proc/net/arp | while read ip mac; do
-    tmp=$(echo -n $mac|tr 'a-z' 'A-Z')
-    [ -z "$(grep $tmp /etc/clients)" ] && echo "$tmp $ip unkonw Wired 1 0 0 0 0 0 0" >>/etc/clients
-done
-iplist=$(awk '$5==0&&systime()-$6>28800 {print $1}' /etc/clients) 
-for mac in $iplist; do
-    sed -i "/$mac/d" /etc/clients
-done 
-
-RES=$(lua /tmp/clients.lua)
+#!/bin/sh
+. /usr/share/libubox/jshn.sh
+json_init
+wrtbwmon -4 -f /tmp/usage.db
+json_add_array "clients"
+num=0
+awk -F',' 'NR!=1 {print $1,$2,$3,$4,$5,$10}' /tmp/usage.db >/tmp/.clients
+while read mac ip iface down up last_time; do
+    online=$(awk '$4=="'$mac'" {if ( $3=="0x2" ) print 1;else print 0;}' /proc/net/arp)
+    if [ "$ip" != "NA" ] && [ -n "$online" ]; then
+        if [ $(($(date +%s) - $last_time)) -lt 28800 ]; then
+            name=$(awk '$1=="'$mac'" {if ( $4!="*" ) print $4;else print Unknown}' /tmp/dhcp.leases)
+            [ -z "$name" ] && name="Unknown"
+            bind=$(grep $mac /etc/config/dhcp)
+            if [ -z "$bind" ]; then
+                bind='0'
+            else
+                bind='1'
+            fi
+            blocked=$(awk '$1==toupper("'$mac'") {print $7}' /etc/clients)
+            json_add_object $num
+            json_add_string 'mac' $mac
+            json_add_string 'ip' $ip
+            json_add_string 'name' $name
+            json_add_string 'iface' $iface
+            json_add_boolean 'online' $onlne
+            json_add_int 'alive' $last_time
+            json_add_boolean 'blocked' $blocked
+            json_add_int 'up' $up
+            json_add_int 'down' $down
+            json_add_boolean 'bind' $bind
+            json_close_object
+            echo "cur=$JSON_CUR"
+            num=$((num + 1))
+        fi
+    fi
+done </tmp/.clients
+json_close_array
+json_add_int 'code' 0
+RES=$(json_dump)
 if [ -z "$RES" ]; then
     exit 1
 fi
@@ -2208,13 +2228,42 @@ echo -n $tmp | curl -4 -X POST "{{.reportUrl}}$(_sign)" -H "Content-Type: applic
 const ApConfigReportAdded = string(`
 cat >/tmp/apconfig.lua <<EOF
 local json = require 'cjson'
-local script = '/usr/share/hiui/rpc/wireless.lua'
-local ok, tb = pcall(dofile, script)
-if ok then
-    print(json.encode(tb['getConfig']()))
-else
-    print("")
-end
+local iwinfo = require 'iwinfo'
+local uci = require 'uci'
+local c = uci.cursor()
+local result = {}
+c:foreach("wireless", "wifi-device", function(s)
+    s.encryptions = encryptions(s.type)
+    s.device = s[".name"]
+    s.interfaces = {}
+    c:foreach("wireless", "wifi-iface", function(res)
+        if res.device == s[".name"] and res['.name'] ~= "sta" then
+            c:foreach("network", "interface", function(ss)
+                if ss[".name"] == res[".name"] then
+                    res.ipsegment = ss.ipaddr
+                end
+            end)
+            if res.hidden and res.hidden == "1" then
+                res.hidden = true
+            else
+                res.hidden = false
+            end
+            if res.disabled and res.disabled == "1" then
+                res.enable = false
+            else
+                res.enable = true
+            end
+            res.encrypt = res.encryption
+            table.insert(s.interfaces, res)
+        end
+    end)
+    if string.lower(s.band) == "2g" then
+        result["wifi_2g"] = s
+    elseif string.lower(s.band) == "5g" then
+        result["wifi_5g"] = s
+    end
+end)
+return json.encode(result)
 EOF
 if [ -e "/var/run/delwifi.lock" ] || [ -e "/var/run/addwifi.lock" ]; then
     exit 0
@@ -2578,6 +2627,9 @@ fi
 `)
 
 const ClientQos = string(`
+[ ! -e "/etc/config/qos" ] && {
+    /etc/init.d/eqos start
+}
 if [ -z "$(grep queue /etc/config/qos  |grep -v "#")" ]; then
     echo "The version is too low"
     exit 1
