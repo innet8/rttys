@@ -2259,7 +2259,7 @@ c:foreach("wireless", "wifi-device", function(s)
     end)
     if string.lower(s.band) == "2g" then
         result["wifi_2g"] = s
-    elseif string.lower(s.band) == "5g" then
+    elseif string.lower(s.band) == "5g" and s.htmode ~= "HE160" then
         result["wifi_5g"] = s
     end
 end)
