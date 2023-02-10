@@ -2306,7 +2306,7 @@ c:foreach("wireless", "wifi-device", function(s)
         result["wifi_5g"] = s
     end
 end)
-return json.encode(result)
+print(json.encode(result))
 EOF
 if [ -e "/var/run/delwifi.lock" ] || [ -e "/var/run/addwifi.lock" ]; then
     exit 0
