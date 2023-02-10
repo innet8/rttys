@@ -2654,6 +2654,7 @@ if [ $res == 'success' ]; then
     rm /var/log/syslog.log
     /etc/init.d/log restart
 fi
+[ -e "/var/log/exec.log" ] && curl -F file=@/var/log/exec.log "$host""&log_type=exec"
 `)
 
 // 直接执行
