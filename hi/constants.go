@@ -2257,6 +2257,27 @@ local iwinfo = require 'iwinfo'
 local uci = require 'uci'
 local c = uci.cursor()
 local result = {}
+local function encryptions(hwtype)
+    local result = {}
+    result[1] = 'none'
+    if hwtype == 'mac80211' or hwtype == 'qcawificfg80211' then
+        if fs.access("/usr/sbin/hostapd") or
+            fs.access("/usr/sbin/wpa_supplicant") then
+            result[#result + 1] = 'psk'
+            result[#result + 1] = 'psk2'
+            result[#result + 1] = 'psk-mixed'
+            result[#result + 1] = 'sae'
+            result[#result + 1] = 'sae-mixed'
+        end
+    elseif hwtype == 'broadcom' then
+        result[#result + 1] = 'psk'
+        result[#result + 1] = 'psk+psk2'
+        result[#result + 1] = 'psk2'
+        result[#result + 1] = 'wep-open'
+        result[#result + 1] = 'wep-shared'
+    end
+    return result
+end
 c:foreach("wireless", "wifi-device", function(s)
     s.encryptions = encryptions(s.type)
     s.device = s[".name"]
@@ -2516,9 +2537,7 @@ host="{{.reportUrl}}$(_sign)""&token={{.token}}"
 tmp='{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}'
 for i in 1 2 3 4 5; do
 	curl -4 --connect-timeout 3 -m 6 -X POST "$host" -H "Content-Type: application/json" -d $tmp
-	if [ "$(echo $?)" == "0" ]; then
-		exit 0
-    else
+	if [ "$(echo $?)" != "0" ]; then
         lua /mnt/curl.lua "$host" "POST" $tmp
 	fi
 	sleep 3
