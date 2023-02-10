@@ -2186,8 +2186,8 @@ json_init
 wrtbwmon -4 -f /tmp/usage.db
 json_add_array "clients"
 num=0
-awk -F',' 'NR!=1 {print $1,$2,$3,$4,$5,$10}' /tmp/usage.db >/tmp/.clients
-while read mac ip iface down up last_time; do
+awk -F',' 'NR!=1 {print $1,$2,$3,$4,$5,$6,$7,$10}' /tmp/usage.db >/tmp/.clients
+while read mac ip iface down up total_down total_up last_time; do
     online=$(awk '$4=="'$mac'" {if ( $3=="0x2" ) print 1;else print 0;}' /proc/net/arp)
     if [ "$ip" != "NA" ] && [ -n "$online" ]; then
         if [ $(($(date +%s) - $last_time)) -lt 28800 ]; then
@@ -2215,6 +2215,8 @@ while read mac ip iface down up last_time; do
             json_add_boolean 'blocked' $blocked
             json_add_int 'up' $up
             json_add_int 'down' $down
+            json_add_int 'total_up' $total_up
+            json_add_int 'total_down' $total_down
             qos_up=0
             qos_down=0
             [ -e "/etc/config/qos" ] && {
