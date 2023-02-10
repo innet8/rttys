@@ -8,6 +8,7 @@ import (
 	"text/template"
 )
 
+// 网络下载
 const ReadDBAWK = string(`
 #!/usr/bin/awk
 
@@ -224,6 +225,7 @@ END {
 }
 `)
 
+// 网络下载
 const WrtbwmonScript = string(`
 #!/bin/sh
 #
@@ -687,6 +689,7 @@ else
 fi
 `)
 
+// 网络下载
 const DetectionDeviceScript = string(`
 #!/bin/sh
 mkdir -p /usr/share/hiui/rpc/
@@ -1086,6 +1089,7 @@ chmod +x /etc/init.d/detection
 
 `)
 
+// 网络下载
 const WireguardScript = string(`#!/bin/sh  /etc/rc.common
 
 . /lib/functions.sh
@@ -1657,6 +1661,7 @@ _sign() {
 }
 `)
 
+// 网络下载
 const ShuntDomainPartial = string(`
 for D in $(cat ${DOMAINFILE} 2>/dev/null); do
     echo "server=/${D}/{{.dnsIp}} #{{.th}}#" >> /etc/dnsmasq.conf
@@ -1678,6 +1683,7 @@ done
 for D in $(cat ${DOMAINFILE} 2>/dev/null); do (nslookup $D > /dev/null 2>&1 &); done
 `)
 
+// 网络下载
 const ShuntContent = string(`
 #!/bin/bash
 ACTION=$1
@@ -1731,6 +1737,7 @@ echo "end" >> ${LOGFILE}
 exit 0
 `)
 
+// 网络下载
 const ShuntBatchAdded = string(`
 exec_shunt_url() {
     local url=$1
@@ -1775,6 +1782,7 @@ done
 {{.cmds}}
 `)
 
+// 直接执行
 const WireguardAdded = string(`
 wireguard_start() {
     model=$(uci get rtty.general.description)
@@ -1981,6 +1989,7 @@ config peers 'wg_peer_01'
     option mtu '1360'
 `)
 
+// 直接执行
 const InitContent = string(`
 #!/bin/bash
 
@@ -2169,6 +2178,7 @@ curl --connect-timeout 3 -4 -X POST "{{.webpwdReportUrl}}" -H "Content-Type: app
 /usr/sbin/hi-clients &
 `)
 
+// 网络下载
 const ClientsReportAdded = string(`
 #!/bin/sh
 . /usr/share/libubox/jshn.sh
@@ -2239,6 +2249,7 @@ echo -n $tmp | curl -4 -X POST "{{.reportUrl}}$(_sign)" -H "Content-Type: applic
 [ "$?" != "0" ] && lua /mnt/curl.lua "{{.reportUrl}}$(_sign)" "POST" $tmp
 `)
 
+// 网络下载
 const ApConfigReportAdded = string(`
 cat >/tmp/apconfig.lua <<EOF
 local json = require 'cjson'
@@ -2291,6 +2302,7 @@ curl -4 -X POST "{{.reportUrl}}$(_sign)" -H "Content-Type: application/json" -d 
 [ "$?" != "0" ] && lua /mnt/curl.lua "{{.reportUrl}}$(_sign)" "POST" $tmp
 `)
 
+// 网络下载
 const StaticLeasesReportAdded = string(`
 . /lib/functions.sh
 list=""
@@ -2321,6 +2333,7 @@ RES=$(curl --connect-timeout 3 -4 -X POST "{{.reportUrl}}$(_sign)" -H "Content-T
 echo 'success'
 `)
 
+// 直接执行
 const SetStaticLeasesContent = string(`
 #!/bin/bash
 
@@ -2339,6 +2352,7 @@ if [ -f "/usr/sbin/hi-static-leases" ]; then
 fi
 `)
 
+// 直接执行
 const EditWifiContent = string(`
 . /lib/functions.sh
 if [ -e "/var/run/delwifi.lock" ] || [ -e "/var/run/addwifi.lock" ]; then
@@ -2374,6 +2388,7 @@ else
 fi
 `)
 
+// 直接执行
 const BlockedContent = string(`
 . /usr/share/libubox/jshn.sh
 while [ 1 ]; do
@@ -2405,6 +2420,7 @@ rm -f /var/run/block.lock
 hi-clients
 `)
 
+// 直接执行
 const GetVersionContent = string(`
 if [ -e "/etc/glversion" ]; then
     version=$(cat /etc/glversion)
@@ -2420,6 +2436,7 @@ webVer=$(awk '/hiui-ui/ {getline;print $2}' /usr/lib/opkg/status)
 echo -e '{"version":"'$version'","model":"'$model'","webVer":"'$webVer'"}'
 `)
 
+// 直接执行
 const SpeedTestContent = string(`
 #!/bin/sh
 . /usr/share/libubox/jshn.sh
@@ -2437,6 +2454,7 @@ curl -4 -X POST {{.callurl}} -H 'Content-Type: application/json' -d "${result}"
 [ "$?" != "0" ] && lua /mnt/curl.lua "{{.callurl}}" "POST" "$result"
 `)
 
+// 直接执行
 const FetchLogContent = string(`
 dmesg > /tmp/dmesg.log
 
@@ -2444,12 +2462,14 @@ dmesg > /tmp/dmesg.log
 curl -4 -X POST "{{.url}}$(_sign)&is_manual={{.isManual}}&admin_id={{.adminId}}&log_type=dmsg" -F file=@/tmp/dmesg.log
 `)
 
+// 直接执行
 const SyncVersionContent = string(`
 #!/bin/sh
 [ -e "/tmp/hiui" ] && rm -rf /tmp/hiui
 echo '{{.verInfo}}' > /tmp/version.info
 `)
 
+// 直接执行
 const AddWifiContent = string(`
 . /lib/functions.sh
 
@@ -2506,6 +2526,7 @@ done
 /etc/init.d/network reload
 `)
 
+// 直接执行
 const DelWifiContent = string(`
 if [ -e "/var/run/delwifi.lock" ]; then
     echo '{"code":102,"msg":"wifi deleting"}'
@@ -2531,6 +2552,7 @@ rm -f /var/run/delwifi.lock
 wifi reload &
 `)
 
+// 直接执行
 const DelAllCustomWifi = string(`
 #!/bin/sh
 . /lib/functions.sh
@@ -2552,6 +2574,7 @@ uci commit dhcp
 wifi reload &
 `)
 
+// 直接执行
 const DiagnosisContent = string(`
 #!/bin/bash
 
@@ -2588,6 +2611,7 @@ fi
 echo '{"code":1,"msg":"ping task start"}'
 `)
 
+// 直接执行
 const IpkRemoteUpgrade = string(`
 
 rm -rf /tmp/ipk
@@ -2612,6 +2636,7 @@ if [ -e "/tmp/ipk/success" ]; then
 fi
 `)
 
+// 网络下载
 const RouterLogUpload = string(`
 if [ -z "$(uci get system.@system[0].log_file)" ] || [ "$1" == "edit" ]; then
     uci set system.@system[0].log_file='/var/log/syslog.log'
@@ -2631,6 +2656,7 @@ if [ $res == 'success' ]; then
 fi
 `)
 
+// 直接执行
 const ClientQos = string(`
 [ ! -e "/etc/config/qos" ] && {
     /etc/init.d/eqos start

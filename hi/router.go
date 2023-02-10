@@ -283,12 +283,12 @@ func ClientQosCmd(list []QosModal, action string) string {
 	var cmds []string
 	for _, item := range list {
 		if action == "add" {
-			cmds = append(cmds, fmt.Sprintf("eqos add %s %s %s", item.Mac, item.Ul, item.Dl))
+			cmds = append(cmds, fmt.Sprintf("eqos add %s %s %s", item.Mac, item.Dl, item.Ul))
 		} else if action == "del" {
-			cmds = append(cmds, fmt.Sprintf("eqos del %s %s %s", item.Mac, item.Ul, item.Dl))
+			cmds = append(cmds, fmt.Sprintf("eqos del %s ", item.Mac))
 		} else if action == "update" {
 			cmds = append(cmds, fmt.Sprintf("[ -n \"$(grep %s /etc/config/qos| grep -v '#')\" ] && eqos del %s only_remove_ts", item.Mac, item.Mac))
-			cmds = append(cmds, fmt.Sprintf("eqos add %s %s %s", item.Mac, item.Ul, item.Dl))
+			cmds = append(cmds, fmt.Sprintf("eqos add %s %s %s", item.Mac, item.Dl, item.Ul))
 		}
 	}
 	var envMap = make(map[string]interface{})
