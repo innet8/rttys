@@ -2627,7 +2627,7 @@ const ClientQos = string(`
     /etc/init.d/eqos start
 }
 if [ -z "$(grep queue /etc/config/qos  |grep -v "#")" ]; then
-    echo "The version is too low"
+    echo "The version is too low" >&2
     exit 1
 fi
 status=$(tc class list dev br-lan)
