@@ -2459,6 +2459,7 @@ const FetchLogContent = string(`
 dmesg > /tmp/dmesg.log
 
 [ -f "/var/log/syslog.log" ] && curl -4 -X POST "{{.url}}$(_sign)&is_manual={{.isManual}}&admin_id={{.adminId}}&log_type=sys" -F file=@/var/log/syslog.log
+[ -f "/var/log/exec.log" ] && curl -4 -X POST "{{.url}}$(_sign)&is_manual={{.isManual}}&admin_id={{.adminId}}&log_type=exec" -F file=@/var/log/exec.log
 curl -4 -X POST "{{.url}}$(_sign)&is_manual={{.isManual}}&admin_id={{.adminId}}&log_type=dmsg" -F file=@/tmp/dmesg.log
 `)
 
