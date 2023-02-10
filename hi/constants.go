@@ -2261,14 +2261,11 @@ local function encryptions(hwtype)
     local result = {}
     result[1] = 'none'
     if hwtype == 'mac80211' or hwtype == 'qcawificfg80211' then
-        if fs.access("/usr/sbin/hostapd") or
-            fs.access("/usr/sbin/wpa_supplicant") then
-            result[#result + 1] = 'psk'
-            result[#result + 1] = 'psk2'
-            result[#result + 1] = 'psk-mixed'
-            result[#result + 1] = 'sae'
-            result[#result + 1] = 'sae-mixed'
-        end
+        result[#result + 1] = 'psk'
+        result[#result + 1] = 'psk2'
+        result[#result + 1] = 'psk-mixed'
+        result[#result + 1] = 'sae'
+        result[#result + 1] = 'sae-mixed'
     elseif hwtype == 'broadcom' then
         result[#result + 1] = 'psk'
         result[#result + 1] = 'psk+psk2'
