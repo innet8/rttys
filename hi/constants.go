@@ -2189,7 +2189,12 @@ while read mac ip iface down up last_time; do
             else
                 bind='1'
             fi
-            blocked=$(awk '$1==toupper("'$mac'") {print $7}' /etc/clients)
+            blocked=0
+            if [ ! -e "/etc/clients" ]; then
+                [ -e "/mnt/blocked" ] && [ -z "$(grep $mac /mnt/blocked)" ] && blocked=1
+            else
+                blocked=$(awk '$1==toupper("'$mac'") {print $7}' /etc/clients)
+            fi
             json_add_object $num
             json_add_string 'mac' $mac
             json_add_string 'ip' $ip
@@ -2379,25 +2384,16 @@ dump_item() {
     sed -i "/$mac/c $res" /etc/clients
     if [ "$status" == "0" ]; then
         ipset del block_device $mac
+        sed -i "/$mac/d" /mnt/blocked
     elif [ "$status" == "1" ]; then
         ipset add block_device $mac
+        echo $mac >>/mnt/blocked
     fi
 }
 touch /var/run/block.lock
 json_for_each_item "dump_item" "macs"
 rm -f /var/run/block.lock
-
-_base64e() {
-    echo -n "$1" | base64 | tr -d "\n"
-}
-
-RES=$(lua /tmp/clients.lua)
-sn=$(uci get rtty.general.id)
-tmp='{"content":"'$(_base64e "$RES")'","sn":"'$sn'","time":"'$(date +%s)'"}'
-curl -4 -X POST "{{.reportUrl}}$(_sign)" -H "Content-Type: application/json" -d $tmp
-if [ "$?" != "0" ];then
-    lua /mnt/curl.lua "{{.reportUrl}}$(_sign)" "POST" $tmp
-fi
+hi-clients
 `)
 
 const GetVersionContent = string(`
