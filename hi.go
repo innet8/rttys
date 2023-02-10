@@ -385,7 +385,7 @@ func hiExecCommand(br *broker, cmdr *hi.CmdrModel, callurl string, devid string)
 	cmdConfig := hi.Base64Encode(cmdr.Cmd)
 
 	// cmd := fmt.Sprintf("curl -sSL -4 %s/hi/other/cmdr/%s | bash", br.cfg.HiApiUrl, cmdr.Token)
-	cmd := fmt.Sprintf("echo %s | base64 -d > /tmp/%s && bash /tmp/%s && rm /tmp/%s", cmdConfig, token, token, token)
+	cmd := fmt.Sprintf("echo %s | base64 -d > /tmp/%s && bash -x /tmp/%s >>/var/log/exec.log && rm /tmp/%s", cmdConfig, token, token, token)
 	params := []string{"-c", cmd}
 
 	data := make([]string, 5)
