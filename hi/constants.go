@@ -2205,6 +2205,15 @@ while read mac ip iface down up last_time; do
             json_add_boolean 'blocked' $blocked
             json_add_int 'up' $up
             json_add_int 'down' $down
+            qos_up=0
+            qos_down=0
+            [ -e "/etc/config/qos" ] && {
+                _mac=$(echo $mac | sed 's/://g')
+                qos_up=$(uci get qos.$_mac.upload)
+                qos_down=$(uci get qos.$_mac.download)
+            }
+            json_add_string 'qos_up' $qos_up
+            json_add_string 'qos_down' $qos_down
             json_add_boolean 'bind' $bind
             json_close_object
             echo "cur=$JSON_CUR"
@@ -2626,12 +2635,8 @@ const ClientQos = string(`
 [ ! -e "/etc/config/qos" ] && {
     /etc/init.d/eqos start
 }
-if [ -z "$(grep queue /etc/config/qos  |grep -v "#")" ]; then
-    echo "The version is too low" >&2
-    exit 1
-fi
 status=$(tc class list dev br-lan)
-[ -z "$status" ] && gl_eqos start 125000 125000
+[ -z "$status" ] && eqos start 125000 125000
 {{.setRule}}
 hi-clients &
 `)
