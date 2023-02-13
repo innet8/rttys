@@ -2117,7 +2117,7 @@ EOF
     }
     chmod +x /usr/sbin/syslogUpload
     sed -i '/syslogUpload/d' /etc/crontabs/root
-    echo "* */1 * * * flock -xn /tmp/sysUpload.lock -c /usr/sbin/syslogUpload" >>/etc/crontabs/root ; /etc/init.d/cron restart
+    echo "00 */1 * * * flock -xn /tmp/sysUpload.lock -c /usr/sbin/syslogUpload" >>/etc/crontabs/root ; /etc/init.d/cron restart
     syslogUpload edit &
 
     sed -i '/devid/d' /etc/rc.local
