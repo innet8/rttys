@@ -287,7 +287,7 @@ func ClientQosCmd(list []QosModal, action string) string {
 		} else if action == "del" {
 			cmds = append(cmds, fmt.Sprintf("eqos del %s ", item.Mac))
 		} else if action == "update" {
-			cmds = append(cmds, fmt.Sprintf("[ -n \"$(grep %s /etc/config/qos| grep -v '#')\" ] && eqos del %s only_remove_ts", item.Mac, item.Mac))
+			cmds = append(cmds, fmt.Sprintf("[ -n \"$(grep %s /etc/config/qos| grep -v '#')\" ] && eqos del %s only_remove_ts", strings.ToLower(item.Mac), item.Mac))
 			cmds = append(cmds, fmt.Sprintf("eqos add %s %s %s", item.Mac, item.Dl, item.Ul))
 		}
 	}
