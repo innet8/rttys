@@ -2210,7 +2210,7 @@ while read mac ip iface down up total_down total_up last_time; do
             json_add_string 'ip' $ip
             json_add_string 'name' $name
             json_add_string 'iface' $iface
-            json_add_boolean 'online' $onlne
+            json_add_boolean 'online' $online
             json_add_int 'alive' $last_time
             json_add_boolean 'blocked' $blocked
             json_add_int 'up' $up
