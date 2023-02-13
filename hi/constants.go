@@ -698,7 +698,7 @@ cat >/usr/share/hiui/rpc/device.lua <<EOF
 local iwinfo = require "iwinfo"
 local uci = require('uci').cursor()
 IFACE_PATTERNS_WIRELESS = {
-    "^wlan%d", "^wl%d", "^ath%d", "^%w+%.network%d", "^ra%d"
+    "^wlan%d", "^wl%d", "^ath%d", "^%w+%.network%d", "^ra%d", "^phy%d[-]ap%d"
 }
 local function is_match_empty(pat, plain)
     return not not string.find('', pat, nil, plain)
@@ -1047,14 +1047,12 @@ cat >/etc/init.d/detection <<EOF
 START=99
 USE_PROCD=1
 args=/usr/sbin/detection.sh
-
 start_service() {
     procd_open_instance
     procd_set_param command \$args
     procd_set_param respawn
     procd_close_instance
 }
-
 EOF
 
 cat >/etc/hotplug.d/dhcp/20-det-clients <<EOF
@@ -1078,15 +1076,12 @@ if [ \$ACTION == 'add' ]; then
     flock -xn /tmp/add-block.lock -c "block-and-qos.sh addBlockList"
 fi
 EOF
-
 chmod +x /etc/hotplug.d/dhcp/20-det-clients
 chmod +x /etc/hotplug.d/firewall/80-add-block
 chmod +x /usr/sbin/detection.sh
 chmod +x /usr/sbin/block-and-qos.sh
 chmod +x /etc/init.d/detection
-
 /etc/init.d/detection start
-
 `)
 
 // 网络下载
@@ -2182,60 +2177,72 @@ curl --connect-timeout 3 -4 -X POST "{{.webpwdReportUrl}}" -H "Content-Type: app
 const ClientsReportAdded = string(`
 #!/bin/sh
 . /usr/share/libubox/jshn.sh
-json_init
-wrtbwmon -4 -f /tmp/usage.db
-json_add_array "clients"
-num=0
-awk -F',' 'NR!=1 {print $1,$2,$3,$4,$5,$6,$7,$10}' /tmp/usage.db >/tmp/.clients
-while read mac ip iface down up total_down total_up last_time; do
-    online=$(awk '$4=="'$mac'" {if ( $3=="0x2" ) print 1;else print 0;}' /proc/net/arp)
-    if [ "$ip" != "NA" ] && [ -n "$online" ]; then
-        if [ $(($(date +%s) - $last_time)) -lt 28800 ]; then
-            name=$(awk '$1=="'$mac'" {if ( $4!="*" ) print $4;else print Unknown}' /tmp/dhcp.leases)
-            [ -z "$name" ] && name="Unknown"
-            bind=$(grep $mac /etc/config/dhcp)
-            if [ -z "$bind" ]; then
-                bind='0'
-            else
-                bind='1'
-            fi
-            blocked=0
-            if [ ! -e "/etc/clients" ]; then
+function shell_get_clients() {
+    json_init
+    wrtbwmon -4 -f /tmp/usage.db
+    json_add_array "clients"
+    num=0
+    awk -F',' 'NR!=1 {print $1,$2,$3,$4,$5,$6,$7,$10}' /tmp/usage.db >/tmp/.clients
+    while read mac ip iface down up total_down total_up last_time; do
+        online=$(awk '$4=="'$mac'" {if ( $3=="0x2" ) print 1;else print 0;}' /proc/net/arp)
+        if [ "$ip" != "NA" ] && [ -n "$online" ]; then
+            if [ $(($(date +%s) - $last_time)) -lt 28800 ]; then
+                name=$(awk '$2=="'$mac'" {if ( $4!="*" ) print $4;else print Unknown}' /tmp/dhcp.leases)
+                [ -z "$name" ] && name="Unknown"
+                bind=$(grep $mac /etc/config/dhcp)
+                if [ -z "$bind" ]; then
+                    bind='0'
+                else
+                    bind='1'
+                fi
+                blocked=0
                 [ -e "/mnt/blocked" ] && [ -z "$(grep $mac /mnt/blocked)" ] && blocked=1
-            else
-                blocked=$(awk '$1==toupper("'$mac'") {print $7}' /etc/clients)
+                json_add_object $num
+                json_add_string 'mac' $mac
+                json_add_string 'ip' $ip
+                json_add_string 'name' $name
+                json_add_string 'iface' $iface
+                json_add_boolean 'online' $online
+                json_add_int 'alive' $last_time
+                json_add_boolean 'blocked' $blocked
+                json_add_int 'up' $up
+                json_add_int 'down' $down
+                json_add_int 'total_up' $total_up
+                json_add_int 'total_down' $total_down
+                qos_up=0
+                qos_down=0
+                [ -e "/etc/config/qos" ] && {
+                    _mac=$(echo $mac | sed 's/://g')
+                    qos_up=$(uci get qos.$_mac.upload)
+                    qos_down=$(uci get qos.$_mac.download)
+                }
+                json_add_string 'qos_up' $qos_up
+                json_add_string 'qos_down' $qos_down
+                json_add_boolean 'bind' $bind
+                json_close_object
+                num=$((num + 1))
             fi
-            json_add_object $num
-            json_add_string 'mac' $mac
-            json_add_string 'ip' $ip
-            json_add_string 'name' $name
-            json_add_string 'iface' $iface
-            json_add_boolean 'online' $online
-            json_add_int 'alive' $last_time
-            json_add_boolean 'blocked' $blocked
-            json_add_int 'up' $up
-            json_add_int 'down' $down
-            json_add_int 'total_up' $total_up
-            json_add_int 'total_down' $total_down
-            qos_up=0
-            qos_down=0
-            [ -e "/etc/config/qos" ] && {
-                _mac=$(echo $mac | sed 's/://g')
-                qos_up=$(uci get qos.$_mac.upload)
-                qos_down=$(uci get qos.$_mac.download)
-            }
-            json_add_string 'qos_up' $qos_up
-            json_add_string 'qos_down' $qos_down
-            json_add_boolean 'bind' $bind
-            json_close_object
-            echo "cur=$JSON_CUR"
-            num=$((num + 1))
         fi
-    fi
-done </tmp/.clients
-json_close_array
-json_add_int 'code' 0
-RES=$(json_dump)
+    done </tmp/.clients
+    json_close_array
+    json_add_int 'code' 0
+    RES=$(json_dump)
+}
+function lua_get_clients() {
+    cat >/tmp/clients.lua <<EOF
+    local json = require 'cjson'
+    local script = '/usr/share/hiui/rpc/clients.lua'
+    local ok, tb = pcall(dofile, script)
+    if ok then
+        print(json.encode(tb['getClients']()))
+    else
+        print("")
+    end
+EOF
+RES=$(lua /tmp/clients.lua)
+}
+lua_get_clients
+[ -z "$RES" ] && shell_get_clients
 if [ -z "$RES" ]; then
     exit 1
 fi
