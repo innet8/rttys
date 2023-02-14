@@ -2255,7 +2255,9 @@ webVer=$(awk '/hiui-ui-core/ {getline;print $2}' /usr/lib/opkg/status)
 rttyVer=$(awk '/Package: rtty-openssl/ {getline;print $2}' /usr/lib/opkg/status)
 tmp='{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'","ver":"'$version'","webVer":"'$webVer'","rttyVer":"'$rttyVer'"}'
 echo -n $tmp | curl -4 -X POST "{{.reportUrl}}$(_sign)" -H "Content-Type: application/json" -d @-
-[ "$?" != "0" ] && lua /mnt/curl.lua "{{.reportUrl}}$(_sign)" "POST" $tmp
+if [ "$?" != "0" ]; then
+    lua /mnt/curl.lua "{{.reportUrl}}$(_sign)" "POST" $tmp
+fi
 `)
 
 // 网络下载
