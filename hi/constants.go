@@ -2466,24 +2466,6 @@ echo -e '{"version":"'$version'","model":"'$model'","webVer":"'$webVer'"}'
 `)
 
 // 直接执行
-const SpeedTestContent = string(`
-#!/bin/sh
-. /usr/share/libubox/jshn.sh
-json_init
-speedpid=$(ps | grep '[s]peedtest_cpp' | awk '{print $1}')
-if [ ! -z "${speedpid}" ]; then
-	kill -9 ${speedpid} >>/dev/null 2>&1 
-fi
-speedtest_cpp --output json >/tmp/speedtest
-json_load "$(cat /tmp/speedtest)"
-json_add_string "sn" "$(uci get rtty.general.id)"
-json_add_int "code" "0"
-result=$(json_dump)
-curl -4 -X POST {{.callurl}} -H 'Content-Type: application/json' -d "${result}"
-[ "$?" != "0" ] && lua /mnt/curl.lua "{{.callurl}}" "POST" "$result"
-`)
-
-// 直接执行
 const FetchLogContent = string(`
 dmesg > /tmp/dmesg.log
 
@@ -2783,12 +2765,6 @@ func GetVersion(name string) string {
 		sb.WriteString(fmt.Sprintf("awk '/Package: %s$/ {getline;print $2}' /usr/lib/opkg/status", name))
 	}
 	return sb.String()
-}
-
-func SpeedTestTemplate(envMap map[string]interface{}) string {
-	var sb strings.Builder
-	sb.Write([]byte(SpeedTestContent))
-	return FromTemplateContent(sb.String(), envMap)
 }
 
 func FetchLogTemplate(envMap map[string]interface{}) string {

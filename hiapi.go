@@ -565,7 +565,7 @@ func deviceList(br *broker) gin.HandlerFunc {
 	}
 }
 
-// deviceAction 设备绑定、解绑、重启、获取版本、连接、测速
+// deviceAction 设备绑定、解绑、重启、获取版本、连接
 func deviceAction(br *broker) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		action := c.Param("action")
@@ -696,37 +696,6 @@ func deviceAction(br *broker) gin.HandlerFunc {
 				})
 			} else {
 				serveUser(br, c)
-			}
-			return
-		} else if action == "speedtest" {
-			onlyid := devidGetOnlyid(br, devid)
-			if len(onlyid) == 0 {
-				c.JSON(http.StatusOK, gin.H{
-					"ret":  0,
-					"msg":  "设备不在线",
-					"data": nil,
-				})
-			} else {
-				callUrl := c.Query("call_url")
-				cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.SpeedTestCmd(callUrl), SpeedTest)
-				if terr != nil {
-					c.JSON(http.StatusOK, gin.H{
-						"ret": 0,
-						"msg": "创建执行任务失败",
-						"data": gin.H{
-							"error": terr.Error(),
-						},
-					})
-				} else {
-					c.JSON(http.StatusOK, gin.H{
-						"ret": 1,
-						"msg": "success",
-						"data": gin.H{
-							"token": hiExecCommand(br, cmdr, callUrl, ""),
-						},
-					})
-				}
-				return
 			}
 			return
 		}

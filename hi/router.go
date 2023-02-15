@@ -173,12 +173,6 @@ func EditWifiCmd(wifi WifiModel, reportUrl, token string) string {
 	return EditWifiTemplate(envMap)
 }
 
-func SpeedTestCmd(callurl string) string {
-	var envMap = make(map[string]interface{})
-	envMap["callurl"] = callurl
-	return SpeedTestTemplate(envMap)
-}
-
 func FetchLogCmd(url, isManual, adminId string) string {
 	var envMap = make(map[string]interface{})
 	envMap["url"] = url
