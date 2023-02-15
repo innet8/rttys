@@ -2158,7 +2158,7 @@ if [ "${git_commit}" != "{{.gitCommit}}" ] || [ "${onlyid}" != "{{.onlyid}}" ]; 
 fi
 
 [ -n "$(grep apconfig.lua /etc/hotplug.d/net/99-hi-wifi)" ] || downloadScript 
-[ -n "$(grep hi_static_leases /usr/sbin/hi-static-leases)" ] || downloadScript
+[ -n "$(grep host_func /usr/sbin/hi-static-leases)" ] || downloadScript
 [ -n "$(grep clients.lua /usr/sbin/hi-clients)" ] || downloadScript
 [ -e "/usr/sbin/detection.sh" ] || downloadExtraScript &
 
