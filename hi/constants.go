@@ -1914,7 +1914,9 @@ config proxy
   option enable '0'
 EOF
     rm -f /etc/config/wireguard_back
-    /etc/init.d/wireguard stop
+    if [ -n "$(wg)" ]; then
+        /etc/init.d/wireguard stop
+    fi
 }
 
 set_lanip() {
