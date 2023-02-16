@@ -1906,24 +1906,20 @@ EOF
 }
 
 set_lanip() {
-    [ "$(uci get wireguard.@proxy[0].enable)" == "0" ] && return
     if [ "$(uci get network.lan.ipaddr)" != "{{.lan_ip}}" ]; then
-        (
-            uci set network.lan.ipaddr="{{.lan_ip}}"
-            uci commit network
-            sleep 2
-            /etc/init.d/network restart
-            [ -e "/usr/sbin/ssdk_sh" ] && {
-                sleep 5; ssdk_sh debug phy set 2 0 0x840; ssdk_sh debug phy set 3 0 0x840
-                sleep 5; ssdk_sh debug phy set 2 0 0x1240; ssdk_sh debug phy set 3 0 0x1240
-            }
-            [ "$(uci get rtty.general.description)" == "a1300" ] && {
-                swconfig dev switch0 set linkdown 1
-                swconfig dev switch0 set linkdown 0
-                swconfig dev switch0 set reset 1
-                swconfig dev switch0 set apply 1
-            }
-        ) >/dev/null 2>&1 &
+        uci set network.lan.ipaddr="{{.lan_ip}}"
+        uci commit network
+        /etc/init.d/network restart
+        [ -e "/usr/sbin/ssdk_sh" ] && {
+            sleep 5; ssdk_sh debug phy set 2 0 0x840; ssdk_sh debug phy set 3 0 0x840
+            sleep 5; ssdk_sh debug phy set 2 0 0x1240; ssdk_sh debug phy set 3 0 0x1240
+        }
+        [ "$(uci get rtty.general.description)" == "a1300" ] && {
+            swconfig dev switch0 set linkdown 1
+            swconfig dev switch0 set linkdown 0
+            swconfig dev switch0 set reset 1
+            swconfig dev switch0 set apply 1
+        }
     fi
 }
 

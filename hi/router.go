@@ -77,11 +77,11 @@ func WireguardCmd(wg WgModel) string {
 		cmds = append(cmds, "clear_wireguard_conf")
 	} else {
 		// 开启wg
+		if IsIp(wg.LanIp) {
+			// 设置lan
+			cmds = append(cmds, "set_lanip")
+		}
 		cmds = append(cmds, "set_wireguard_conf")
-	}
-	if IsIp(wg.LanIp) {
-		// 设置lan
-		cmds = append(cmds, "set_lanip")
 	}
 	if IsIp(wg.DnsServer) {
 		// 设置dns服务器ip
