@@ -1623,20 +1623,14 @@ downup() {
 `)
 
 const CommonUtilsContent = string(`
+#-----------{{.date}}-------------
 #!/bin/bash
-
 _base64e() {
     echo -n "$1" | base64 | tr -d "\n"
 }
-
 _base64d() {
     echo -n "$1" | base64 -d | sed 's/\\n//g'
 }
-
-_random() {
-    echo -n $(date +%s) | md5sum | md5sum | cut -d ' ' -f 1
-}
-
 _filemd5() {
     if [ -f "$1" ]; then
         echo -n $(md5sum $1 | cut -d ' ' -f1)
@@ -1644,7 +1638,6 @@ _filemd5() {
         echo ""
     fi
 }
-
 _sign() {
 	secretKey=$(uci get rtty.general.token)
 	nonce=$(echo -n $(date +%s) | md5sum | md5sum | cut -d ' ' -f 1)
@@ -1678,35 +1671,29 @@ done
 for D in $(cat ${DOMAINFILE} 2>/dev/null); do (nslookup $D > /dev/null 2>&1 &); done
 `)
 
-// 网络下载
+// 网络下载--已添加set -e
 const ShuntContent = string(`
 #!/bin/bash
 ACTION=$1
 DNSFILE="/etc/dnsmasq.d/domain_hicloud.conf"
 LOGFILE="/tmp/hicloud/shunt/{{.th}}.log"
 DOMAINFILE="/tmp/hicloud/shunt/{{.th}}.domain"
-
 echo "start: $(date "+%Y-%m-%d %H:%M:%S")" > ${LOGFILE}
-
 mkdir -p /etc/dnsmasq.d
 mkdir -p /tmp/hicloud/shunt
-
 if [ -z "$(cat /etc/dnsmasq.conf | grep conf-dir=/etc/dnsmasq.d)" ]; then
     sed -i /conf-dir=/d /etc/dnsmasq.conf
     echo conf-dir=/etc/dnsmasq.d >> /etc/dnsmasq.conf
 fi
-
 if [ ! -f "$DNSFILE" ]; then
     touch $DNSFILE
 fi
-
 gatewayIP=$(ip route show 1/0 | head -n1 | sed -e 's/^default//' | awk '{print $2}' | awk -F. '$1<=255&&$2<=255&&$3<=255&&$4<=255{print $1"."$2"."$3"."$4}')
 if [ -z "${gatewayIP}" ]; then
     echo "Unable to get gateway IP"
     exit 1
 fi
 gatewayCIP=$(echo "${gatewayIP}" | awk -F. '$1<=255&&$2<=255&&$3<=255&&$4<=255{print $1"."$2"."$3".0/24"}')
-
 echo "remove" >> ${LOGFILE}
 {{.removeString}}
 sed -i /#{{.th}}#/d /etc/dnsmasq.conf
@@ -1714,9 +1701,9 @@ sed -i 's/,{{.th}},/,/g' ${DNSFILE}
 sed -i 's/,{{.th}}$//g' ${DNSFILE}
 sed -i 's/\/{{.th}},/\//g' ${DNSFILE}
 sed -i '/\/{{.th}}$/d' ${DNSFILE}
-
 if [ -z "${ACTION}" ]; then
     echo "install" >> ${LOGFILE}
+    set -e
     if [[ -z "$(iptables -L shunt-1 -t mangle -w 2>/dev/null | grep shunt-1)" ]]; then
         for i in $(seq 1 80); do
             iptables -w -t mangle -N shunt-${i}
@@ -1726,13 +1713,13 @@ if [ -z "${ACTION}" ]; then
         done
     fi
     {{.installString}}
+    set +e
 fi
 echo "end" >> ${LOGFILE}
-
 exit 0
 `)
 
-// 网络下载
+// 网络下载--已添加set -e---极大概率会经常有报错返回
 const ShuntBatchAdded = string(`
 exec_shunt_url() {
     local url=$1
@@ -1768,12 +1755,11 @@ array=(
 
 for file in $(ls /tmp/hicloud/shunt 2>/dev/null); do
     if [[ "${file}" =~ .*\.sh$ ]] && [[ ! "${array[@]}" =~ ":${file}" ]]; then
-        bash +x /tmp/hicloud/shunt/${file} remove
+        bash /tmp/hicloud/shunt/${file} remove
         pathname="$(echo ${file} | sed 's/\.sh$//')"
         rm -f /tmp/hicloud/shunt/${pathname}.* &> /dev/null
     fi
 done
-
 {{.cmds}}
 `)
 
@@ -1799,6 +1785,8 @@ wireguard_start() {
             [ "$(wireguard_hotup)" = "no" ] && /etc/init.d/wireguard downup >/dev/null 2>&1
         fi
         wireguard_confirm downup
+        sleep 2
+        [ -z "$(wg)" ] && exit 1
     else
         if [ -f "/etc/config/wireguard_back" ]; then
             cat /etc/config/wireguard_back > /etc/config/wireguard
@@ -1807,21 +1795,21 @@ wireguard_start() {
         uci commit wireguard
         /etc/init.d/wireguard start >/dev/null 2>&1
         wireguard_confirm start
+        sleep 2
+        [[ -z "$(wg)" || -z "$(route -n |grep $endpoint)" ]] && exit 1
     fi
 }
 
 wireguard_confirm() {
-    (
-        sleep 5
-        if [ -z "$(wg)" ]; then
-            /etc/init.d/wireguard $1 >/dev/null 2>&1
-        else
-            local endpoint=$(uci get wireguard.@peers[0].end_point | awk -F':' '{print $1}')
-            if [ -z "$(route -n |grep $endpoint)" ]; then
-                /etc/init.d/wireguard downup >/dev/null 2>&1
-            fi
+    sleep 5
+    if [ -z "$(wg)" ]; then
+        /etc/init.d/wireguard $1 >/dev/null 2>&1
+    else
+        local endpoint=$(uci get wireguard.@peers[0].end_point | awk -F':' '{print $1}')
+        if [ -z "$(route -n |grep $endpoint)" ]; then
+            /etc/init.d/wireguard downup >/dev/null 2>&1
         fi
-    ) >/dev/null 2>&1 &
+    fi
 }
 
 wireguard_hotup() {
@@ -2158,8 +2146,8 @@ if [ "${git_commit}" != "{{.gitCommit}}" ] || [ "${onlyid}" != "{{.onlyid}}" ]; 
 fi
 
 [ -n "$(grep apconfig.lua /etc/hotplug.d/net/99-hi-wifi)" ] || downloadScript 
-[ -n "$(grep host_func /usr/sbin/hi-static-leases)" ] || downloadScript
-[ -n "$(grep clients.lua /usr/sbin/hi-clients)" ] || downloadScript
+[ -n "$(grep {{.apiHost}} /usr/sbin/hi-static-leases)" ] || downloadScript
+[ -n "$(grep {{.apiHost}} /usr/sbin/hi-clients)" ] || downloadScript
 [ -e "/usr/sbin/detection.sh" ] || downloadExtraScript &
 
 sn=$(uci get rtty.general.id)
