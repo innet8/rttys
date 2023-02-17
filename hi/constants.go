@@ -8,7 +8,7 @@ import (
 	"text/template"
 )
 
-// 网络下载
+// 网络下载--无需添加set -e
 const ReadDBAWK = string(`
 #!/usr/bin/awk
 
@@ -225,7 +225,7 @@ END {
 }
 `)
 
-// 网络下载
+// 网络下载--无需添加set -e
 const WrtbwmonScript = string(`
 #!/bin/sh
 #
@@ -689,7 +689,7 @@ else
 fi
 `)
 
-// 网络下载
+// 网络下载--无需添加set -e
 const DetectionDeviceScript = string(`
 #!/bin/sh
 mkdir -p /usr/share/hiui/rpc/
@@ -1084,7 +1084,7 @@ chmod +x /etc/init.d/detection
 /etc/init.d/detection start
 `)
 
-// 网络下载
+// 网络下载--无需添加set -e
 const WireguardScript = string(`#!/bin/sh  /etc/rc.common
 
 . /lib/functions.sh
@@ -1649,7 +1649,7 @@ _sign() {
 }
 `)
 
-// 网络下载
+// 网络下载--无需添加set -e
 const ShuntDomainPartial = string(`
 for D in $(cat ${DOMAINFILE} 2>/dev/null); do
     echo "server=/${D}/{{.dnsIp}} #{{.th}}#" >> /etc/dnsmasq.conf
@@ -1763,7 +1763,7 @@ done
 {{.cmds}}
 `)
 
-// 直接执行
+// 直接执行--待定
 const WireguardAdded = string(`
 wireguard_start() {
     model=$(uci get rtty.general.description)
@@ -1968,7 +1968,7 @@ config peers 'wg_peer_01'
     option mtu '1360'
 `)
 
-// 直接执行
+// 直接执行--无需添加set -e
 const InitContent = string(`
 #!/bin/bash
 
@@ -2082,7 +2082,7 @@ EOF
         echo "$res">/usr/sbin/hi-clients
     }
     chmod +x /usr/sbin/hi-clients
-    [ -z "crontab -l|grep hi-clients" ] && echo "* * * * * flock -xn /tmp/hi-clients.lock -c /usr/sbin/hi-clients" >>/tmp/cronbak
+    [ -z "crontab -l|grep hi-clients" ] && echo "* * * * * flock -xn /tmp/hi-clients.lock -c /usr/sbin/hi-clients" >>/etc/crontabs/root 
     /etc/init.d/cron reload
 
     [ ! -e "/etc/init.d/wireguard" ] && {
@@ -2157,7 +2157,7 @@ curl --connect-timeout 3 -4 -X POST "{{.webpwdReportUrl}}" -H "Content-Type: app
 /usr/sbin/hi-clients &
 `)
 
-// 网络下载
+// 网络下载--无需添加set -e
 const ClientsReportAdded = string(`
 #!/bin/sh
 . /usr/share/libubox/jshn.sh
@@ -2191,8 +2191,8 @@ function shell_get_clients() {
                 json_add_boolean 'blocked' $blocked
                 json_add_int 'up' $up
                 json_add_int 'down' $down
-                json_add_int 'total_up' $total_up
-                json_add_int 'total_down' $total_down
+                json_add_string 'total_up' $total_up
+                json_add_string 'total_down' $total_down
                 qos_up=0
                 qos_down=0
                 [ -e "/etc/config/qos" ] && {
@@ -2244,7 +2244,7 @@ if [ "$?" != "0" ]; then
 fi
 `)
 
-// 网络下载
+// 网络下载--无需添加set -e
 const ApConfigReportAdded = string(`
 cat >/tmp/apconfig.lua <<EOF
 local json = require 'cjson'
@@ -2315,7 +2315,7 @@ curl -4 -X POST "{{.reportUrl}}$(_sign)" -H "Content-Type: application/json" -d 
 [ "$?" != "0" ] && lua /mnt/curl.lua "{{.reportUrl}}$(_sign)" "POST" $tmp
 `)
 
-// 网络下载
+// 网络下载--无需添加set -e
 const StaticLeasesReportAdded = string(`
 . /lib/functions.sh
 list=""
@@ -2346,17 +2346,17 @@ RES=$(curl --connect-timeout 3 -4 -X POST "{{.reportUrl}}$(_sign)" -H "Content-T
 echo 'success'
 `)
 
-// 直接执行
+// 直接执行--已添加set -e
 const SetStaticLeasesContent = string(`
 #!/bin/bash
-
+set -e
 # delete
 for mac_str in $(cat /etc/config/dhcp | grep '\<host\>' | awk '{print $3}' | sed -r "s/'//g"); do
     uci delete dhcp.$mac_str
 done
-
 # add
 {{.addString}}
+set +e
 uci commit dhcp
 
 # report
@@ -2365,18 +2365,20 @@ if [ -f "/usr/sbin/hi-static-leases" ]; then
 fi
 `)
 
-// 直接执行
+// 直接执行--已添加set -e
 const EditWifiContent = string(`
 . /lib/functions.sh
 if [ -e "/var/run/delwifi.lock" ] || [ -e "/var/run/addwifi.lock" ]; then
     echo '{"code":103,"msg":"wifi deleting or adding"}'
     exit 1
 fi
+set -e
 handle_wifi(){
     {{.addString}}
     ssid=$(uci get wireless.$1.ssid)
 }
 handle_wifi {{.name}}
+set +e
 uci commit wireless
 _base64e() {
     echo -n "$1" | base64 | tr -d "\n"
@@ -2391,7 +2393,9 @@ if [ "$(cat /etc/openwrt_version)" == "15.05.1" ]; then
     (
         /sbin/wifi reload
         sleep 10
+        set -e
         {{.chaos_calmer}}
+        set +e
         uci commit network
         uci commit wireless
         /etc/init.d/network reload
@@ -2401,7 +2405,7 @@ else
 fi
 `)
 
-// 直接执行
+// 直接执行--已添加set -e
 const BlockedContent = string(`
 . /usr/share/libubox/jshn.sh
 while [ 1 ]; do
@@ -2409,6 +2413,7 @@ while [ 1 ]; do
     sleep 1
 done
 json_init
+set -e
 json_load '{{.macs}}'
 if [ "{{.action}}" == "addBlocked" ]; then
     status=1
@@ -2430,10 +2435,11 @@ dump_item() {
 touch /var/run/block.lock
 json_for_each_item "dump_item" "macs"
 rm -f /var/run/block.lock
+set +e
 hi-clients
 `)
 
-// 直接执行
+// 直接执行--未使用
 const GetVersionContent = string(`
 if [ -e "/etc/glversion" ]; then
     version=$(cat /etc/glversion)
@@ -2449,23 +2455,23 @@ webVer=$(awk '/hiui-ui/ {getline;print $2}' /usr/lib/opkg/status)
 echo -e '{"version":"'$version'","model":"'$model'","webVer":"'$webVer'"}'
 `)
 
-// 直接执行
+// 直接执行--无需添加set -e
 const FetchLogContent = string(`
 dmesg > /tmp/dmesg.log
-
+logread >/var/log/syslog.log
 [ -f "/var/log/syslog.log" ] && curl -4 -X POST "{{.url}}$(_sign)&is_manual={{.isManual}}&admin_id={{.adminId}}&log_type=sys" -F file=@/var/log/syslog.log
 [ -f "/var/log/exec.log" ] && curl -4 -X POST "{{.url}}$(_sign)&is_manual={{.isManual}}&admin_id={{.adminId}}&log_type=exec" -F file=@/var/log/exec.log
 curl -4 -X POST "{{.url}}$(_sign)&is_manual={{.isManual}}&admin_id={{.adminId}}&log_type=dmesg" -F file=@/tmp/dmesg.log
 `)
 
-// 直接执行
+// 直接执行--无需添加set -e
 const SyncVersionContent = string(`
 #!/bin/sh
 [ -e "/tmp/hiui" ] && rm -rf /tmp/hiui
 echo '{{.verInfo}}' > /tmp/version.info
 `)
 
-// 直接执行
+// 直接执行--已添加set -e
 const AddWifiContent = string(`
 . /lib/functions.sh
 
@@ -2473,25 +2479,33 @@ if [ -e "/var/run/addwifi.lock" ]; then
     echo '{"code":102,"msg":"wifi adding"}'
     exit 1
 fi
+set -e
 {{.ipSegment}}
 touch /var/run/addwifi.lock
 {{.wireless}}
+set +e
 uci commit wireless
+set -e
 {{.network}}
+set +e
 if [ "$(cat /etc/openwrt_version)" == "15.05.1" ]; then
     wifi reload
     sleep 20
+    set -e
     {{.chaos_calmer}}
+    set +e
     uci commit network
     uci commit wireless
 else
+    set -e
     {{.openwrt}}
+    set +e
     uci commit network
     uci commit wireless
     wifi reload
 fi
+set -e
 {{.dhcp}}
-uci commit dhcp
 handle_firewall(){
     local tmp=$1
     config_get name "$1" "name"
@@ -2501,8 +2515,10 @@ handle_firewall(){
 }
 config_load firewall
 config_foreach handle_firewall zone
+uci commit dhcp
 uci commit firewall
 rm -f /var/run/addwifi.lock
+set +e
 _base64e() {
     echo -n "$1" | base64 | tr -d "\n"
 }
@@ -2520,14 +2536,16 @@ done
 /etc/init.d/network reload
 `)
 
-// 直接执行
+// 直接执行--已添加set -e
 const DelWifiContent = string(`
 if [ -e "/var/run/delwifi.lock" ]; then
     echo '{"code":102,"msg":"wifi deleting"}'
     exit 1
 fi
+set -e
 touch /var/run/delwifi.lock
 {{.del}}
+set +e
 uci commit firewall
 uci commit network
 uci commit wireless
@@ -2546,10 +2564,11 @@ rm -f /var/run/delwifi.lock
 wifi reload &
 `)
 
-// 直接执行
+// 直接执行--已添加set -e
 const DelAllCustomWifi = string(`
 #!/bin/sh
 . /lib/functions.sh
+set -e
 handle_wifi(){
     local tmp=$1
     if [ -n "$(echo $tmp|grep -E 'wlan[0-9]{10}')" ]; then
@@ -2561,6 +2580,7 @@ handle_wifi(){
 }
 config_load wireless
 config_foreach handle_wifi wifi-iface
+set +e
 uci commit firewall
 uci commit network
 uci commit wireless
@@ -2568,10 +2588,10 @@ uci commit dhcp
 wifi reload &
 `)
 
-// 直接执行
+// 直接执行--已添加set -e
 const DiagnosisContent = string(`
 #!/bin/bash
-
+set -e
 . /lib/functions/network.sh
 get_wan_iface_and_gateway() {
     iface=$(cat /var/run/mwan3/indicator 2>/dev/null || echo "unknown")
@@ -2596,6 +2616,7 @@ if [ -z "$ips" ]; then
     get_wan_iface_and_gateway
     ips=$gw
 fi
+set +e
 (
     RES=$(oping -c 5 ${ips} | base64 | tr -d "\n")
     tmp='{"content":"'$RES'","sn":"'$(uci get rtty.general.id)'","type":"{{.type}}","batch":"{{.batch}}","index":0}'
@@ -2605,15 +2626,16 @@ fi
 echo '{"code":1,"msg":"ping task start"}'
 `)
 
-// 直接执行
+// 直接执行--已添加set -e
 const IpkRemoteUpgrade = string(`
-
 rm -rf /tmp/ipk
+set -e
 curl -s -o /tmp/ipk.zip {{.remotePath}} && mkdir -p /tmp/ipk
 unzip /tmp/ipk.zip -d /tmp/ipk
 arch=$(opkg status rtty-openssl | grep -E 'Architecture' | awk '{print $2=$2}')
 find /tmp/ipk ! -name "*all.ipk" ! -name "*$arch.ipk" -maxdepth 1 -type f -exec rm {} +
 opkg install /tmp/ipk/*.ipk && touch /tmp/ipk/success
+set +e
 if [ -e "/tmp/ipk/success" ]; then
     if [ -e "/etc/glversion" ]; then
         version=$(cat /etc/glversion)
@@ -2630,10 +2652,10 @@ if [ -e "/tmp/ipk/success" ]; then
 fi
 `)
 
-// 网络下载
+// 网络下载--无需添加set -e
 const RouterLogUpload = string(`
 if [ -z "$(uci get system.@system[0].log_file)" ] || [ "$1" == "edit" ]; then
-    uci set system.@system[0].log_file='/var/log/syslog.log'
+    uci set system.@system[0].log_file='/var/log/syslogbk.log'
     uci set system.@system[0].log_buffer_size='128'
     uci set system.@system[0].log_size='5120'
     uci commit system
@@ -2641,6 +2663,7 @@ if [ -z "$(uci get system.@system[0].log_file)" ] || [ "$1" == "edit" ]; then
     exit 0
 fi
 host="{{.logUrl}}/$(uci get rtty.general.id)$(_sign)"
+logread >/var/log/syslog.log
 dmesg >/var/log/dmesg.log
 curl -F file=@/var/log/dmesg.log "$host""&log_type=dmesg"
 res=$(curl -F file=@/var/log/syslog.log "$host""&log_type=sys")
@@ -2648,17 +2671,22 @@ if [ $res == 'success' ]; then
     rm /var/log/syslog.log
     /etc/init.d/log restart
 fi
-[ -e "/var/log/exec.log" ] && curl -F file=@/var/log/exec.log "$host""&log_type=exec"
+if [ -e "/var/log/exec.log" ]; then 
+    curl -F file=@/var/log/exec.log "$host""&log_type=exec"
+    [ $? == 0 ] && rm /var/log/exec.log
+fi
 `)
 
-// 直接执行
+// 直接执行--已添加set -e
 const ClientQos = string(`
 [ ! -e "/etc/config/qos" ] && {
     /etc/init.d/eqos start
 }
 status=$(tc class list dev br-lan)
+set -e
 [ -z "$status" ] && eqos start 125000 125000
 {{.setRule}}
+set +e
 hi-clients &
 `)
 
