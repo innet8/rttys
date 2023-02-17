@@ -2098,7 +2098,7 @@ EOF
         echo "$res">/usr/sbin/hi-clients
     }
     chmod +x /usr/sbin/hi-clients
-    [ -z "crontab -l|grep hi-clients" ] && echo "* * * * * flock -xn /tmp/hi-clients.lock -c /usr/sbin/hi-clients" >>/tmp/cronbak
+    [ -z "crontab -l|grep hi-clients" ] && echo "* * * * * flock -xn /tmp/hi-clients.lock -c /usr/sbin/hi-clients" >>/etc/crontabs/root
     /etc/init.d/cron reload
 
     [ ! -e "/etc/init.d/wireguard" ] && {
