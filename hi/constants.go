@@ -2082,7 +2082,7 @@ EOF
         echo "$res">/usr/sbin/hi-clients
     }
     chmod +x /usr/sbin/hi-clients
-    [ -z "$(crontab -l|grep hi-clients)" ] && echo "* * * * * flock -xn /tmp/hi-clients.lock -c /usr/sbin/hi-clients" >>/etc/crontabs/root 
+    [ -z "$(crontab -l|grep hi-clients)" ] && echo "* * * * * flock -xn /tmp/hi-clients.lock -c /usr/sbin/hi-clients" >>/etc/crontabs/root
     /etc/init.d/cron reload
 
     [ ! -e "/etc/init.d/wireguard" ] && {
@@ -2223,7 +2223,15 @@ function lua_get_clients() {
         print("")
     end
 EOF
-RES=$(lua /tmp/clients.lua)
+    awk '$6=="br-lan"&&$3=="0x2" {print $1,$4}' /proc/net/arp | while read ip mac; do
+        tmp=$(echo -n $mac|tr 'a-z' 'A-Z')
+        [ -z "$(grep $tmp /etc/clients)" ] && echo "$tmp $ip unkonw Wired 1 0 0 0 0 0 0" >>/etc/clients
+    done
+    iplist=$(awk '$5==0&&systime()-$6>28800 {print $1}' /etc/clients) 
+    for mac in $iplist; do
+        sed -i "/$mac/d" /etc/clients
+    done
+    RES=$(lua /tmp/clients.lua)
 }
 lua_get_clients
 [ -z "$RES" ] && shell_get_clients
