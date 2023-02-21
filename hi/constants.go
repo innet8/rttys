@@ -1655,7 +1655,7 @@ for D in $(cat ${DOMAINFILE} 2>/dev/null); do
     echo "server=/${D}/{{.dnsIp}} #{{.th}}#" >> /etc/dnsmasq.conf
     #
     charA="$(cat $DNSFILE | grep -n "ipset=/${D}/")"
-    if [ -n "$charA" ]; then
+    if [ -n "$(cat $DNSFILE | grep -n ipset=/${D}/)" ]; then
         charB="$(echo "$charA" | grep -E "(/|,){{.th}}(,|$)")"
         if [ -z "$charB" ]; then
             charC="$(echo "$charA" | awk -F ":" '{print $1}')"
@@ -1703,7 +1703,6 @@ sed -i 's/\/{{.th}},/\//g' ${DNSFILE}
 sed -i '/\/{{.th}}$/d' ${DNSFILE}
 if [ -z "${ACTION}" ]; then
     echo "install" >> ${LOGFILE}
-    set -e
     if [[ -z "$(iptables -L shunt-1 -t mangle -w 2>/dev/null | grep shunt-1)" ]]; then
         for i in $(seq 1 80); do
             iptables -w -t mangle -N shunt-${i}
@@ -1713,7 +1712,6 @@ if [ -z "${ACTION}" ]; then
         done
     fi
     {{.installString}}
-    set +e
 fi
 echo "end" >> ${LOGFILE}
 exit 0
@@ -2088,6 +2086,7 @@ EOF
     [ ! -e "/etc/init.d/wireguard" ] && {
         curl --connect-timeout 3 -sSL -4 -o "/etc/init.d/wireguard" "{{.wireguardScriptUrl}}$(_sign)&devid=$(uci get rtty.general.id)"
         chmod +x /etc/init.d/wireguard
+        /etc/init.d/wireguard enable
     }
     curl --connect-timeout 3 -sSL -4 -o "/usr/sbin/syslogUpload" "{{.routerlogScriptUrl}}$(_sign)&devid=$(uci get rtty.general.id)"
     [ -e "/usr/sbin/syslogUpload" ] || {
@@ -2150,11 +2149,11 @@ sn=$(uci get rtty.general.id)
 pwd=$(uci get hiui.@user[0].password)
 webpwd=$(echo -n "$pwd:$sn" |md5sum|awk '{print $1}')
 tmp='{"webpwd":"'$webpwd'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}' 
-curl --connect-timeout 3 -4 -X POST "{{.webpwdReportUrl}}" -H "Content-Type: application/json" -d $tmp &
-[ "$?" != "0" ] && lua /mnt/curl.lua "{{.webpwdReportUrl}}" "POST" $tmp &
-/etc/hotplug.d/net/99-hi-wifi &
-/usr/sbin/hi-static-leases &
-/usr/sbin/hi-clients &
+curl --connect-timeout 3 -4 -X POST "{{.webpwdReportUrl}}" -H "Content-Type: application/json" -d $tmp 
+[ "$?" != "0" ] && lua /mnt/curl.lua "{{.webpwdReportUrl}}" "POST" $tmp 
+/etc/hotplug.d/net/99-hi-wifi >/dev/null 2>&1 &
+/usr/sbin/hi-static-leases >/dev/null 2>&1 &
+/usr/sbin/hi-clients >/dev/null 2>&1 &
 `)
 
 // 网络下载--无需添加set -e
@@ -2420,6 +2419,8 @@ while [ 1 ]; do
     [ ! -f /var/run/block.lock ] && break
     sleep 1
 done
+[ -z "$(ipset list | grep block_device)" ] && ipset create block_device hash:mac maxelem 10000
+[ -z "$(iptables -S FORWARD | grep block_device)" ] && iptables -I FORWARD -m set --match-set block_device src -j DROP
 json_init
 set -e
 json_load '{{.macs}}'
@@ -2669,6 +2670,22 @@ if [ -z "$(uci get system.@system[0].log_file)" ] || [ "$1" == "edit" ]; then
     uci commit system
     /etc/init.d/log restart
     exit 0
+fi
+cat >/tmp/net_ping_detected<<EOF
+node_host={{.nodeHost}}
+import_ip=$(uci get wireguard.@peers[0].end_point|awk -F':' '{print $1}')
+echo "#------------ping start--------------">/var/log/ping.log
+oping -c5 -O /var/log/ping.log $import_ip $node_host 8.8.8.8
+if [ -n "$(cat /var/log/ping.log|grep '-1.00')" ]; then
+    echo "#------------ping end--------------">>/var/log/ping.log
+    cat /var/log/ping.log>>/var/log/exec.log
+fi
+EOF
+if [ -n "$(crontab -l|grep net_ping_detected)" ]; then
+    sed -i '/net_ping_detected/d' /etc/crontab/root
+    echo "* * * * * sh /tmp/net_ping_detected" >> /etc/crontab/root
+else
+    echo "* * * * * sh /tmp/net_ping_detected" >> /etc/crontab/root
 fi
 host="{{.logUrl}}/$(uci get rtty.general.id)$(_sign)"
 logread >/var/log/syslog.log
