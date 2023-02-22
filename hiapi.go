@@ -1745,3 +1745,93 @@ func fetchLog(br *broker) gin.HandlerFunc {
 		}
 	}
 }
+
+// getCmdrLog 获取执行命令日志
+func getCmdrLog(br *broker) gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+		db, err := hi.InstanceDB(br.cfg.DB)
+		if err != nil {
+			log.Error().Msg(err.Error())
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+		defer closeDB(db)
+		devid := c.Param("devid")
+		_, authErr := userAuth(c, db, devid)
+		if authErr != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"ret": 0,
+				"msg": "Authentication failed",
+				"data": gin.H{
+					"error": authErr.Error(),
+				},
+			})
+			return
+		}
+		startTime := c.Query("start_time")
+		endTime := c.Query("end_time")
+
+		page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"ret": 0,
+				"msg": "params error",
+			})
+			return
+		}
+		pageSize, err := strconv.Atoi(c.DefaultQuery("pagesize", "10"))
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"ret": 0,
+				"msg": "params error",
+			})
+			return
+		}
+
+		action := c.Query("action")
+		where := map[string]interface{}{
+			"devid": devid,
+		}
+		if action != "" {
+			where["action"] = action
+		}
+
+		type cmd struct {
+			ID        uint32 `json:"id"`
+			Action    string `json:"action"`
+			Cmd       string `json:"cmd"`
+			Result    string `json:"result"`
+			StartTime uint32 `json:"start_time"`
+			EndTime   uint32 `json:"end_time"`
+		}
+		var cmds []cmd
+		tx := db.Table("hi_cmdr").Where(where)
+		if startTime != "" && endTime != "" {
+			tx.Where("start_time between ? and ?", startTime, endTime)
+		}
+		tx.Limit(pageSize).Offset(pageSize * (page - 1)).Order("id desc").Find(&cmds)
+
+		totalTx := db.Table("hi_cmdr").Where(where)
+		if startTime != "" && endTime != "" {
+			tx.Where("start_time between ? and ?", startTime, endTime)
+		}
+		var total, over int64
+		totalTx.Count(&total)
+		if total%int64(pageSize) > 0 {
+			over = 1
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"ret": 1,
+			"msg": "success",
+			"data": gin.H{
+				"last_page": total/int64(pageSize) + over,
+				"page":      page,
+				"pagesize":  pageSize,
+				"total":     total,
+				"data":      cmds,
+			},
+		})
+	}
+}
