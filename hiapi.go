@@ -1795,7 +1795,7 @@ func getCmdrLog(br *broker) gin.HandlerFunc {
 			"devid": devid,
 		}
 		if action != "" {
-			where["action"] = action
+			where["action"] = strings.Split(action, ",")
 		}
 
 		type cmd struct {
@@ -1804,7 +1804,6 @@ func getCmdrLog(br *broker) gin.HandlerFunc {
 			Cmd       string `json:"cmd"`
 			Result    string `json:"result"`
 			StartTime uint32 `json:"start_time"`
-			EndTime   uint32 `json:"end_time"`
 		}
 		var cmds []cmd
 		tx := db.Table("hi_cmdr").Where(where)
