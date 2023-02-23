@@ -2713,10 +2713,10 @@ fi
 const ClientQos = string(`
 #-----------{{.date}}-------------
 [ ! -e "/etc/config/qos" ] && {
-    a='[ -n "$(grep queue /etc/config/qos | grep -v "#")" ] || /etc/init.d/eqos stop'
-    sed -i "/eqos stop/c $a" /usr/sbin/eqos
     /etc/init.d/eqos start
 }
+a='[ -n "$(grep queue /etc/config/qos | grep -v "#")" ] || /etc/init.d/eqos stop'
+sed -i "/eqos stop/c $a" /usr/sbin/eqos
 status=$(tc class list dev br-lan)
 set -e
 [ -z "$status" ] && eqos start 125000 125000
