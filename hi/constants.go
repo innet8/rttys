@@ -1654,10 +1654,9 @@ _sign() {
 const ShuntDomainPartial = string(`
 for D in $(cat ${DOMAINFILE} 2>/dev/null); do
     echo "server=/${D}/{{.dnsIp}} #{{.th}}#" >> /etc/dnsmasq.conf
-    charA="$(cat $DNSFILE | grep -n "ipset=/${D}/")"
     if [ -n "$(cat $DNSFILE | grep -n ipset=/${D}/)" ]; then
-        charB="$(echo "$charA" | grep -E "(/|,){{.th}}(,|$)")"
-        if [ -z "$charB" ]; then
+        charA="$(cat $DNSFILE | grep -n "ipset=/${D}/")"
+        if [ -z "$(echo "$charA" | grep -E "(/|,){{.th}}(,|$)")" ]; then
             charC="$(echo "$charA" | awk -F ":" '{print $1}')"
             charD="$(echo "$charA" | awk -F ":" '{print $2}')"
             sed -i "${charC}d" $DNSFILE
@@ -2714,6 +2713,8 @@ fi
 const ClientQos = string(`
 #-----------{{.date}}-------------
 [ ! -e "/etc/config/qos" ] && {
+    a='[ -n "$(grep queue /etc/config/qos | grep -v "#")" ] || /etc/init.d/eqos stop'
+    sed -i "/eqos stop/c $a" /usr/sbin/eqos
     /etc/init.d/eqos start
 }
 status=$(tc class list dev br-lan)
