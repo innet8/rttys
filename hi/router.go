@@ -273,7 +273,7 @@ func DiagnosisCmd(callbackUrl, typ, batch, ip string) string {
 	return DiagnosisTemplate(envMap)
 }
 
-func ClientQosCmd(list []QosModal, action string) string {
+func ClientQosCmd(list []QosModal, action string, host string) string {
 	var cmds []string
 	for _, item := range list {
 		if action == "add" {
@@ -287,6 +287,7 @@ func ClientQosCmd(list []QosModal, action string) string {
 	}
 	var envMap = make(map[string]interface{})
 	envMap["setRule"] = strings.Join(cmds, "\n")
+	envMap["nodeHost"] = host
 	return ClientQosTemplate(envMap)
 }
 

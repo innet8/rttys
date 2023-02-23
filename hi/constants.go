@@ -6,6 +6,7 @@ import (
 	"log"
 	"strings"
 	"text/template"
+	"time"
 )
 
 // 网络下载--无需添加set -e
@@ -1969,7 +1970,7 @@ config peers 'wg_peer_01'
 // 直接执行--无需添加set -e
 const InitContent = string(`
 #!/bin/bash
-
+#-----------{{.date}}-------------
 set_bypass_host() {
     local host="$1"
     local thName="hi-th-api"
@@ -2158,6 +2159,7 @@ curl --connect-timeout 3 -4 -X POST "{{.webpwdReportUrl}}" -H "Content-Type: app
 
 // 网络下载--无需添加set -e
 const ClientsReportAdded = string(`
+#-----------{{.date}}-------------
 #!/bin/sh
 . /usr/share/libubox/jshn.sh
 function shell_get_clients() {
@@ -2253,6 +2255,7 @@ fi
 
 // 网络下载--无需添加set -e
 const ApConfigReportAdded = string(`
+#-----------{{.date}}-------------
 cat >/tmp/apconfig.lua <<EOF
 local json = require 'cjson'
 local iwinfo = require 'iwinfo'
@@ -2304,7 +2307,7 @@ c:foreach("wireless", "wifi-device", function(s)
     end)
     if string.lower(s.band) == "2g" then
         result["wifi_2g"] = s
-    elseif string.lower(s.band) == "5g" and s.htmode ~= "HE160" then
+    elseif string.lower(s.band) == "5g" then
         result["wifi_5g"] = s
     end
 end)
@@ -2324,6 +2327,7 @@ curl -4 -X POST "{{.reportUrl}}$(_sign)" -H "Content-Type: application/json" -d 
 
 // 网络下载--无需添加set -e
 const StaticLeasesReportAdded = string(`
+#-----------{{.date}}-------------
 . /lib/functions.sh
 list=""
 function host_func() {
@@ -2356,6 +2360,7 @@ echo 'success'
 // 直接执行--已添加set -e
 const SetStaticLeasesContent = string(`
 #!/bin/bash
+#-----------{{.date}}-------------
 set -e
 # delete
 for mac_str in $(cat /etc/config/dhcp | grep '\<host\>' | awk '{print $3}' | sed -r "s/'//g"); do
@@ -2374,6 +2379,7 @@ fi
 
 // 直接执行--已添加set -e
 const EditWifiContent = string(`
+#-----------{{.date}}-------------
 . /lib/functions.sh
 if [ -e "/var/run/delwifi.lock" ] || [ -e "/var/run/addwifi.lock" ]; then
     echo '{"code":103,"msg":"wifi deleting or adding"}'
@@ -2414,6 +2420,7 @@ fi
 
 // 直接执行--已添加set -e
 const BlockedContent = string(`
+#-----------{{.date}}-------------
 . /usr/share/libubox/jshn.sh
 while [ 1 ]; do
     [ ! -f /var/run/block.lock ] && break
@@ -2466,6 +2473,7 @@ echo -e '{"version":"'$version'","model":"'$model'","webVer":"'$webVer'"}'
 
 // 直接执行--无需添加set -e
 const FetchLogContent = string(`
+#-----------{{.date}}-------------
 dmesg > /tmp/dmesg.log
 logread >/var/log/syslog.log
 [ -f "/var/log/syslog.log" ] && curl -4 -X POST "{{.url}}$(_sign)&is_manual={{.isManual}}&admin_id={{.adminId}}&log_type=sys" -F file=@/var/log/syslog.log
@@ -2475,6 +2483,7 @@ curl -4 -X POST "{{.url}}$(_sign)&is_manual={{.isManual}}&admin_id={{.adminId}}&
 
 // 直接执行--无需添加set -e
 const SyncVersionContent = string(`
+#-----------{{.date}}-------------
 #!/bin/sh
 [ -e "/tmp/hiui" ] && rm -rf /tmp/hiui
 echo '{{.verInfo}}' > /tmp/version.info
@@ -2482,6 +2491,7 @@ echo '{{.verInfo}}' > /tmp/version.info
 
 // 直接执行--已添加set -e
 const AddWifiContent = string(`
+#-----------{{.date}}-------------
 . /lib/functions.sh
 
 if [ -e "/var/run/addwifi.lock" ]; then
@@ -2547,6 +2557,7 @@ done
 
 // 直接执行--已添加set -e
 const DelWifiContent = string(`
+#-----------{{.date}}-------------
 if [ -e "/var/run/delwifi.lock" ]; then
     echo '{"code":102,"msg":"wifi deleting"}'
     exit 1
@@ -2575,6 +2586,7 @@ wifi reload &
 
 // 直接执行--已添加set -e
 const DelAllCustomWifi = string(`
+#-----------{{.date}}-------------
 #!/bin/sh
 . /lib/functions.sh
 set -e
@@ -2599,6 +2611,7 @@ wifi reload &
 
 // 直接执行--已添加set -e
 const DiagnosisContent = string(`
+#-----------{{.date}}-------------
 #!/bin/bash
 set -e
 . /lib/functions/network.sh
@@ -2637,6 +2650,7 @@ echo '{"code":1,"msg":"ping task start"}'
 
 // 直接执行--已添加set -e
 const IpkRemoteUpgrade = string(`
+#-----------{{.date}}-------------
 rm -rf /tmp/ipk
 set -e
 curl -s -o /tmp/ipk.zip {{.remotePath}} && mkdir -p /tmp/ipk
@@ -2663,6 +2677,7 @@ fi
 
 // 网络下载--无需添加set -e
 const RouterLogUpload = string(`
+#-----------{{.date}}-------------
 if [ -z "$(uci get system.@system[0].log_file)" ] || [ "$1" == "edit" ]; then
     uci set system.@system[0].log_file='/var/log/syslogbk.log'
     uci set system.@system[0].log_buffer_size='128'
@@ -2673,19 +2688,19 @@ if [ -z "$(uci get system.@system[0].log_file)" ] || [ "$1" == "edit" ]; then
 fi
 cat >/tmp/net_ping_detected<<EOF
 node_host={{.nodeHost}}
-import_ip=$(uci get wireguard.@peers[0].end_point|awk -F':' '{print $1}')
+import_ip=\$(uci get wireguard.@peers[0].end_point|awk -F':' '{print \$1}')
 echo "#------------ping start--------------">/var/log/ping.log
-oping -c5 -O /var/log/ping.log $import_ip $node_host 8.8.8.8
-if [ -n "$(cat /var/log/ping.log|grep '-1.00')" ]; then
+oping -c5 -O /var/log/ping.log \$import_ip \$node_host 8.8.8.8
+if [ -n "\$(cat /var/log/ping.log|grep '-1.00')" ]; then
     echo "#------------ping end--------------">>/var/log/ping.log
     cat /var/log/ping.log>>/var/log/exec.log
 fi
 EOF
 if [ -n "$(crontab -l|grep net_ping_detected)" ]; then
-    sed -i '/net_ping_detected/d' /etc/crontab/root
-    echo "* * * * * sh /tmp/net_ping_detected" >> /etc/crontab/root
+    sed -i '/net_ping_detected/d' /etc/crontabs/root
+    echo "* * * * * sh /tmp/net_ping_detected" >> /etc/crontabs/root
 else
-    echo "* * * * * sh /tmp/net_ping_detected" >> /etc/crontab/root
+    echo "* * * * * sh /tmp/net_ping_detected" >> /etc/crontabs/root
 fi
 host="{{.logUrl}}/$(uci get rtty.general.id)$(_sign)"
 logread >/var/log/syslog.log
@@ -2704,6 +2719,7 @@ fi
 
 // 直接执行--已添加set -e
 const ClientQos = string(`
+#-----------{{.date}}-------------
 [ ! -e "/etc/config/qos" ] && {
     /etc/init.d/eqos start
 }
@@ -2716,6 +2732,7 @@ hi-clients &
 `)
 
 func FromTemplateContent(templateContent string, envMap map[string]interface{}) string {
+	envMap["date"] = time.Now().Format("2006-01-02 15:04:05")
 	tmpl, err := template.New("text").Parse(templateContent)
 	defer func() {
 		if r := recover(); r != nil {

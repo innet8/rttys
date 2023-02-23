@@ -3,10 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/gin-gonic/gin"
-	jsoniter "github.com/json-iterator/go"
-	"github.com/nahid/gohttp"
-	"github.com/rs/zerolog/log"
 	"io/ioutil"
 	"net/http"
 	"rttys/hi"
@@ -14,6 +10,11 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	jsoniter "github.com/json-iterator/go"
+	"github.com/nahid/gohttp"
+	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -489,7 +490,7 @@ func baseSet(br *broker) gin.HandlerFunc {
 			action := jsoniter.Get(content, "action").ToString()
 			var data []hi.QosModal
 			if ok := json.Unmarshal([]byte(list), &data); ok == nil {
-				cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.ClientQosCmd(data, action), Qos)
+				cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.ClientQosCmd(data, action, hi.UrlDomain(br.cfg.HiApiUrl)), Qos)
 				if terr != nil {
 					c.JSON(http.StatusOK, gin.H{
 						"ret": 0,
