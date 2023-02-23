@@ -1654,7 +1654,6 @@ _sign() {
 const ShuntDomainPartial = string(`
 for D in $(cat ${DOMAINFILE} 2>/dev/null); do
     echo "server=/${D}/{{.dnsIp}} #{{.th}}#" >> /etc/dnsmasq.conf
-    #
     charA="$(cat $DNSFILE | grep -n "ipset=/${D}/")"
     if [ -n "$(cat $DNSFILE | grep -n ipset=/${D}/)" ]; then
         charB="$(echo "$charA" | grep -E "(/|,){{.th}}(,|$)")"
@@ -1672,7 +1671,7 @@ done
 for D in $(cat ${DOMAINFILE} 2>/dev/null); do (nslookup $D > /dev/null 2>&1 &); done
 `)
 
-// 网络下载--已添加set -e
+// 网络下载--
 const ShuntContent = string(`
 #!/bin/bash
 ACTION=$1
@@ -1712,7 +1711,9 @@ if [ -z "${ACTION}" ]; then
             iptables -w -t nat -A PREROUTING -j shunt-${i}
         done
     fi
+    set -e
     {{.installString}}
+    set +e
 fi
 echo "end" >> ${LOGFILE}
 exit 0
@@ -2361,12 +2362,12 @@ echo 'success'
 const SetStaticLeasesContent = string(`
 #!/bin/bash
 #-----------{{.date}}-------------
-set -e
 # delete
 for mac_str in $(cat /etc/config/dhcp | grep '\<host\>' | awk '{print $3}' | sed -r "s/'//g"); do
     uci delete dhcp.$mac_str
 done
 # add
+set -e
 {{.addString}}
 set +e
 uci commit dhcp
@@ -2403,18 +2404,16 @@ curl -4 -X POST "$host" -H "Content-Type: application/json" -d $tmp
 [ "$?" != "0" ] && lua /mnt/curl.lua "$host" "POST" $tmp
 
 if [ "$(cat /etc/openwrt_version)" == "15.05.1" ]; then
-    (
         /sbin/wifi reload
-        sleep 10
+        sleep 5
         set -e
         {{.chaos_calmer}}
         set +e
         uci commit network
         uci commit wireless
         /etc/init.d/network reload
-    ) >/dev/null 2>&1 &
 else
-    /sbin/wifi reload >/dev/null 2>&1 &
+    /sbin/wifi reload 
 fi
 `)
 
@@ -2498,32 +2497,25 @@ if [ -e "/var/run/addwifi.lock" ]; then
     echo '{"code":102,"msg":"wifi adding"}'
     exit 1
 fi
-set -e
 {{.ipSegment}}
-touch /var/run/addwifi.lock
-{{.wireless}}
-set +e
-uci commit wireless
 set -e
+{{.wireless}}
 {{.network}}
 set +e
+uci commit wireless
+touch /var/run/addwifi.lock
 if [ "$(cat /etc/openwrt_version)" == "15.05.1" ]; then
     wifi reload
     sleep 20
-    set -e
     {{.chaos_calmer}}
-    set +e
     uci commit network
     uci commit wireless
 else
-    set -e
     {{.openwrt}}
-    set +e
     uci commit network
     uci commit wireless
     wifi reload
 fi
-set -e
 {{.dhcp}}
 handle_firewall(){
     local tmp=$1
@@ -2537,7 +2529,6 @@ config_foreach handle_firewall zone
 uci commit dhcp
 uci commit firewall
 rm -f /var/run/addwifi.lock
-set +e
 _base64e() {
     echo -n "$1" | base64 | tr -d "\n"
 }
@@ -2563,9 +2554,9 @@ if [ -e "/var/run/delwifi.lock" ]; then
     exit 1
 fi
 set -e
-touch /var/run/delwifi.lock
 {{.del}}
 set +e
+touch /var/run/delwifi.lock
 uci commit firewall
 uci commit network
 uci commit wireless
@@ -2609,7 +2600,7 @@ uci commit dhcp
 wifi reload &
 `)
 
-// 直接执行--已添加set -e
+// 直接执行--不需要
 const DiagnosisContent = string(`
 #-----------{{.date}}-------------
 #!/bin/bash
@@ -2672,6 +2663,8 @@ if [ -e "/tmp/ipk/success" ]; then
     curl -4 -X POST "$host" -H "Content-Type: application/json" -d $tmp
     [ "$?" != "0" ] && lua /mnt/curl.lua "$host" "POST" $tmp
     echo "success"
+else
+    exit 1
 fi
 `)
 
