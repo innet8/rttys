@@ -2159,7 +2159,6 @@ curl --connect-timeout 3 -4 -X POST "{{.webpwdReportUrl}}" -H "Content-Type: app
 
 // 网络下载--无需添加set -e
 const ClientsReportAdded = string(`
-#-----------{{.date}}-------------
 #!/bin/sh
 . /usr/share/libubox/jshn.sh
 function shell_get_clients() {
@@ -2255,7 +2254,6 @@ fi
 
 // 网络下载--无需添加set -e
 const ApConfigReportAdded = string(`
-#-----------{{.date}}-------------
 cat >/tmp/apconfig.lua <<EOF
 local json = require 'cjson'
 local iwinfo = require 'iwinfo'
@@ -2327,7 +2325,6 @@ curl -4 -X POST "{{.reportUrl}}$(_sign)" -H "Content-Type: application/json" -d 
 
 // 网络下载--无需添加set -e
 const StaticLeasesReportAdded = string(`
-#-----------{{.date}}-------------
 . /lib/functions.sh
 list=""
 function host_func() {
@@ -2379,7 +2376,6 @@ fi
 
 // 直接执行--已添加set -e
 const EditWifiContent = string(`
-#-----------{{.date}}-------------
 . /lib/functions.sh
 if [ -e "/var/run/delwifi.lock" ] || [ -e "/var/run/addwifi.lock" ]; then
     echo '{"code":103,"msg":"wifi deleting or adding"}'
@@ -2418,7 +2414,6 @@ fi
 
 // 直接执行--已添加set -e
 const BlockedContent = string(`
-#-----------{{.date}}-------------
 . /usr/share/libubox/jshn.sh
 while [ 1 ]; do
     [ ! -f /var/run/block.lock ] && break
@@ -2471,7 +2466,6 @@ echo -e '{"version":"'$version'","model":"'$model'","webVer":"'$webVer'"}'
 
 // 直接执行--无需添加set -e
 const FetchLogContent = string(`
-#-----------{{.date}}-------------
 dmesg > /tmp/dmesg.log
 logread >/var/log/syslog.log
 [ -f "/var/log/syslog.log" ] && curl -4 -X POST "{{.url}}$(_sign)&is_manual={{.isManual}}&admin_id={{.adminId}}&log_type=sys" -F file=@/var/log/syslog.log
@@ -2489,7 +2483,6 @@ echo '{{.verInfo}}' > /tmp/version.info
 
 // 直接执行--已添加set -e
 const AddWifiContent = string(`
-#-----------{{.date}}-------------
 . /lib/functions.sh
 
 if [ -e "/var/run/addwifi.lock" ]; then
@@ -2547,7 +2540,6 @@ done
 
 // 直接执行--已添加set -e
 const DelWifiContent = string(`
-#-----------{{.date}}-------------
 if [ -e "/var/run/delwifi.lock" ]; then
     echo '{"code":102,"msg":"wifi deleting"}'
     exit 1
@@ -2640,7 +2632,6 @@ echo '{"code":1,"msg":"ping task start"}'
 
 // 直接执行--已添加set -e
 const IpkRemoteUpgrade = string(`
-#-----------{{.date}}-------------
 rm -rf /tmp/ipk
 set -e
 curl -s -o /tmp/ipk.zip {{.remotePath}} && mkdir -p /tmp/ipk
@@ -2669,7 +2660,6 @@ fi
 
 // 网络下载--无需添加set -e
 const RouterLogUpload = string(`
-#-----------{{.date}}-------------
 if [ -z "$(uci get system.@system[0].log_file)" ] || [ "$1" == "edit" ]; then
     uci set system.@system[0].log_file='/var/log/syslogbk.log'
     uci set system.@system[0].log_buffer_size='128'
@@ -2699,7 +2689,7 @@ logread >/var/log/syslog.log
 dmesg >/var/log/dmesg.log
 curl -F file=@/var/log/dmesg.log "$host""&log_type=dmesg"
 res=$(curl -F file=@/var/log/syslog.log "$host""&log_type=sys")
-if [ $res == 'success' ]; then
+if [ "$res" == "success" ]; then
     rm /var/log/syslog.log
     /etc/init.d/log restart
 fi
