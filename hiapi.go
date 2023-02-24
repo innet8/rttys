@@ -179,6 +179,7 @@ func baseCmd(br *broker) gin.HandlerFunc {
 		} else if action == "router_log" {
 			var envMap = make(map[string]interface{})
 			envMap["logUrl"] = fmt.Sprintf("%s/hi/other/upload-log", br.cfg.HiApiUrl)
+			envMap["nodeHost"] = hi.UrlDomain(br.cfg.HiApiUrl)
 			c.String(http.StatusOK, hi.RouterLogUploadTemplate(envMap))
 		}
 	}
@@ -490,7 +491,7 @@ func baseSet(br *broker) gin.HandlerFunc {
 			action := jsoniter.Get(content, "action").ToString()
 			var data []hi.QosModal
 			if ok := json.Unmarshal([]byte(list), &data); ok == nil {
-				cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.ClientQosCmd(data, action, hi.UrlDomain(br.cfg.HiApiUrl)), Qos)
+				cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.ClientQosCmd(data, action), Qos)
 				if terr != nil {
 					c.JSON(http.StatusOK, gin.H{
 						"ret": 0,
