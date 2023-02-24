@@ -1795,6 +1795,7 @@ wireguard_start() {
         /etc/init.d/wireguard start >/dev/null 2>&1
         wireguard_confirm start
         sleep 2
+        local endpoint=$(uci get wireguard.@peers[0].end_point | awk -F':' '{print $1}')
         [[ -z "$(wg)" || -z "$(route -n |grep $endpoint)" ]] && exit 1
     fi
 }
