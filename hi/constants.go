@@ -2416,9 +2416,12 @@ fi
 // 直接执行--已添加set -e
 const BlockedContent = string(`
 . /usr/share/libubox/jshn.sh
+num=1
 while [ 1 ]; do
+    [ $num -gt 5 ] && rm -f /var/run/block.lock
     [ ! -f /var/run/block.lock ] && break
     sleep 1
+    num=$((num+1))
 done
 [ -z "$(ipset list | grep block_device)" ] && ipset create block_device hash:mac maxelem 10000
 [ -z "$(iptables -S FORWARD | grep block_device)" ] && iptables -I FORWARD -m set --match-set block_device src -j DROP
