@@ -1138,9 +1138,10 @@ addroute() {
     enable=$(uci get wireguard.@proxy[0].enable)
     [ "$enable" = "1" ] || return 
 
-    host=$(uci get wireguard.@proxy[0].host)
+    host=$(uci get wireguard.@peers[0].end_point)
     [ -n "$host" ] || return
-    ip=$(echo $host | egrep '[0-9]{1,3}(\.[0-9]{1,3}){3}')
+    local publicip=$(echo $host | cut -d ":" -f1)                                                                 
+    ip=$(echo $publicip | grep "^[0-9]\{1,3\}\.\([0-9]\{1,3\}\.\)\{2\}[0-9]\{1,3\}")
     [ -n "$ip" ] && {
         refresh_route $ip
     }
