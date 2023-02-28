@@ -1102,6 +1102,32 @@ model="${board_name#*-}"
 guest_exist=""
 openwrt_version=$(cat /etc/os-release | grep "VERSION_ID=" | cut -d '"' -f 2)
 
+refresh_route() {
+    local ip
+    local gw
+    local dev
+    local iface
+    local device
+    local server="$1"
+    # Invalid ip address, return
+    [ -n "$(echo $server | egrep '[0-9]{1,3}(\.[0-9]{1,3}){3}')" ] || return 0
+    # Check again
+    [ "$iface" = "unknown" ] && return 0
+    network_get_device device $iface
+    network_get_gateway gw $iface
+    dev=$(ip route list $server | sed 's/.*dev \(.*\)/\1/')
+    [ -n "$dev" ] && {                                     
+        [ "$dev" = "$device" ] && return 0
+        ip route del $server 2>/dev/null  
+    }
+    [ -n "$device" ] && {
+        if [ -n "$gw" ]; then
+            ip route add $server via $gw dev $device 2>/dev/null
+        else
+            ip route add $(ip route show dev $device | sed "s/default/$server/g" | head -n 1) 2>/dev/null || true
+        fi
+    }
+}
 addroute() {
     local ip
     local host
@@ -1112,13 +1138,10 @@ addroute() {
 
     host=$(uci get wireguard.@proxy[0].host)
     [ -n "$host" ] || return
-
     ip=$(echo $host | egrep '[0-9]{1,3}(\.[0-9]{1,3}){3}')
-
     [ -n "$ip" ] && {
-            refresh_route $ip
+        refresh_route $ip
     }
-
     local DDNS=$(iptables -nL -t mangle | grep WG_DDNS)
     local lanip=$(uci get network.lan.ipaddr)          
     local gateway=${lanip%.*}.0/24                                     
@@ -1134,7 +1157,7 @@ addroute() {
     ip rule add fwmark 0x60000/0x60000 lookup 31 pref 31                                 
     ip route add $ip dev wg0 table 31  
     for file in $(ls /tmp/hicloud/shunt 2>/dev/null); do
-        if [ "${file}" =~ .*\.sh$ ]; then
+        if [ -n "$(echo $file|grep .sh)" ]; then
             bash /tmp/hicloud/shunt/${file}
         fi
     done
