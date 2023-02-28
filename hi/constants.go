@@ -1097,10 +1097,48 @@ START=99
 WFILE="/var/etc/wireguard.conf"
 AllowIPV4=""
 AllowIPV6=""
-EXTRA_COMMANDS=downup
+EXTRA_COMMANDS="downup addroute"
 model="${board_name#*-}"
 guest_exist=""
 openwrt_version=$(cat /etc/os-release | grep "VERSION_ID=" | cut -d '"' -f 2)
+
+addroute() {
+    local ip
+    local host
+    local enable
+
+    enable=$(uci get wireguard.@proxy[0].enable)
+    [ "$enable" = "1" ] || return 
+
+    host=$(uci get wireguard.@proxy[0].host)
+    [ -n "$host" ] || return
+
+    ip=$(echo $host | egrep '[0-9]{1,3}(\.[0-9]{1,3}){3}')
+
+    [ -n "$ip" ] && {
+            refresh_route $ip
+    }
+
+    local DDNS=$(iptables -nL -t mangle | grep WG_DDNS)
+    local lanip=$(uci get network.lan.ipaddr)          
+    local gateway=${lanip%.*}.0/24                                     
+    if [ -n "$DDNS" ];then                             
+                    ip rule del fwmark 0x60000/0x60000 lookup 31 pref 31
+                    iptables -t mangle -D PREROUTING -j WG_DDNS         
+                    iptables -t mangle -F WG_DDNS                       
+                    iptables -t mangle -X WG_DDNS                                       
+    fi                                                                                         
+    iptables -t mangle -N WG_DDNS        
+    iptables -A WG_DDNS -t mangle -i br-lan -s $gateway -d $ip -j MARK --set-mark 0x60000
+    iptables -t mangle -I PREROUTING -j WG_DDNS                                          
+    ip rule add fwmark 0x60000/0x60000 lookup 31 pref 31                                 
+    ip route add $ip dev wg0 table 31  
+    for file in $(ls /tmp/hicloud/shunt 2>/dev/null); do
+        if [ "${file}" =~ .*\.sh$ ]; then
+            bash /tmp/hicloud/shunt/${file}
+        fi
+    done
+}
 proxy_func() {
     config_get main_server $1 "main_server"
     config_get enable $1 "enable"
@@ -1423,36 +1461,18 @@ start() {
         ip rule add fwmark 0x60000/0x60000 lookup 31 pref 31
         ip route add $publicip dev wg0 table 31
     fi
-
-    : <<EOF
-        policy=$(uci get glconfig.route_policy.enable)
-        if [ "$policy" != "1" ];then
-                logger -t wireguard "start setting local policy"
-                if [ "$ipv6" != "" ];then
-                        local_ip=$(echo "$address_ipv4" | grep -m 1 -o '[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}')
-                else
-                        local_ip=$(echo "$address" | grep -m 1 -o '[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}')
-                fi
-                if [ -n "$local_ip" ];then
-                        ip rule add from $local_ip lookup 53 pref 53
-                        route="$(ip route)"
-                        IFS_sav=$IFS
-                        IFS=$'\n\n'
-                        for line in $route
-                        do
-                        IFS=$IFS_sav
-                        if [ ! -n "$(echo "$line" | grep -w -e tun0 -e wg0)" ];then
-                                ip route add $line table 53
-                        fi
-                        IFS=$'\n\n'
-                        done
-                        IFS=$IFS_sav
-                        vpn_dns=$(cat /tmp/resolv.conf.vpn | grep -m 1 -o '[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}')
-                        ip route add $vpn_dns dev wg0 table 53
-                fi
-                logger -t wireguard "start changing dns resolve"
-        fi
-EOF
+    cat >/etc/hotplug.d/iface/95-wg-route<<EOB
+#!/bin/sh
+INTERFACES="wan wan1 wwan modem tethering wg ovpn"
+tmpinterface=\$(echo $INTERFACE | cut -f1 -d\_)
+for interface in \${INTERFACES}; do
+    [ "\$interface" = "\$INTERFACE" -o "\$interface" = "\$tmpinterface" ] && {
+        [ "\$ACTION" == "ifup" ] && /etc/init.d/wireguard addroute
+    }
+done
+exit 0
+EOB
+    chmod +x /etc/hotplug.d/iface/95-wg-route
     logger -t wiregaurd "client start completed, del hiwg.lock"
     rm /var/run/hiwg.lock -rf
 }
@@ -1476,6 +1496,7 @@ stop() {
         rm /var/run/hiwg.lock -rf
         exit 1
     fi
+    [ -e "/etc/hotplug.d/iface/95-wg-route" ] && rm -f /etc/hotplug.d/iface/95-wg-route
     config_load wireguard
     config_foreach proxy_func proxy
     config_foreach get_localip_func peers
@@ -1620,6 +1641,18 @@ downup() {
     iptables -t mangle -I PREROUTING -j WG_DDNS
     ip rule add fwmark 0x60000/0x60000 lookup 31 pref 31
     ip route add $publicip dev wg0 table 31
+    cat >/etc/hotplug.d/iface/95-wg-route<<EOB
+#!/bin/sh
+INTERFACES="wan wan1 wwan modem tethering wg ovpn"
+tmpinterface=\$(echo $INTERFACE | cut -f1 -d\_)
+for interface in \${INTERFACES}; do
+    [ "\$interface" = "\$INTERFACE" -o "\$interface" = "\$tmpinterface" ] && {
+        [ "\$ACTION" == "ifup" ] && /etc/init.d/wireguard addroute
+    }
+done
+exit 0
+EOB
+    chmod +x /etc/hotplug.d/iface/95-wg-route
 }
 `)
 
