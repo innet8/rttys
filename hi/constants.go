@@ -1140,8 +1140,7 @@ addroute() {
 
     host=$(uci get wireguard.@peers[0].end_point)
     [ -n "$host" ] || return
-    local publicip=$(echo $host | cut -d ":" -f1)                                                                 
-    ip=$(echo $publicip | grep "^[0-9]\{1,3\}\.\([0-9]\{1,3\}\.\)\{2\}[0-9]\{1,3\}")
+    ip=$(echo $host | cut -d ":" -f1)                                                                 
     [ -n "$ip" ] && {
         refresh_route $ip
     }
