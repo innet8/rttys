@@ -1113,8 +1113,10 @@ refresh_route() {
     [ -n "$(echo $server | egrep '[0-9]{1,3}(\.[0-9]{1,3}){3}')" ] || return 0
     # Check again
     [ "$iface" = "unknown" ] && return 0
-    network_get_device device $iface
-    network_get_gateway gw $iface
+    local tmpiface
+    network_find_wan tmpiface
+    network_get_gateway gw $tmpiface
+    network_get_device device $tmpiface
     dev=$(ip route list $server | sed 's/.*dev \(.*\)/\1/')
     [ -n "$dev" ] && {                                     
         [ "$dev" = "$device" ] && return 0
@@ -1146,10 +1148,10 @@ addroute() {
     local lanip=$(uci get network.lan.ipaddr)          
     local gateway=${lanip%.*}.0/24                                     
     if [ -n "$DDNS" ];then                             
-                    ip rule del fwmark 0x60000/0x60000 lookup 31 pref 31
-                    iptables -t mangle -D PREROUTING -j WG_DDNS         
-                    iptables -t mangle -F WG_DDNS                       
-                    iptables -t mangle -X WG_DDNS                                       
+        ip rule del fwmark 0x60000/0x60000 lookup 31 pref 31
+        iptables -t mangle -D PREROUTING -j WG_DDNS         
+        iptables -t mangle -F WG_DDNS                       
+        iptables -t mangle -X WG_DDNS                                       
     fi                                                                                         
     iptables -t mangle -N WG_DDNS        
     iptables -A WG_DDNS -t mangle -i br-lan -s $gateway -d $ip -j MARK --set-mark 0x60000
