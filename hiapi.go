@@ -1815,7 +1815,7 @@ func getCmdrLog(br *broker) gin.HandlerFunc {
 
 		totalTx := db.Table("hi_cmdr").Where(where)
 		if startTime != "" && endTime != "" {
-			tx.Where("start_time between ? and ?", startTime, endTime)
+			totalTx.Where("start_time between ? and ?", startTime, endTime)
 		}
 		var total, over int64
 		totalTx.Count(&total)
