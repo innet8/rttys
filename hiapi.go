@@ -2,7 +2,9 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"gorm.io/gorm"
 	"io/ioutil"
 	"net/http"
 	"rttys/hi"
@@ -1091,6 +1093,134 @@ func shuntModify(br *broker) gin.HandlerFunc {
 			"data": gin.H{
 				"token": hiSyncShuntConf(br, devid, callUrl),
 				"shunt": shunt,
+			},
+		})
+	}
+}
+
+// shuntBatch 批量添加、修改分流
+func shuntBatch(br *broker) gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+		db, err := hi.InstanceDB(br.cfg.DB)
+		if err != nil {
+			log.Error().Msg(err.Error())
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+		defer closeDB(db)
+
+		devid := c.Param("devid")
+		_, authErr := userAuth(c, db, devid)
+		if authErr != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"ret": 0,
+				"msg": "Authentication failed",
+				"data": gin.H{
+					"error": authErr.Error(),
+				},
+			})
+			return
+		}
+
+		content, err := ioutil.ReadAll(c.Request.Body)
+		if err != nil {
+			c.Status(http.StatusBadRequest)
+			return
+		}
+
+		type shuntItem struct {
+			Source       string `json:"source"`
+			SourceRemark string `json:"source_remark"`
+			Rule         string `json:"rule"`
+			RuleRemark   string `json:"rule_remark"`
+			Prio         uint32 `json:"prio"`
+			OutIp        string `json:"out_ip"`
+			OutRemark    string `json:"out_remark"`
+			Uuid         string `json:"uuid"`
+			Sid          uint32 `json:"sid"`
+		}
+		type shuntParams struct {
+			CallUrl   string      `json:"call_url"`
+			ShuntList []shuntItem `json:"list"`
+		}
+
+		var sp shuntParams
+		err = json.Unmarshal(content, &sp)
+		if err != nil {
+			c.Status(http.StatusBadRequest)
+			return
+		}
+
+		newShunts := make(map[string]interface{})
+		var shuntIds []uint32
+		onlyId := devidGetOnlyid(br, devid)
+		err = db.Transaction(func(tx *gorm.DB) error {
+			for _, item := range sp.ShuntList {
+				var shunt hi.ShuntModel
+				if item.Sid > 0 {
+					shuntIds = append(shuntIds, item.Sid)
+					db.Table("hi_shunt").Where(map[string]interface{}{
+						"id":     item.Sid,
+						"status": "use",
+						"devid":  devid,
+					}).Last(&shunt)
+					if shunt.ID == 0 {
+						return errors.New("分流不存在")
+					}
+					shunt.Onlyid = onlyId // devidGetOnlyid(br, devid)
+					shunt.Source = item.Source
+					shunt.Rule = item.Rule
+					shunt.Prio = item.Prio
+					shunt.OutIp = item.OutIp
+					shunt.SourceRemark = item.SourceRemark
+					shunt.RuleRemark = item.RuleRemark
+					shunt.OutRemark = item.OutRemark
+					shunt.Status = "use"
+					result := db.Table("hi_shunt").Save(&shunt)
+					if result.Error != nil {
+						return errors.New("更新失败")
+					}
+				} else {
+					shunt.Devid = devid
+					shunt.Onlyid = onlyId
+					shunt.Source = item.Source
+					shunt.Rule = item.Rule
+					shunt.Prio = item.Prio
+					shunt.OutIp = item.OutIp
+					shunt.SourceRemark = item.SourceRemark
+					shunt.RuleRemark = item.RuleRemark
+					shunt.OutRemark = item.OutRemark
+					shunt.Status = "use"
+					result := db.Table("hi_shunt").Create(&shunt)
+					if result.Error != nil {
+						return errors.New("创建失败")
+					}
+
+					shuntIds = append(shuntIds, shunt.ID)
+					newShunts[item.Uuid] = shunt.ID
+				}
+			}
+			return nil
+		})
+
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"ret":  0,
+				"msg":  err.Error(),
+				"data": nil,
+			})
+		}
+
+		var shunts []hi.ShuntModel
+		db.Table("hi_shunt").Where("id in ?", shuntIds).Find(&shunts)
+		c.JSON(http.StatusOK, gin.H{
+			"ret": 1,
+			"msg": "success",
+			"data": gin.H{
+				"token":  hiSyncShuntConf(br, devid, sp.CallUrl),
+				"shunts": shunts,
+				"new":    newShunts,
 			},
 		})
 	}
