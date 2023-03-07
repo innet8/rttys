@@ -2429,7 +2429,7 @@ uci commit dhcp
 
 # report
 if [ -f "/usr/sbin/hi-static-leases" ]; then
-    /usr/sbin/hi-static-leases &
+    /usr/sbin/hi-static-leases 
 fi
 `)
 
