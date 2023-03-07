@@ -2424,13 +2424,12 @@ done
 # add
 set -e
 {{.addString}}
-set +e
 uci commit dhcp
-
 # report
 if [ -f "/usr/sbin/hi-static-leases" ]; then
-    /usr/sbin/hi-static-leases &
+    /usr/sbin/hi-static-leases 
 fi
+set +e
 `)
 
 // 直接执行--已添加set -e
