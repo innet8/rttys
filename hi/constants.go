@@ -2408,9 +2408,10 @@ config_foreach host_func host
 uci commit dhcp
 RES=$(echo -e '{"code":0,"list":['"$list"']}')
 tmp='{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}'
-RES=$(curl --connect-timeout 3 -4 -X POST "{{.reportUrl}}$(_sign)" -H "Content-Type: application/json" -d $tmp)
-[ "${RES}" != "success" ] && lua /mnt/curl.lua "{{.reportUrl}}$(_sign)" "POST" $tmp
-echo 'success'
+curl --connect-timeout 3 -4 -X POST "{{.reportUrl}}$(_sign)" -H "Content-Type: application/json" -d $tmp
+if [ "$?" != "0" ]; then
+    lua /mnt/curl.lua "{{.reportUrl}}$(_sign)" "POST" $tmp
+fi
 `)
 
 // 直接执行--已添加set -e
@@ -2430,6 +2431,7 @@ if [ -f "/usr/sbin/hi-static-leases" ]; then
     /usr/sbin/hi-static-leases 
 fi
 set +e
+echo "success"
 `)
 
 // 直接执行--已添加set -e
@@ -2588,12 +2590,18 @@ _base64e() {
 RES=$(lua /tmp/apconfig.lua)
 host="{{.reportUrl}}$(_sign)""&token={{.token}}"
 tmp='{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}'
+success='false'
 for i in 1 2 3 4 5; do
-	curl -4 --connect-timeout 3 -m 6 -X POST "$host" -H "Content-Type: application/json" -d $tmp
-	if [ "$(echo $?)" != "0" ]; then
-        lua /mnt/curl.lua "$host" "POST" $tmp
-	fi
-	sleep 3
+    [ "$success" == "false" ] && {
+        curl -4 --connect-timeout 3 -m 6 -X POST "$host" -H "Content-Type: application/json" -d $tmp
+        if [ "$?" != "0" ]; then
+            res=$(lua /mnt/curl.lua "$host" "POST" $tmp)
+            [ "$res" == "success" ] && success="true"
+        else
+            success="true"
+        fi
+	    sleep 3
+    }
 done
 /etc/init.d/firewall reload
 /etc/init.d/network reload
