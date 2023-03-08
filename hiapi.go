@@ -277,6 +277,7 @@ func baseReport(br *broker) gin.HandlerFunc {
 					if req, ok := commands.Load(cmdr.Token); ok {
 						res := req.(*commandReq)
 						res.h.result = `{"ret":1,"msg":"done","data":{}}`
+						go hiExecResult(res.h)
 						res.cancel()
 					}
 				}
