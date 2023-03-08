@@ -2422,6 +2422,7 @@ const SetStaticLeasesContent = string(`
 for mac_str in $(cat /etc/config/dhcp | grep '\<host\>' | awk '{print $3}' | sed -r "s/'//g"); do
     uci delete dhcp.$mac_str
 done
+uci commit dhcp
 # add
 set -e
 {{.addString}}
@@ -2431,7 +2432,6 @@ if [ -f "/usr/sbin/hi-static-leases" ]; then
     /usr/sbin/hi-static-leases 
 fi
 set +e
-echo "success"
 `)
 
 // 直接执行--已添加set -e
