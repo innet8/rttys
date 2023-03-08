@@ -665,7 +665,7 @@ func hiExecWifiTask(br *broker, devid string) {
 		}
 	}
 	where["status"] = "pending"
-	db.Table("hi_wifi_task").Where(where).First(&pendingTask)
+	db.Table("hi_wifi_task").Where(where).Where("operation <> ?", "unbind").First(&pendingTask)
 	if pendingTask.ID == 0 {
 		return
 	}
