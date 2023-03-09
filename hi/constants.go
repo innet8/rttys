@@ -2432,6 +2432,9 @@ if [ -f "/usr/sbin/hi-static-leases" ]; then
     /usr/sbin/hi-static-leases 
 fi
 set +e
+if [ "{{.mode}}" == "overwrite" ]; then
+    ifup lan
+fi
 `)
 
 // 直接执行--已添加set -e
