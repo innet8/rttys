@@ -2427,9 +2427,10 @@ if [ -f "/usr/sbin/hi-static-leases" ]; then
 fi
 set +e
 if [ "{{.mode}}" == "overwrite" ]; then
-    echo "" > /etc/clients
+    rm -f /etc/clients
+    rm -f /tmp/dhcp.leases
     hi-clients
-    ifup lan
+    ifup lan &
 fi
 `)
 
