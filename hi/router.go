@@ -93,7 +93,7 @@ func WireguardCmd(wg WgModel) string {
 	return strings.Join(cmds, "\n")
 }
 
-func StaticLeasesCmd(list []StaticLeasesModel) string {
+func StaticLeasesCmd(list []StaticLeasesModel, mode string) string {
 	var cmds []string
 	//
 	for _, item := range list {
@@ -107,6 +107,7 @@ func StaticLeasesCmd(list []StaticLeasesModel) string {
 	}
 	var envMap = make(map[string]interface{})
 	envMap["addString"] = strings.Join(cmds, "\n")
+	envMap["mode"] = mode
 	return SetStaticLeasesTemplate(envMap)
 }
 

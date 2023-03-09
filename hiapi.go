@@ -472,10 +472,11 @@ func baseSet(br *broker) gin.HandlerFunc {
 		}
 		if action == "static_leases" {
 			list := jsoniter.Get(content, "list").ToString()
+			mode := jsoniter.Get(content, "mode").ToString()
 			callUrl := jsoniter.Get(content, "call_url").ToString()
 			var data []hi.StaticLeasesModel
 			if ok := json.Unmarshal([]byte(list), &data); ok == nil {
-				cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.StaticLeasesCmd(data), UpdateStaticIp)
+				cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.StaticLeasesCmd(data, mode), UpdateStaticIp)
 				if terr != nil {
 					c.JSON(http.StatusOK, gin.H{
 						"ret": 0,
