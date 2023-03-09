@@ -2229,42 +2229,40 @@ function shell_get_clients() {
     while read mac ip iface down up total_down total_up last_time; do
         online=$(awk '$4=="'$mac'" {if ( $3=="0x2" ) print 1;else print 0;}' /proc/net/arp)
         if [ "$ip" != "NA" ] && [ -n "$online" ]; then
-            if [ $(($(date +%s) - $last_time)) -lt 28800 ]; then
-                name=$(awk '$2=="'$mac'" {if ( $4!="*" ) print $4;else print Unknown}' /tmp/dhcp.leases)
-                [ -z "$name" ] && name="Unknown"
-                bind=$(grep $mac /etc/config/dhcp)
-                if [ -z "$bind" ]; then
-                    bind='0'
-                else
-                    bind='1'
-                fi
-                blocked=0
-                [ -e "/mnt/blocked" ] && [ -z "$(grep $mac /mnt/blocked)" ] && blocked=1
-                json_add_object $num
-                json_add_string 'mac' $mac
-                json_add_string 'ip' $ip
-                json_add_string 'name' $name
-                json_add_string 'iface' $iface
-                json_add_boolean 'online' $online
-                json_add_int 'alive' $last_time
-                json_add_boolean 'blocked' $blocked
-                json_add_int 'up' $up
-                json_add_int 'down' $down
-                json_add_string 'total_up' $total_up
-                json_add_string 'total_down' $total_down
-                qos_up=0
-                qos_down=0
-                [ -e "/etc/config/qos" ] && {
-                    _mac=$(echo $mac | sed 's/://g')
-                    qos_up=$(uci get qos.$_mac.upload)
-                    qos_down=$(uci get qos.$_mac.download)
-                }
-                json_add_string 'qos_up' $qos_up
-                json_add_string 'qos_down' $qos_down
-                json_add_boolean 'bind' $bind
-                json_close_object
-                num=$((num + 1))
+            name=$(awk '$2=="'$mac'" {if ( $4!="*" ) print $4;else print Unknown}' /tmp/dhcp.leases)
+            [ -z "$name" ] && name="Unknown"
+            bind=$(grep $mac /etc/config/dhcp)
+            if [ -z "$bind" ]; then
+                bind='0'
+            else
+                bind='1'
             fi
+            blocked=0
+            [ -e "/mnt/blocked" ] && [ -z "$(grep $mac /mnt/blocked)" ] && blocked=1
+            json_add_object $num
+            json_add_string 'mac' $mac
+            json_add_string 'ip' $ip
+            json_add_string 'name' $name
+            json_add_string 'iface' $iface
+            json_add_boolean 'online' $online
+            json_add_int 'alive' $last_time
+            json_add_boolean 'blocked' $blocked
+            json_add_int 'up' $up
+            json_add_int 'down' $down
+            json_add_string 'total_up' $total_up
+            json_add_string 'total_down' $total_down
+            qos_up=0
+            qos_down=0
+            [ -e "/etc/config/qos" ] && {
+                _mac=$(echo $mac | sed 's/://g')
+                qos_up=$(uci get qos.$_mac.upload)
+                qos_down=$(uci get qos.$_mac.download)
+            }
+            json_add_string 'qos_up' $qos_up
+            json_add_string 'qos_down' $qos_down
+            json_add_boolean 'bind' $bind
+            json_close_object
+            num=$((num + 1))
         fi
     done </tmp/.clients
     json_close_array
@@ -2285,10 +2283,6 @@ EOF
     awk '$6=="br-lan"&&$3=="0x2" {print $1,$4}' /proc/net/arp | while read ip mac; do
         tmp=$(echo -n $mac|tr 'a-z' 'A-Z')
         [ -z "$(grep $tmp /etc/clients)" ] && echo "$tmp $ip unkonw Wired 1 0 0 0 0 0 0" >>/etc/clients
-    done
-    iplist=$(awk '$5==0&&systime()-$6>28800 {print $1}' /etc/clients) 
-    for mac in $iplist; do
-        sed -i "/$mac/d" /etc/clients
     done
     RES=$(lua /tmp/clients.lua)
 }
@@ -2433,6 +2427,8 @@ if [ -f "/usr/sbin/hi-static-leases" ]; then
 fi
 set +e
 if [ "{{.mode}}" == "overwrite" ]; then
+    echo "" > /etc/client
+    hi-clients
     ifup lan
 fi
 `)
