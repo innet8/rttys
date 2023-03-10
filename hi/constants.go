@@ -2413,9 +2413,7 @@ const SetStaticLeasesContent = string(`
 #!/bin/bash
 #-----------{{.date}}-------------
 # delete
-for mac_str in $(cat /etc/config/dhcp | grep '\<host\>' | awk '{print $3}' | sed -r "s/'//g"); do
-    uci delete dhcp.$mac_str
-done
+ubus call uci delete '{"config":"dhcp","type":"host"}'
 uci commit dhcp
 # add
 set -e
@@ -2667,22 +2665,9 @@ const DiagnosisContent = string(`
 set -e
 . /lib/functions/network.sh
 get_wan_iface_and_gateway() {
-    iface=$(cat /var/run/mwan3/indicator 2>/dev/null || echo "unknown")
-    [ "$iface" != "unknown" ] && {
-        interface=$(ifstatus $iface | jsonfilter -e @.l3_device)
-        proto=$(ifstatus $iface | jsonfilter -e @.proto)
-        result=$(echo $iface | grep "modem")
-        if [ "$result" != "" -a "$proto" = "qmi" ]; then
-            gw=$(ifstatus ${iface}_4 | jsonfilter -e @.route[0].nexthop)
-        else
-            gw=$(ifstatus $iface | jsonfilter -e @.route[0].nexthop)
-        fi
-    }
-    [ "$iface" = "unknown" ] && {
-        local tmpiface
-        network_find_wan tmpiface
-        network_get_gateway gw $tmpiface
-    }
+    local tmpiface
+    network_find_wan tmpiface
+    network_get_gateway gw $tmpiface
 }
 ips={{.ip}}
 if [ -z "$ips" ]; then

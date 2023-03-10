@@ -219,7 +219,7 @@ func AddWifiCmd(models []AddWifiModel, report, token string) string {
 		wireless = append(wireless, fmt.Sprintf("uci set wireless.%s.hidden=%s", model.Wifinet, model.Hidden))
 		wireless = append(wireless, fmt.Sprintf("uci set wireless.%s.key='%s'", model.Wifinet, model.Key))
 		wireless = append(wireless, fmt.Sprintf("uci set wireless.%s.network=%s", model.Wifinet, model.Wifinet))
-		ipSegment = append(ipSegment, fmt.Sprintf("[ -n \"$(ip=%s;grep ${ip%%.*}. /etc/config/network)\" ] && exit 1", model.IpSegment))
+		ipSegment = append(ipSegment, fmt.Sprintf("[ -n \"$(ip=%s;grep ${ip%%/*}. /etc/config/network)\" ] && exit 1", model.IpSegment))
 		network = append(network, fmt.Sprintf("uci set network.%s=interface", model.Wifinet))
 		network = append(network, fmt.Sprintf("uci set network.%s.proto=static", model.Wifinet))
 		network = append(network, fmt.Sprintf("uci set network.%s.ipaddr=%s", model.Wifinet, model.IpSegment))
