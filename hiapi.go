@@ -2,11 +2,9 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
-	"github.com/gin-gonic/gin"
-	jsoniter "github.com/json-iterator/go"
-	"github.com/nahid/gohttp"
-	"github.com/rs/zerolog/log"
+	"gorm.io/gorm"
 	"io/ioutil"
 	"net/http"
 	"rttys/hi"
@@ -14,6 +12,11 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	jsoniter "github.com/json-iterator/go"
+	"github.com/nahid/gohttp"
+	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -178,6 +181,7 @@ func baseCmd(br *broker) gin.HandlerFunc {
 		} else if action == "router_log" {
 			var envMap = make(map[string]interface{})
 			envMap["logUrl"] = fmt.Sprintf("%s/hi/other/upload-log", br.cfg.HiApiUrl)
+			envMap["nodeHost"] = hi.UrlDomain(br.cfg.HiApiUrl)
 			c.String(http.StatusOK, hi.RouterLogUploadTemplate(envMap))
 		}
 	}
@@ -273,6 +277,7 @@ func baseReport(br *broker) gin.HandlerFunc {
 					if req, ok := commands.Load(cmdr.Token); ok {
 						res := req.(*commandReq)
 						res.h.result = `{"ret":1,"msg":"done","data":{}}`
+						go hiExecResult(res.h)
 						res.cancel()
 					}
 				}
@@ -467,9 +472,11 @@ func baseSet(br *broker) gin.HandlerFunc {
 		}
 		if action == "static_leases" {
 			list := jsoniter.Get(content, "list").ToString()
+			mode := jsoniter.Get(content, "mode").ToString()
+			callUrl := jsoniter.Get(content, "call_url").ToString()
 			var data []hi.StaticLeasesModel
 			if ok := json.Unmarshal([]byte(list), &data); ok == nil {
-				cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.StaticLeasesCmd(data), UpdateStaticIp)
+				cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.StaticLeasesCmd(data, mode), UpdateStaticIp)
 				if terr != nil {
 					c.JSON(http.StatusOK, gin.H{
 						"ret": 0,
@@ -479,7 +486,13 @@ func baseSet(br *broker) gin.HandlerFunc {
 						},
 					})
 				} else {
-					hiExecRequest(br, c, cmdr)
+					c.JSON(http.StatusOK, gin.H{
+						"ret": 1,
+						"msg": "success",
+						"data": gin.H{
+							"token": hiExecCommand(br, cmdr, callUrl),
+						},
+					})
 				}
 				return
 			}
@@ -770,7 +783,7 @@ func deviceUpgrade(br *broker) gin.HandlerFunc {
 					"ret": 1,
 					"msg": "success",
 					"data": gin.H{
-						"token": hiExecCommand(br, cmdr, callUrl, ""),
+						"token": hiExecCommand(br, cmdr, callUrl),
 					},
 				})
 			}
@@ -1089,6 +1102,134 @@ func shuntModify(br *broker) gin.HandlerFunc {
 			"data": gin.H{
 				"token": hiSyncShuntConf(br, devid, callUrl),
 				"shunt": shunt,
+			},
+		})
+	}
+}
+
+// shuntBatch 批量添加、修改分流
+func shuntBatch(br *broker) gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+		db, err := hi.InstanceDB(br.cfg.DB)
+		if err != nil {
+			log.Error().Msg(err.Error())
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+		defer closeDB(db)
+
+		devid := c.Param("devid")
+		_, authErr := userAuth(c, db, devid)
+		if authErr != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"ret": 0,
+				"msg": "Authentication failed",
+				"data": gin.H{
+					"error": authErr.Error(),
+				},
+			})
+			return
+		}
+
+		content, err := ioutil.ReadAll(c.Request.Body)
+		if err != nil {
+			c.Status(http.StatusBadRequest)
+			return
+		}
+
+		type shuntItem struct {
+			Source       string `json:"source"`
+			SourceRemark string `json:"source_remark"`
+			Rule         string `json:"rule"`
+			RuleRemark   string `json:"rule_remark"`
+			Prio         uint32 `json:"prio"`
+			OutIp        string `json:"out_ip"`
+			OutRemark    string `json:"out_remark"`
+			Uuid         string `json:"uuid"`
+			Sid          uint32 `json:"sid"`
+		}
+		type shuntParams struct {
+			CallUrl   string      `json:"call_url"`
+			ShuntList []shuntItem `json:"list"`
+		}
+
+		var sp shuntParams
+		err = json.Unmarshal(content, &sp)
+		if err != nil {
+			c.Status(http.StatusBadRequest)
+			return
+		}
+
+		newShunts := make(map[string]interface{})
+		var shuntIds []uint32
+		onlyId := devidGetOnlyid(br, devid)
+		err = db.Transaction(func(tx *gorm.DB) error {
+			for _, item := range sp.ShuntList {
+				var shunt hi.ShuntModel
+				if item.Sid > 0 {
+					shuntIds = append(shuntIds, item.Sid)
+					db.Table("hi_shunt").Where(map[string]interface{}{
+						"id":     item.Sid,
+						"status": "use",
+						"devid":  devid,
+					}).Last(&shunt)
+					if shunt.ID == 0 {
+						return errors.New("分流不存在")
+					}
+					shunt.Onlyid = onlyId // devidGetOnlyid(br, devid)
+					shunt.Source = item.Source
+					shunt.Rule = item.Rule
+					shunt.Prio = item.Prio
+					shunt.OutIp = item.OutIp
+					shunt.SourceRemark = item.SourceRemark
+					shunt.RuleRemark = item.RuleRemark
+					shunt.OutRemark = item.OutRemark
+					shunt.Status = "use"
+					result := db.Table("hi_shunt").Save(&shunt)
+					if result.Error != nil {
+						return errors.New("更新失败")
+					}
+				} else {
+					shunt.Devid = devid
+					shunt.Onlyid = onlyId
+					shunt.Source = item.Source
+					shunt.Rule = item.Rule
+					shunt.Prio = item.Prio
+					shunt.OutIp = item.OutIp
+					shunt.SourceRemark = item.SourceRemark
+					shunt.RuleRemark = item.RuleRemark
+					shunt.OutRemark = item.OutRemark
+					shunt.Status = "use"
+					result := db.Table("hi_shunt").Create(&shunt)
+					if result.Error != nil {
+						return errors.New("创建失败")
+					}
+
+					shuntIds = append(shuntIds, shunt.ID)
+					newShunts[item.Uuid] = shunt.ID
+				}
+			}
+			return nil
+		})
+
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"ret":  0,
+				"msg":  err.Error(),
+				"data": nil,
+			})
+		}
+
+		var shunts []hi.ShuntModel
+		db.Table("hi_shunt").Where("id in ?", shuntIds).Find(&shunts)
+		c.JSON(http.StatusOK, gin.H{
+			"ret": 1,
+			"msg": "success",
+			"data": gin.H{
+				"token":  hiSyncShuntConf(br, devid, sp.CallUrl),
+				"shunts": shunts,
+				"new":    newShunts,
 			},
 		})
 	}
@@ -1739,9 +1880,98 @@ func fetchLog(br *broker) gin.HandlerFunc {
 				"ret": 1,
 				"msg": "success",
 				"data": gin.H{
-					"token": hiExecCommand(br, cmdr, "", ""),
+					"token": hiExecCommand(br, cmdr, ""),
 				},
 			})
 		}
+	}
+}
+
+// getCmdrLog 获取执行命令日志
+func getCmdrLog(br *broker) gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+		db, err := hi.InstanceDB(br.cfg.DB)
+		if err != nil {
+			log.Error().Msg(err.Error())
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+		defer closeDB(db)
+		devid := c.Param("devid")
+		_, authErr := userAuth(c, db, devid)
+		if authErr != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"ret": 0,
+				"msg": "Authentication failed",
+				"data": gin.H{
+					"error": authErr.Error(),
+				},
+			})
+			return
+		}
+		startTime := c.Query("start_time")
+		endTime := c.Query("end_time")
+
+		page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"ret": 0,
+				"msg": "params error",
+			})
+			return
+		}
+		pageSize, err := strconv.Atoi(c.DefaultQuery("pagesize", "10"))
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"ret": 0,
+				"msg": "params error",
+			})
+			return
+		}
+
+		action := c.Query("action")
+		where := map[string]interface{}{
+			"devid": devid,
+		}
+		if action != "" {
+			where["action"] = strings.Split(action, ",")
+		}
+
+		type cmd struct {
+			ID        uint32 `json:"id"`
+			Action    string `json:"action"`
+			Cmd       string `json:"cmd"`
+			Result    string `json:"result"`
+			StartTime uint32 `json:"start_time"`
+		}
+		var cmds []cmd
+		tx := db.Table("hi_cmdr").Where(where)
+		if startTime != "" && endTime != "" {
+			tx.Where("start_time between ? and ?", startTime, endTime)
+		}
+		tx.Limit(pageSize).Offset(pageSize * (page - 1)).Order("id desc").Find(&cmds)
+
+		totalTx := db.Table("hi_cmdr").Where(where)
+		if startTime != "" && endTime != "" {
+			totalTx.Where("start_time between ? and ?", startTime, endTime)
+		}
+		var total, over int64
+		totalTx.Count(&total)
+		if total%int64(pageSize) > 0 {
+			over = 1
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"ret": 1,
+			"msg": "success",
+			"data": gin.H{
+				"last_page": total/int64(pageSize) + over,
+				"page":      page,
+				"pagesize":  pageSize,
+				"total":     total,
+				"data":      cmds,
+			},
+		})
 	}
 }

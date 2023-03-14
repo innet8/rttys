@@ -6,9 +6,10 @@ import (
 	"log"
 	"strings"
 	"text/template"
+	"time"
 )
 
-// 网络下载
+// 网络下载--无需添加set -e
 const ReadDBAWK = string(`
 #!/usr/bin/awk
 
@@ -225,7 +226,7 @@ END {
 }
 `)
 
-// 网络下载
+// 网络下载--无需添加set -e
 const WrtbwmonScript = string(`
 #!/bin/sh
 #
@@ -689,7 +690,7 @@ else
 fi
 `)
 
-// 网络下载
+// 网络下载--无需添加set -e
 const DetectionDeviceScript = string(`
 #!/bin/sh
 mkdir -p /usr/share/hiui/rpc/
@@ -1084,7 +1085,7 @@ chmod +x /etc/init.d/detection
 /etc/init.d/detection start
 `)
 
-// 网络下载
+// 网络下载--无需添加set -e
 const WireguardScript = string(`#!/bin/sh  /etc/rc.common
 
 . /lib/functions.sh
@@ -1096,10 +1097,73 @@ START=99
 WFILE="/var/etc/wireguard.conf"
 AllowIPV4=""
 AllowIPV6=""
-EXTRA_COMMANDS=downup
+EXTRA_COMMANDS="downup addroute"
 model="${board_name#*-}"
 guest_exist=""
 openwrt_version=$(cat /etc/os-release | grep "VERSION_ID=" | cut -d '"' -f 2)
+
+refresh_route() {
+    local ip
+    local gw
+    local dev
+    local iface
+    local device
+    local server="$1"
+    # Invalid ip address, return
+    [ -n "$(echo $server | egrep '[0-9]{1,3}(\.[0-9]{1,3}){3}')" ] || return 0
+    # Check again
+    [ "$iface" = "unknown" ] && return 0
+    local tmpiface
+    network_find_wan tmpiface
+    network_get_gateway gw $tmpiface
+    network_get_device device $tmpiface
+    dev=$(ip route list $server | sed 's/.*dev \(.*\)/\1/')
+    [ -n "$dev" ] && {                                     
+        [ "$dev" = "$device" ] && return 0
+        ip route del $server 2>/dev/null  
+    }
+    [ -n "$device" ] && {
+        if [ -n "$gw" ]; then
+            ip route add $server via $gw dev $device 2>/dev/null
+        else
+            ip route add $(ip route show dev $device | sed "s/default/$server/g" | head -n 1) 2>/dev/null || true
+        fi
+    }
+}
+addroute() {
+    local ip
+    local host
+    local enable
+
+    enable=$(uci get wireguard.@proxy[0].enable)
+    [ "$enable" = "1" ] || return 
+
+    host=$(uci get wireguard.@peers[0].end_point)
+    [ -n "$host" ] || return
+    ip=$(echo $host | cut -d ":" -f1)                                                                 
+    [ -n "$ip" ] && {
+        refresh_route $ip
+    }
+    local DDNS=$(iptables -nL -t mangle | grep WG_DDNS)
+    local lanip=$(uci get network.lan.ipaddr)          
+    local gateway=${lanip%.*}.0/24                                     
+    if [ -n "$DDNS" ];then                             
+        ip rule del fwmark 0x60000/0x60000 lookup 31 pref 31
+        iptables -t mangle -D PREROUTING -j WG_DDNS         
+        iptables -t mangle -F WG_DDNS                       
+        iptables -t mangle -X WG_DDNS                                       
+    fi                                                                                         
+    iptables -t mangle -N WG_DDNS        
+    iptables -A WG_DDNS -t mangle -i br-lan -s $gateway -d $ip -j MARK --set-mark 0x60000
+    iptables -t mangle -I PREROUTING -j WG_DDNS                                          
+    ip rule add fwmark 0x60000/0x60000 lookup 31 pref 31                                 
+    ip route add $ip dev wg0 table 31  
+    for file in $(ls /tmp/hicloud/shunt 2>/dev/null); do
+        if [ -n "$(echo $file|grep .sh)" ]; then
+            bash /tmp/hicloud/shunt/${file}
+        fi
+    done
+}
 proxy_func() {
     config_get main_server $1 "main_server"
     config_get enable $1 "enable"
@@ -1422,36 +1486,18 @@ start() {
         ip rule add fwmark 0x60000/0x60000 lookup 31 pref 31
         ip route add $publicip dev wg0 table 31
     fi
-
-    : <<EOF
-        policy=$(uci get glconfig.route_policy.enable)
-        if [ "$policy" != "1" ];then
-                logger -t wireguard "start setting local policy"
-                if [ "$ipv6" != "" ];then
-                        local_ip=$(echo "$address_ipv4" | grep -m 1 -o '[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}')
-                else
-                        local_ip=$(echo "$address" | grep -m 1 -o '[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}')
-                fi
-                if [ -n "$local_ip" ];then
-                        ip rule add from $local_ip lookup 53 pref 53
-                        route="$(ip route)"
-                        IFS_sav=$IFS
-                        IFS=$'\n\n'
-                        for line in $route
-                        do
-                        IFS=$IFS_sav
-                        if [ ! -n "$(echo "$line" | grep -w -e tun0 -e wg0)" ];then
-                                ip route add $line table 53
-                        fi
-                        IFS=$'\n\n'
-                        done
-                        IFS=$IFS_sav
-                        vpn_dns=$(cat /tmp/resolv.conf.vpn | grep -m 1 -o '[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}')
-                        ip route add $vpn_dns dev wg0 table 53
-                fi
-                logger -t wireguard "start changing dns resolve"
-        fi
-EOF
+    cat >/etc/hotplug.d/iface/95-wg-route<<EOB
+#!/bin/sh
+INTERFACES="wan wan1 wwan modem tethering wg ovpn"
+tmpinterface=\$(echo $INTERFACE | cut -f1 -d\_)
+for interface in \${INTERFACES}; do
+    [ "\$interface" = "\$INTERFACE" -o "\$interface" = "\$tmpinterface" ] && {
+        [ "\$ACTION" == "ifup" ] && /etc/init.d/wireguard addroute
+    }
+done
+exit 0
+EOB
+    chmod +x /etc/hotplug.d/iface/95-wg-route
     logger -t wiregaurd "client start completed, del hiwg.lock"
     rm /var/run/hiwg.lock -rf
 }
@@ -1475,6 +1521,7 @@ stop() {
         rm /var/run/hiwg.lock -rf
         exit 1
     fi
+    [ -e "/etc/hotplug.d/iface/95-wg-route" ] && rm -f /etc/hotplug.d/iface/95-wg-route
     config_load wireguard
     config_foreach proxy_func proxy
     config_foreach get_localip_func peers
@@ -1619,24 +1666,30 @@ downup() {
     iptables -t mangle -I PREROUTING -j WG_DDNS
     ip rule add fwmark 0x60000/0x60000 lookup 31 pref 31
     ip route add $publicip dev wg0 table 31
+    cat >/etc/hotplug.d/iface/95-wg-route<<EOB
+#!/bin/sh
+INTERFACES="wan wan1 wwan modem tethering wg ovpn"
+tmpinterface=\$(echo $INTERFACE | cut -f1 -d\_)
+for interface in \${INTERFACES}; do
+    [ "\$interface" = "\$INTERFACE" -o "\$interface" = "\$tmpinterface" ] && {
+        [ "\$ACTION" == "ifup" ] && /etc/init.d/wireguard addroute
+    }
+done
+exit 0
+EOB
+    chmod +x /etc/hotplug.d/iface/95-wg-route
 }
 `)
 
 const CommonUtilsContent = string(`
+#-----------{{.date}}-------------
 #!/bin/bash
-
 _base64e() {
     echo -n "$1" | base64 | tr -d "\n"
 }
-
 _base64d() {
     echo -n "$1" | base64 -d | sed 's/\\n//g'
 }
-
-_random() {
-    echo -n $(date +%s) | md5sum | md5sum | cut -d ' ' -f 1
-}
-
 _filemd5() {
     if [ -f "$1" ]; then
         echo -n $(md5sum $1 | cut -d ' ' -f1)
@@ -1644,7 +1697,6 @@ _filemd5() {
         echo ""
     fi
 }
-
 _sign() {
 	secretKey=$(uci get rtty.general.token)
 	nonce=$(echo -n $(date +%s) | md5sum | md5sum | cut -d ' ' -f 1)
@@ -1656,15 +1708,13 @@ _sign() {
 }
 `)
 
-// 网络下载
+// 网络下载--无需添加set -e
 const ShuntDomainPartial = string(`
 for D in $(cat ${DOMAINFILE} 2>/dev/null); do
     echo "server=/${D}/{{.dnsIp}} #{{.th}}#" >> /etc/dnsmasq.conf
-    #
-    charA="$(cat $DNSFILE | grep -n "ipset=/${D}/")"
-    if [ -n "$charA" ]; then
-        charB="$(echo "$charA" | grep -E "(/|,){{.th}}(,|$)")"
-        if [ -z "$charB" ]; then
+    if [ -n "$(cat $DNSFILE | grep -n ipset=/${D}/)" ]; then
+        charA="$(cat $DNSFILE | grep -n "ipset=/${D}/")"
+        if [ -z "$(echo "$charA" | grep -E "(/|,){{.th}}(,|$)")" ]; then
             charC="$(echo "$charA" | awk -F ":" '{print $1}')"
             charD="$(echo "$charA" | awk -F ":" '{print $2}')"
             sed -i "${charC}d" $DNSFILE
@@ -1678,35 +1728,29 @@ done
 for D in $(cat ${DOMAINFILE} 2>/dev/null); do (nslookup $D > /dev/null 2>&1 &); done
 `)
 
-// 网络下载
+// 网络下载--
 const ShuntContent = string(`
 #!/bin/bash
 ACTION=$1
 DNSFILE="/etc/dnsmasq.d/domain_hicloud.conf"
 LOGFILE="/tmp/hicloud/shunt/{{.th}}.log"
 DOMAINFILE="/tmp/hicloud/shunt/{{.th}}.domain"
-
 echo "start: $(date "+%Y-%m-%d %H:%M:%S")" > ${LOGFILE}
-
 mkdir -p /etc/dnsmasq.d
 mkdir -p /tmp/hicloud/shunt
-
 if [ -z "$(cat /etc/dnsmasq.conf | grep conf-dir=/etc/dnsmasq.d)" ]; then
     sed -i /conf-dir=/d /etc/dnsmasq.conf
     echo conf-dir=/etc/dnsmasq.d >> /etc/dnsmasq.conf
 fi
-
 if [ ! -f "$DNSFILE" ]; then
     touch $DNSFILE
 fi
-
 gatewayIP=$(ip route show 1/0 | head -n1 | sed -e 's/^default//' | awk '{print $2}' | awk -F. '$1<=255&&$2<=255&&$3<=255&&$4<=255{print $1"."$2"."$3"."$4}')
 if [ -z "${gatewayIP}" ]; then
     echo "Unable to get gateway IP"
     exit 1
 fi
 gatewayCIP=$(echo "${gatewayIP}" | awk -F. '$1<=255&&$2<=255&&$3<=255&&$4<=255{print $1"."$2"."$3".0/24"}')
-
 echo "remove" >> ${LOGFILE}
 {{.removeString}}
 sed -i /#{{.th}}#/d /etc/dnsmasq.conf
@@ -1714,7 +1758,6 @@ sed -i 's/,{{.th}},/,/g' ${DNSFILE}
 sed -i 's/,{{.th}}$//g' ${DNSFILE}
 sed -i 's/\/{{.th}},/\//g' ${DNSFILE}
 sed -i '/\/{{.th}}$/d' ${DNSFILE}
-
 if [ -z "${ACTION}" ]; then
     echo "install" >> ${LOGFILE}
     if [[ -z "$(iptables -L shunt-1 -t mangle -w 2>/dev/null | grep shunt-1)" ]]; then
@@ -1725,14 +1768,15 @@ if [ -z "${ACTION}" ]; then
             iptables -w -t nat -A PREROUTING -j shunt-${i}
         done
     fi
+    set -e
     {{.installString}}
+    set +e
 fi
 echo "end" >> ${LOGFILE}
-
 exit 0
 `)
 
-// 网络下载
+// 网络下载--已添加set -e---极大概率会经常有报错返回
 const ShuntBatchAdded = string(`
 exec_shunt_url() {
     local url=$1
@@ -1768,16 +1812,15 @@ array=(
 
 for file in $(ls /tmp/hicloud/shunt 2>/dev/null); do
     if [[ "${file}" =~ .*\.sh$ ]] && [[ ! "${array[@]}" =~ ":${file}" ]]; then
-        bash +x /tmp/hicloud/shunt/${file} remove
+        bash /tmp/hicloud/shunt/${file} remove
         pathname="$(echo ${file} | sed 's/\.sh$//')"
         rm -f /tmp/hicloud/shunt/${pathname}.* &> /dev/null
     fi
 done
-
 {{.cmds}}
 `)
 
-// 直接执行
+// 直接执行--待定
 const WireguardAdded = string(`
 wireguard_start() {
     model=$(uci get rtty.general.description)
@@ -1799,6 +1842,8 @@ wireguard_start() {
             [ "$(wireguard_hotup)" = "no" ] && /etc/init.d/wireguard downup >/dev/null 2>&1
         fi
         wireguard_confirm downup
+        sleep 2
+        [ -z "$(wg)" ] && exit 1
     else
         if [ -f "/etc/config/wireguard_back" ]; then
             cat /etc/config/wireguard_back > /etc/config/wireguard
@@ -1807,21 +1852,22 @@ wireguard_start() {
         uci commit wireguard
         /etc/init.d/wireguard start >/dev/null 2>&1
         wireguard_confirm start
+        sleep 2
+        local endpoint=$(uci get wireguard.@peers[0].end_point | awk -F':' '{print $1}')
+        [[ -z "$(wg)" || -z "$(route -n |grep $endpoint)" ]] && exit 1
     fi
 }
 
 wireguard_confirm() {
-    (
-        sleep 5
-        if [ -z "$(wg)" ]; then
-            /etc/init.d/wireguard $1 >/dev/null 2>&1
-        else
-            local endpoint=$(uci get wireguard.@peers[0].end_point | awk -F':' '{print $1}')
-            if [ -z "$(route -n |grep $endpoint)" ]; then
-                /etc/init.d/wireguard downup >/dev/null 2>&1
-            fi
+    sleep 5
+    if [ -z "$(wg)" ]; then
+        /etc/init.d/wireguard $1 >/dev/null 2>&1
+    else
+        local endpoint=$(uci get wireguard.@peers[0].end_point | awk -F':' '{print $1}')
+        if [ -z "$(route -n |grep $endpoint)" ]; then
+            /etc/init.d/wireguard downup >/dev/null 2>&1
         fi
-    ) >/dev/null 2>&1 &
+    fi
 }
 
 wireguard_hotup() {
@@ -1918,24 +1964,20 @@ EOF
 }
 
 set_lanip() {
-    [ "$(uci get wireguard.@proxy[0].enable)" == "0" ] && return
     if [ "$(uci get network.lan.ipaddr)" != "{{.lan_ip}}" ]; then
-        (
-            uci set network.lan.ipaddr="{{.lan_ip}}"
-            uci commit network
-            sleep 2
-            /etc/init.d/network restart
-            [ -e "/usr/sbin/ssdk_sh" ] && {
-                sleep 5; ssdk_sh debug phy set 2 0 0x840; ssdk_sh debug phy set 3 0 0x840
-                sleep 5; ssdk_sh debug phy set 2 0 0x1240; ssdk_sh debug phy set 3 0 0x1240
-            }
-            [ "$(uci get rtty.general.description)" == "a1300" ] && {
-                swconfig dev switch0 set linkdown 1
-                swconfig dev switch0 set linkdown 0
-                swconfig dev switch0 set reset 1
-                swconfig dev switch0 set apply 1
-            }
-        ) >/dev/null 2>&1 &
+        uci set network.lan.ipaddr="{{.lan_ip}}"
+        uci commit network
+        /etc/init.d/network restart
+        [ -e "/usr/sbin/ssdk_sh" ] && {
+            sleep 5; ssdk_sh debug phy set 2 0 0x840; ssdk_sh debug phy set 3 0 0x840
+            sleep 5; ssdk_sh debug phy set 2 0 0x1240; ssdk_sh debug phy set 3 0 0x1240
+        }
+        [ "$(uci get rtty.general.description)" == "a1300" ] && {
+            swconfig dev switch0 set linkdown 1
+            swconfig dev switch0 set linkdown 0
+            swconfig dev switch0 set reset 1
+            swconfig dev switch0 set apply 1
+        }
     fi
 }
 
@@ -1984,10 +2026,10 @@ config peers 'wg_peer_01'
     option mtu '1360'
 `)
 
-// 直接执行
+// 直接执行--无需添加set -e
 const InitContent = string(`
 #!/bin/bash
-
+#-----------{{.date}}-------------
 set_bypass_host() {
     local host="$1"
     local thName="hi-th-api"
@@ -2104,6 +2146,7 @@ EOF
     [ ! -e "/etc/init.d/wireguard" ] && {
         curl --connect-timeout 3 -sSL -4 -o "/etc/init.d/wireguard" "{{.wireguardScriptUrl}}$(_sign)&devid=$(uci get rtty.general.id)"
         chmod +x /etc/init.d/wireguard
+        /etc/init.d/wireguard enable
     }
     curl --connect-timeout 3 -sSL -4 -o "/usr/sbin/syslogUpload" "{{.routerlogScriptUrl}}$(_sign)&devid=$(uci get rtty.general.id)"
     [ -e "/usr/sbin/syslogUpload" ] || {
@@ -2158,22 +2201,22 @@ if [ "${git_commit}" != "{{.gitCommit}}" ] || [ "${onlyid}" != "{{.onlyid}}" ]; 
 fi
 
 [ -n "$(grep apconfig.lua /etc/hotplug.d/net/99-hi-wifi)" ] || downloadScript 
-[ -n "$(grep host_func /usr/sbin/hi-static-leases)" ] || downloadScript
-[ -n "$(grep clients.lua /usr/sbin/hi-clients)" ] || downloadScript
+[ -n "$(grep {{.apiHost}} /usr/sbin/hi-static-leases)" ] || downloadScript
+[ -n "$(grep {{.apiHost}} /usr/sbin/hi-clients)" ] || downloadScript
 [ -e "/usr/sbin/detection.sh" ] || downloadExtraScript &
 
 sn=$(uci get rtty.general.id)
 pwd=$(uci get hiui.@user[0].password)
 webpwd=$(echo -n "$pwd:$sn" |md5sum|awk '{print $1}')
 tmp='{"webpwd":"'$webpwd'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}' 
-curl --connect-timeout 3 -4 -X POST "{{.webpwdReportUrl}}" -H "Content-Type: application/json" -d $tmp &
-[ "$?" != "0" ] && lua /mnt/curl.lua "{{.webpwdReportUrl}}" "POST" $tmp &
-/etc/hotplug.d/net/99-hi-wifi &
-/usr/sbin/hi-static-leases &
-/usr/sbin/hi-clients &
+curl --connect-timeout 3 -4 -X POST "{{.webpwdReportUrl}}" -H "Content-Type: application/json" -d $tmp 
+[ "$?" != "0" ] && lua /mnt/curl.lua "{{.webpwdReportUrl}}" "POST" $tmp 
+/etc/hotplug.d/net/99-hi-wifi >/dev/null 2>&1 &
+/usr/sbin/hi-static-leases >/dev/null 2>&1 &
+/usr/sbin/hi-clients >/dev/null 2>&1 &
 `)
 
-// 网络下载
+// 网络下载--无需添加set -e
 const ClientsReportAdded = string(`
 #!/bin/sh
 . /usr/share/libubox/jshn.sh
@@ -2186,42 +2229,40 @@ function shell_get_clients() {
     while read mac ip iface down up total_down total_up last_time; do
         online=$(awk '$4=="'$mac'" {if ( $3=="0x2" ) print 1;else print 0;}' /proc/net/arp)
         if [ "$ip" != "NA" ] && [ -n "$online" ]; then
-            if [ $(($(date +%s) - $last_time)) -lt 28800 ]; then
-                name=$(awk '$2=="'$mac'" {if ( $4!="*" ) print $4;else print Unknown}' /tmp/dhcp.leases)
-                [ -z "$name" ] && name="Unknown"
-                bind=$(grep $mac /etc/config/dhcp)
-                if [ -z "$bind" ]; then
-                    bind='0'
-                else
-                    bind='1'
-                fi
-                blocked=0
-                [ -e "/mnt/blocked" ] && [ -z "$(grep $mac /mnt/blocked)" ] && blocked=1
-                json_add_object $num
-                json_add_string 'mac' $mac
-                json_add_string 'ip' $ip
-                json_add_string 'name' $name
-                json_add_string 'iface' $iface
-                json_add_boolean 'online' $online
-                json_add_int 'alive' $last_time
-                json_add_boolean 'blocked' $blocked
-                json_add_int 'up' $up
-                json_add_int 'down' $down
-                json_add_int 'total_up' $total_up
-                json_add_int 'total_down' $total_down
-                qos_up=0
-                qos_down=0
-                [ -e "/etc/config/qos" ] && {
-                    _mac=$(echo $mac | sed 's/://g')
-                    qos_up=$(uci get qos.$_mac.upload)
-                    qos_down=$(uci get qos.$_mac.download)
-                }
-                json_add_string 'qos_up' $qos_up
-                json_add_string 'qos_down' $qos_down
-                json_add_boolean 'bind' $bind
-                json_close_object
-                num=$((num + 1))
+            name=$(awk '$2=="'$mac'" {if ( $4!="*" ) print $4;else print Unknown}' /tmp/dhcp.leases)
+            [ -z "$name" ] && name="Unknown"
+            bind=$(grep $mac /etc/config/dhcp)
+            if [ -z "$bind" ]; then
+                bind='0'
+            else
+                bind='1'
             fi
+            blocked=0
+            [ -e "/mnt/blocked" ] && [ -z "$(grep $mac /mnt/blocked)" ] && blocked=1
+            json_add_object $num
+            json_add_string 'mac' $mac
+            json_add_string 'ip' $ip
+            json_add_string 'name' $name
+            json_add_string 'iface' $iface
+            json_add_boolean 'online' $online
+            json_add_int 'alive' $last_time
+            json_add_boolean 'blocked' $blocked
+            json_add_int 'up' $up
+            json_add_int 'down' $down
+            json_add_string 'total_up' $total_up
+            json_add_string 'total_down' $total_down
+            qos_up=0
+            qos_down=0
+            [ -e "/etc/config/qos" ] && {
+                _mac=$(echo $mac | sed 's/://g')
+                qos_up=$(uci get qos.$_mac.upload)
+                qos_down=$(uci get qos.$_mac.download)
+            }
+            json_add_string 'qos_up' $qos_up
+            json_add_string 'qos_down' $qos_down
+            json_add_boolean 'bind' $bind
+            json_close_object
+            num=$((num + 1))
         fi
     done </tmp/.clients
     json_close_array
@@ -2242,10 +2283,6 @@ EOF
     awk '$6=="br-lan"&&$3=="0x2" {print $1,$4}' /proc/net/arp | while read ip mac; do
         tmp=$(echo -n $mac|tr 'a-z' 'A-Z')
         [ -z "$(grep $tmp /etc/clients)" ] && echo "$tmp $ip unkonw Wired 1 0 0 0 0 0 0" >>/etc/clients
-    done
-    iplist=$(awk '$5==0&&systime()-$6>28800 {print $1}' /etc/clients) 
-    for mac in $iplist; do
-        sed -i "/$mac/d" /etc/clients
     done
     RES=$(lua /tmp/clients.lua)
 }
@@ -2268,7 +2305,7 @@ if [ "$?" != "0" ]; then
 fi
 `)
 
-// 网络下载
+// 网络下载--无需添加set -e
 const ApConfigReportAdded = string(`
 cat >/tmp/apconfig.lua <<EOF
 local json = require 'cjson'
@@ -2321,7 +2358,7 @@ c:foreach("wireless", "wifi-device", function(s)
     end)
     if string.lower(s.band) == "2g" then
         result["wifi_2g"] = s
-    elseif string.lower(s.band) == "5g" and s.htmode ~= "HE160" then
+    elseif string.lower(s.band) == "5g" then
         result["wifi_5g"] = s
     end
 end)
@@ -2339,7 +2376,7 @@ curl -4 -X POST "{{.reportUrl}}$(_sign)" -H "Content-Type: application/json" -d 
 [ "$?" != "0" ] && lua /mnt/curl.lua "{{.reportUrl}}$(_sign)" "POST" $tmp
 `)
 
-// 网络下载
+// 网络下载--无需添加set -e
 const StaticLeasesReportAdded = string(`
 . /lib/functions.sh
 list=""
@@ -2365,42 +2402,50 @@ config_foreach host_func host
 uci commit dhcp
 RES=$(echo -e '{"code":0,"list":['"$list"']}')
 tmp='{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}'
-RES=$(curl --connect-timeout 3 -4 -X POST "{{.reportUrl}}$(_sign)" -H "Content-Type: application/json" -d $tmp)
-[ "${RES}" != "success" ] && lua /mnt/curl.lua "{{.reportUrl}}$(_sign)" "POST" $tmp
-echo 'success'
-`)
-
-// 直接执行
-const SetStaticLeasesContent = string(`
-#!/bin/bash
-
-# delete
-for mac_str in $(cat /etc/config/dhcp | grep '\<host\>' | awk '{print $3}' | sed -r "s/'//g"); do
-    uci delete dhcp.$mac_str
-done
-
-# add
-{{.addString}}
-uci commit dhcp
-
-# report
-if [ -f "/usr/sbin/hi-static-leases" ]; then
-    /usr/sbin/hi-static-leases &
+curl --connect-timeout 3 -4 -X POST "{{.reportUrl}}$(_sign)" -H "Content-Type: application/json" -d $tmp
+if [ "$?" != "0" ]; then
+    lua /mnt/curl.lua "{{.reportUrl}}$(_sign)" "POST" $tmp
 fi
 `)
 
-// 直接执行
+// 直接执行--已添加set -e
+const SetStaticLeasesContent = string(`
+#!/bin/bash
+#-----------{{.date}}-------------
+# delete
+ubus call uci delete '{"config":"dhcp","type":"host"}'
+uci commit dhcp
+# add
+set -e
+{{.addString}}
+uci commit dhcp
+# report
+if [ -f "/usr/sbin/hi-static-leases" ]; then
+    /usr/sbin/hi-static-leases 
+fi
+set +e
+if [ "{{.mode}}" == "overwrite" ]; then
+    echo > /etc/clients
+    echo > /tmp/dhcp.leases
+    hi-clients
+    ifup lan &
+fi
+`)
+
+// 直接执行--已添加set -e
 const EditWifiContent = string(`
 . /lib/functions.sh
 if [ -e "/var/run/delwifi.lock" ] || [ -e "/var/run/addwifi.lock" ]; then
     echo '{"code":103,"msg":"wifi deleting or adding"}'
     exit 1
 fi
+set -e
 handle_wifi(){
     {{.addString}}
     ssid=$(uci get wireless.$1.ssid)
 }
 handle_wifi {{.name}}
+set +e
 uci commit wireless
 _base64e() {
     echo -n "$1" | base64 | tr -d "\n"
@@ -2412,27 +2457,33 @@ curl -4 -X POST "$host" -H "Content-Type: application/json" -d $tmp
 [ "$?" != "0" ] && lua /mnt/curl.lua "$host" "POST" $tmp
 
 if [ "$(cat /etc/openwrt_version)" == "15.05.1" ]; then
-    (
         /sbin/wifi reload
-        sleep 10
+        sleep 5
+        set -e
         {{.chaos_calmer}}
+        set +e
         uci commit network
         uci commit wireless
         /etc/init.d/network reload
-    ) >/dev/null 2>&1 &
 else
-    /sbin/wifi reload >/dev/null 2>&1 &
+    /sbin/wifi reload 
 fi
 `)
 
-// 直接执行
+// 直接执行--已添加set -e
 const BlockedContent = string(`
 . /usr/share/libubox/jshn.sh
+num=1
 while [ 1 ]; do
+    [ $num -gt 5 ] && rm -f /var/run/block.lock
     [ ! -f /var/run/block.lock ] && break
     sleep 1
+    num=$((num+1))
 done
+[ -z "$(ipset list | grep block_device)" ] && ipset create block_device hash:mac maxelem 10000
+[ -z "$(iptables -S FORWARD | grep block_device)" ] && iptables -I FORWARD -m set --match-set block_device src -j DROP
 json_init
+set -e
 json_load '{{.macs}}'
 if [ "{{.action}}" == "addBlocked" ]; then
     status=1
@@ -2454,10 +2505,11 @@ dump_item() {
 touch /var/run/block.lock
 json_for_each_item "dump_item" "macs"
 rm -f /var/run/block.lock
+set +e
 hi-clients
 `)
 
-// 直接执行
+// 直接执行--未使用
 const GetVersionContent = string(`
 if [ -e "/etc/glversion" ]; then
     version=$(cat /etc/glversion)
@@ -2473,23 +2525,24 @@ webVer=$(awk '/hiui-ui/ {getline;print $2}' /usr/lib/opkg/status)
 echo -e '{"version":"'$version'","model":"'$model'","webVer":"'$webVer'"}'
 `)
 
-// 直接执行
+// 直接执行--无需添加set -e
 const FetchLogContent = string(`
 dmesg > /tmp/dmesg.log
-
+logread >/var/log/syslog.log
 [ -f "/var/log/syslog.log" ] && curl -4 -X POST "{{.url}}$(_sign)&is_manual={{.isManual}}&admin_id={{.adminId}}&log_type=sys" -F file=@/var/log/syslog.log
 [ -f "/var/log/exec.log" ] && curl -4 -X POST "{{.url}}$(_sign)&is_manual={{.isManual}}&admin_id={{.adminId}}&log_type=exec" -F file=@/var/log/exec.log
 curl -4 -X POST "{{.url}}$(_sign)&is_manual={{.isManual}}&admin_id={{.adminId}}&log_type=dmesg" -F file=@/tmp/dmesg.log
 `)
 
-// 直接执行
+// 直接执行--无需添加set -e
 const SyncVersionContent = string(`
+#-----------{{.date}}-------------
 #!/bin/sh
 [ -e "/tmp/hiui" ] && rm -rf /tmp/hiui
 echo '{{.verInfo}}' > /tmp/version.info
 `)
 
-// 直接执行
+// 直接执行--已添加set -e
 const AddWifiContent = string(`
 . /lib/functions.sh
 
@@ -2498,10 +2551,12 @@ if [ -e "/var/run/addwifi.lock" ]; then
     exit 1
 fi
 {{.ipSegment}}
-touch /var/run/addwifi.lock
+set -e
 {{.wireless}}
-uci commit wireless
 {{.network}}
+set +e
+uci commit wireless
+touch /var/run/addwifi.lock
 if [ "$(cat /etc/openwrt_version)" == "15.05.1" ]; then
     wifi reload
     sleep 20
@@ -2515,7 +2570,6 @@ else
     wifi reload
 fi
 {{.dhcp}}
-uci commit dhcp
 handle_firewall(){
     local tmp=$1
     config_get name "$1" "name"
@@ -2525,6 +2579,7 @@ handle_firewall(){
 }
 config_load firewall
 config_foreach handle_firewall zone
+uci commit dhcp
 uci commit firewall
 rm -f /var/run/addwifi.lock
 _base64e() {
@@ -2533,25 +2588,33 @@ _base64e() {
 RES=$(lua /tmp/apconfig.lua)
 host="{{.reportUrl}}$(_sign)""&token={{.token}}"
 tmp='{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}'
+success='false'
 for i in 1 2 3 4 5; do
-	curl -4 --connect-timeout 3 -m 6 -X POST "$host" -H "Content-Type: application/json" -d $tmp
-	if [ "$(echo $?)" != "0" ]; then
-        lua /mnt/curl.lua "$host" "POST" $tmp
-	fi
-	sleep 3
+    [ "$success" == "false" ] && {
+        curl -4 --connect-timeout 3 -m 6 -X POST "$host" -H "Content-Type: application/json" -d $tmp
+        if [ "$?" != "0" ]; then
+            res=$(lua /mnt/curl.lua "$host" "POST" $tmp)
+            [ "$res" == "success" ] && success="true"
+        else
+            success="true"
+        fi
+	    sleep 3
+    }
 done
 /etc/init.d/firewall reload
 /etc/init.d/network reload
 `)
 
-// 直接执行
+// 直接执行--已添加set -e
 const DelWifiContent = string(`
 if [ -e "/var/run/delwifi.lock" ]; then
     echo '{"code":102,"msg":"wifi deleting"}'
     exit 1
 fi
-touch /var/run/delwifi.lock
+set -e
 {{.del}}
+set +e
+touch /var/run/delwifi.lock
 uci commit firewall
 uci commit network
 uci commit wireless
@@ -2570,10 +2633,12 @@ rm -f /var/run/delwifi.lock
 wifi reload &
 `)
 
-// 直接执行
+// 直接执行--已添加set -e
 const DelAllCustomWifi = string(`
+#-----------{{.date}}-------------
 #!/bin/sh
 . /lib/functions.sh
+set -e
 handle_wifi(){
     local tmp=$1
     if [ -n "$(echo $tmp|grep -E 'wlan[0-9]{10}')" ]; then
@@ -2585,6 +2650,7 @@ handle_wifi(){
 }
 config_load wireless
 config_foreach handle_wifi wifi-iface
+set +e
 uci commit firewall
 uci commit network
 uci commit wireless
@@ -2592,34 +2658,23 @@ uci commit dhcp
 wifi reload &
 `)
 
-// 直接执行
+// 直接执行--不需要
 const DiagnosisContent = string(`
+#-----------{{.date}}-------------
 #!/bin/bash
-
+set -e
 . /lib/functions/network.sh
 get_wan_iface_and_gateway() {
-    iface=$(cat /var/run/mwan3/indicator 2>/dev/null || echo "unknown")
-    [ "$iface" != "unknown" ] && {
-        interface=$(ifstatus $iface | jsonfilter -e @.l3_device)
-        proto=$(ifstatus $iface | jsonfilter -e @.proto)
-        result=$(echo $iface | grep "modem")
-        if [ "$result" != "" -a "$proto" = "qmi" ]; then
-            gw=$(ifstatus ${iface}_4 | jsonfilter -e @.route[0].nexthop)
-        else
-            gw=$(ifstatus $iface | jsonfilter -e @.route[0].nexthop)
-        fi
-    }
-    [ "$iface" = "unknown" ] && {
-        local tmpiface
-        network_find_wan tmpiface
-        network_get_gateway gw $tmpiface
-    }
+    local tmpiface
+    network_find_wan tmpiface
+    network_get_gateway gw $tmpiface
 }
 ips={{.ip}}
 if [ -z "$ips" ]; then
     get_wan_iface_and_gateway
     ips=$gw
 fi
+set +e
 (
     RES=$(oping -c 5 ${ips} | base64 | tr -d "\n")
     tmp='{"content":"'$RES'","sn":"'$(uci get rtty.general.id)'","type":"{{.type}}","batch":"{{.batch}}","index":0}'
@@ -2629,15 +2684,16 @@ fi
 echo '{"code":1,"msg":"ping task start"}'
 `)
 
-// 直接执行
+// 直接执行--已添加set -e
 const IpkRemoteUpgrade = string(`
-
 rm -rf /tmp/ipk
+set -e
 curl -s -o /tmp/ipk.zip {{.remotePath}} && mkdir -p /tmp/ipk
 unzip /tmp/ipk.zip -d /tmp/ipk
 arch=$(opkg status rtty-openssl | grep -E 'Architecture' | awk '{print $2=$2}')
 find /tmp/ipk ! -name "*all.ipk" ! -name "*$arch.ipk" -maxdepth 1 -type f -exec rm {} +
 opkg install /tmp/ipk/*.ipk && touch /tmp/ipk/success
+set +e
 if [ -e "/tmp/ipk/success" ]; then
     if [ -e "/etc/glversion" ]; then
         version=$(cat /etc/glversion)
@@ -2651,42 +2707,70 @@ if [ -e "/tmp/ipk/success" ]; then
     curl -4 -X POST "$host" -H "Content-Type: application/json" -d $tmp
     [ "$?" != "0" ] && lua /mnt/curl.lua "$host" "POST" $tmp
     echo "success"
+else
+    exit 1
 fi
 `)
 
-// 网络下载
+// 网络下载--无需添加set -e
 const RouterLogUpload = string(`
 if [ -z "$(uci get system.@system[0].log_file)" ] || [ "$1" == "edit" ]; then
-    uci set system.@system[0].log_file='/var/log/syslog.log'
+    uci set system.@system[0].log_file='/var/log/syslogbk.log'
     uci set system.@system[0].log_buffer_size='128'
     uci set system.@system[0].log_size='5120'
     uci commit system
     /etc/init.d/log restart
     exit 0
 fi
+cat >/tmp/net_ping_detected<<EOF
+node_host={{.nodeHost}}
+import_ip=\$(uci get wireguard.@peers[0].end_point|awk -F':' '{print \$1}')
+echo "#------------ping start--------------">/var/log/ping.log
+oping -c5 -O /var/log/ping.log \$import_ip \$node_host 8.8.8.8
+if [ -n "\$(cat /var/log/ping.log|grep '\\-1.00')" ]; then
+    echo "#------------ping end--------------">>/var/log/ping.log
+    cat /var/log/ping.log>>/var/log/exec.log
+fi
+EOF
+if [ -n "$(crontab -l|grep net_ping_detected)" ]; then
+    sed -i '/net_ping_detected/d' /etc/crontabs/root
+    echo "* * * * * sh /tmp/net_ping_detected" >> /etc/crontabs/root
+else
+    echo "* * * * * sh /tmp/net_ping_detected" >> /etc/crontabs/root
+fi
 host="{{.logUrl}}/$(uci get rtty.general.id)$(_sign)"
+logread >/var/log/syslog.log
 dmesg >/var/log/dmesg.log
 curl -F file=@/var/log/dmesg.log "$host""&log_type=dmesg"
 res=$(curl -F file=@/var/log/syslog.log "$host""&log_type=sys")
-if [ $res == 'success' ]; then
+if [ "$res" == "success" ]; then
     rm /var/log/syslog.log
     /etc/init.d/log restart
 fi
-[ -e "/var/log/exec.log" ] && curl -F file=@/var/log/exec.log "$host""&log_type=exec"
+if [ -e "/var/log/exec.log" ]; then 
+    curl -F file=@/var/log/exec.log "$host""&log_type=exec"
+    [ $? == 0 ] && rm /var/log/exec.log
+fi
 `)
 
-// 直接执行
+// 直接执行--已添加set -e
 const ClientQos = string(`
+#-----------{{.date}}-------------
 [ ! -e "/etc/config/qos" ] && {
     /etc/init.d/eqos start
 }
+a='[ -n "$(grep queue /etc/config/qos | grep -v "#")" ] || /etc/init.d/eqos stop'
+sed -i "/eqos stop/c $a" /usr/sbin/eqos
 status=$(tc class list dev br-lan)
+set -e
 [ -z "$status" ] && eqos start 125000 125000
 {{.setRule}}
+set +e
 hi-clients &
 `)
 
 func FromTemplateContent(templateContent string, envMap map[string]interface{}) string {
+	envMap["date"] = time.Now().Format("2006-01-02 15:04:05")
 	tmpl, err := template.New("text").Parse(templateContent)
 	defer func() {
 		if r := recover(); r != nil {

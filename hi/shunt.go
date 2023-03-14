@@ -71,7 +71,8 @@ func GetCmd(apiUrl string, shunt ShuntModel) string {
 			}
 		}
 		if len(domain) > 0 {
-			install = append(install, fmt.Sprintf("curl -sSL -4 \"%s/hi/shunt/domain/%d\" | sh", apiUrl, shunt.ID))
+			// 修复只修改分流规则时，不下发到路由器的问题
+			install = append(install, fmt.Sprintf("curl -sSL -4 \"%s/hi/shunt/domain/%d?s=%s\" | sh", apiUrl, shunt.ID, StringMd5(shunt.Rule)))
 			var envMap = make(map[string]interface{})
 			envMap["dnsIp"] = dnsIp
 			envMap["th"] = th

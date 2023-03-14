@@ -632,6 +632,9 @@ func apiStart(br *broker) {
 	// 分流 devid=设备id  sid=分流id（0表示添加）
 	r.POST("/hi/shunt/modify/:devid/:sid", shuntModify(br))
 
+	// 批量添加，修改分流 devid=设备id
+	r.POST("/hi/shunt/batch/:devid", shuntBatch(br))
+
 	// 分流 action=info|delete|cmd|domain  sid=分流id
 	r.GET("/hi/shunt/:action/:sid", shuntAction(br))
 
@@ -660,6 +663,9 @@ func apiStart(br *broker) {
 
 	// 手动获取日志
 	r.GET("/hi/other/fetch-log/:devid", fetchLog(br))
+
+	// 获取执行命令日志
+	r.GET("/hi/other/cmdr-log/:devid", getCmdrLog(br))
 
 	/**************************************************************************************************/
 	/***********************************************HI*************************************************/

@@ -355,11 +355,11 @@ func hiExecBefore(br *broker, db *gorm.DB, devid, cmd, callback, action string) 
 	if err != nil {
 		return ""
 	}
-	return hiExecCommand(br, cmdr, callback, "")
+	return hiExecCommand(br, cmdr, callback)
 }
 
 // 发送执行命令
-func hiExecCommand(br *broker, cmdr *hi.CmdrModel, callurl string, devid string) string {
+func hiExecCommand(br *broker, cmdr *hi.CmdrModel, callurl string) string {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	req := &commandReq{
@@ -379,13 +379,13 @@ func hiExecCommand(br *broker, cmdr *hi.CmdrModel, callurl string, devid string)
 
 	token := utils.GenUniqueID("cmd")
 	// WiFi 任务
-	if devid != "" {
+	if hi.InArray(cmdr.Action, []string{AddWifi, EditWifi, DelWifi}) {
 		token = cmdr.Token
 	}
 	cmdConfig := hi.Base64Encode(cmdr.Cmd)
 
 	// cmd := fmt.Sprintf("curl -sSL -4 %s/hi/other/cmdr/%s | bash", br.cfg.HiApiUrl, cmdr.Token)
-	cmd := fmt.Sprintf("echo %s | base64 -d > /tmp/%s && bash /tmp/%s  && rm /tmp/%s", cmdConfig, token, token, token)
+	cmd := fmt.Sprintf("echo %s | base64 -d > /tmp/%s && cat /tmp/%s>>/var/log/exec.log; bash -x /tmp/%s 2>>/var/log/exec.log;if [ \"$?\" != \"0\" ]; then tail -n5 /var/log/exec.log; error ;else rm /tmp/%s;fi", cmdConfig, token, token, token, token)
 	params := []string{"-c", cmd}
 
 	data := make([]string, 5)
@@ -409,11 +409,11 @@ func hiExecCommand(br *broker, cmdr *hi.CmdrModel, callurl string, devid string)
 	//go hiPushCmdrStart(cmdr)
 
 	commands.Store(token, req)
-	go func(cmdrid uint32, devid string) {
-		isWifiTask := devid != ""
+	go func(cmdr *hi.CmdrModel) {
+		isWifiTask := hi.InArray(cmdr.Action, []string{AddWifi, EditWifi, DelWifi})
 		duration := commandTimeout
-		if isWifiTask {
-			duration = 120 // wifi任务2分钟超时
+		if isWifiTask || cmdr.Action == UpdateStaticIp {
+			duration = 120 // wifi/更新静态IP绑定任务2分钟超时
 		}
 		tmr := time.NewTimer(time.Second * time.Duration(duration))
 		isTimeout := false
@@ -428,13 +428,13 @@ func hiExecCommand(br *broker, cmdr *hi.CmdrModel, callurl string, devid string)
 		}
 		if isWifiTask {
 			if isTimeout {
-				hiUpdateWifiTask(br, devid, cmdrid, "timeout")
+				hiUpdateWifiTask(br, cmdr.Devid, cmdr.ID, "timeout")
 			} else {
-				hiUpdateWifiTask(br, devid, cmdrid, "done")
+				hiUpdateWifiTask(br, cmdr.Devid, cmdr.ID, "done")
 			}
-			go hiExecWifiTask(br, devid)
+			go hiExecWifiTask(br, cmdr.Devid)
 		}
-	}(cmdr.ID, devid)
+	}(cmdr)
 
 	return token
 }
@@ -464,7 +464,7 @@ func hiExecRequest(br *broker, c *gin.Context, cmdr *hi.CmdrModel) {
 	cmdConfig := hi.Base64Encode(cmdr.Cmd)
 
 	// cmd := fmt.Sprintf("curl -sSL -4 %s/hi/other/cmdr/%s | bash", br.cfg.HiApiUrl, cmdr.Token)
-	cmd := fmt.Sprintf("echo %s | base64 -d > /tmp/%s && bash /tmp/%s && rm /tmp/%s", cmdConfig, token, token, token)
+	cmd := fmt.Sprintf("echo %s | base64 -d > /tmp/%s && cat /tmp/%s>>/var/log/exec.log; bash -x /tmp/%s 2>>/var/log/exec.log;if [ \"$?\" != \"0\" ]; then tail -n5 /var/log/exec.log ; error ;else rm /tmp/%s;fi", cmdConfig, token, token, token, token)
 	params := []string{"-c", cmd}
 
 	data := make([]string, 5)
@@ -665,7 +665,7 @@ func hiExecWifiTask(br *broker, devid string) {
 		}
 	}
 	where["status"] = "pending"
-	db.Table("hi_wifi_task").Where(where).First(&pendingTask)
+	db.Table("hi_wifi_task").Where(where).Where("operation <> ?", "unbind").First(&pendingTask)
 	if pendingTask.ID == 0 {
 		return
 	}
@@ -682,7 +682,7 @@ func hiExecWifiTask(br *broker, devid string) {
 	pendingTask.Status = "running"
 	db.Table("hi_wifi_task").Save(&pendingTask)
 
-	token := hiExecCommand(br, &cmdr, pendingTask.CallbackUrl, devid)
+	token := hiExecCommand(br, &cmdr, pendingTask.CallbackUrl)
 	if token != cmdr.Token { // 离线
 		pendingTask.Status = "pending"
 		db.Table("hi_wifi_task").Save(&pendingTask)

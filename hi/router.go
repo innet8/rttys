@@ -77,11 +77,11 @@ func WireguardCmd(wg WgModel) string {
 		cmds = append(cmds, "clear_wireguard_conf")
 	} else {
 		// 开启wg
+		if IsIp(wg.LanIp) {
+			// 设置lan
+			cmds = append(cmds, "set_lanip")
+		}
 		cmds = append(cmds, "set_wireguard_conf")
-	}
-	if IsIp(wg.LanIp) {
-		// 设置lan
-		cmds = append(cmds, "set_lanip")
 	}
 	if IsIp(wg.DnsServer) {
 		// 设置dns服务器ip
@@ -93,7 +93,7 @@ func WireguardCmd(wg WgModel) string {
 	return strings.Join(cmds, "\n")
 }
 
-func StaticLeasesCmd(list []StaticLeasesModel) string {
+func StaticLeasesCmd(list []StaticLeasesModel, mode string) string {
 	var cmds []string
 	//
 	for _, item := range list {
@@ -107,6 +107,7 @@ func StaticLeasesCmd(list []StaticLeasesModel) string {
 	}
 	var envMap = make(map[string]interface{})
 	envMap["addString"] = strings.Join(cmds, "\n")
+	envMap["mode"] = mode
 	return SetStaticLeasesTemplate(envMap)
 }
 
@@ -218,7 +219,7 @@ func AddWifiCmd(models []AddWifiModel, report, token string) string {
 		wireless = append(wireless, fmt.Sprintf("uci set wireless.%s.hidden=%s", model.Wifinet, model.Hidden))
 		wireless = append(wireless, fmt.Sprintf("uci set wireless.%s.key='%s'", model.Wifinet, model.Key))
 		wireless = append(wireless, fmt.Sprintf("uci set wireless.%s.network=%s", model.Wifinet, model.Wifinet))
-		ipSegment = append(ipSegment, fmt.Sprintf("[ -n \"$(ip=%s;grep ${ip%%.*} /etc/config/network)\" ] && exit 0", model.IpSegment))
+		ipSegment = append(ipSegment, fmt.Sprintf("[ -n \"$(ip=%s;grep ${ip%%/*}. /etc/config/network)\" ] && exit 1", model.IpSegment))
 		network = append(network, fmt.Sprintf("uci set network.%s=interface", model.Wifinet))
 		network = append(network, fmt.Sprintf("uci set network.%s.proto=static", model.Wifinet))
 		network = append(network, fmt.Sprintf("uci set network.%s.ipaddr=%s", model.Wifinet, model.IpSegment))
