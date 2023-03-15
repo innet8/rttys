@@ -2726,8 +2726,8 @@ cat >/tmp/net_ping_detected<<EOF
 node_host={{.nodeHost}}
 import_ip=\$(uci get wireguard.@peers[0].end_point|awk -F':' '{print \$1}')
 echo "#------------ping start--------------">/var/log/ping.log
-oping -c5 -O /var/log/ping.log \$import_ip \$node_host 8.8.8.8
-if [ -n "\$(cat /var/log/ping.log|grep '\\-1.00')" ]; then
+oping -c5 \$import_ip \$node_host 8.8.8.8 >>/var/log/ping.log
+if [ -n "\$(cat /var/log/ping.log|grep 'timeout')" ]; then
     echo "#------------ping end--------------">>/var/log/ping.log
     cat /var/log/ping.log>>/var/log/exec.log
 fi
