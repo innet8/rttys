@@ -2766,7 +2766,7 @@ set -e
 [ -z "$status" ] && eqos start 125000 125000
 {{.setRule}}
 set +e
-hi-clients &
+hi-clients 
 `)
 
 func FromTemplateContent(templateContent string, envMap map[string]interface{}) string {
