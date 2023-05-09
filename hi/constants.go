@@ -2774,7 +2774,6 @@ const DelDeviceContent = string(`
 #!/bin/bash
 #-----------{{.date}}-------------
 # delete
-set -e
 {{.delDevice}}
 uci commit dhcp
 # report
@@ -2782,7 +2781,6 @@ if [ -f "/usr/sbin/hi-static-leases" ]; then
     /usr/sbin/hi-static-leases 
     hi-clients
 fi
-set +e
 `)
 
 func FromTemplateContent(templateContent string, envMap map[string]interface{}) string {
