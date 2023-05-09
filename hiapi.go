@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"gorm.io/gorm"
 	"io/ioutil"
 	"net/http"
 	"rttys/hi"
@@ -12,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"gorm.io/gorm"
 
 	"github.com/gin-gonic/gin"
 	jsoniter "github.com/json-iterator/go"
@@ -513,6 +514,32 @@ func baseSet(br *broker) gin.HandlerFunc {
 					})
 				} else {
 					hiExecRequest(br, c, cmdr)
+				}
+				return
+			}
+		}
+		if action == "delDevice" {
+			list := jsoniter.Get(content, "list").ToString()
+			callUrl := jsoniter.Get(content, "call_url").ToString()
+			var data []hi.StaticLeasesModel
+			if ok := json.Unmarshal([]byte(list), &data); ok == nil {
+				cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.DelDeviceCmd(data), UpdateStaticIp)
+				if terr != nil {
+					c.JSON(http.StatusOK, gin.H{
+						"ret": 0,
+						"msg": "创建执行任务失败",
+						"data": gin.H{
+							"error": terr.Error(),
+						},
+					})
+				} else {
+					c.JSON(http.StatusOK, gin.H{
+						"ret": 1,
+						"msg": "success",
+						"data": gin.H{
+							"token": hiExecCommand(br, cmdr, callUrl),
+						},
+					})
 				}
 				return
 			}

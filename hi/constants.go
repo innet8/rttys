@@ -2769,6 +2769,22 @@ set +e
 hi-clients 
 `)
 
+// 直接执行--已添加set -e
+const DelDeviceContent = string(`
+#!/bin/bash
+#-----------{{.date}}-------------
+# delete
+set -e
+{{.delDevice}}
+uci commit dhcp
+# report
+if [ -f "/usr/sbin/hi-static-leases" ]; then
+    /usr/sbin/hi-static-leases 
+    hi-clients
+fi
+set +e
+`)
+
 func FromTemplateContent(templateContent string, envMap map[string]interface{}) string {
 	envMap["date"] = time.Now().Format("2006-01-02 15:04:05")
 	tmpl, err := template.New("text").Parse(templateContent)
@@ -2923,5 +2939,10 @@ func RouterLogUploadTemplate(envMap map[string]interface{}) string {
 func ClientQosTemplate(envMap map[string]interface{}) string {
 	var sb strings.Builder
 	sb.Write([]byte(ClientQos))
+	return FromTemplateContent(sb.String(), envMap)
+}
+func DelDeviceTemplate(envMap map[string]interface{}) string {
+	var sb strings.Builder
+	sb.Write([]byte(DelDeviceContent))
 	return FromTemplateContent(sb.String(), envMap)
 }

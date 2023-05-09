@@ -98,7 +98,7 @@ func StaticLeasesCmd(list []StaticLeasesModel, mode string) string {
 	//
 	for _, item := range list {
 		if IsIp(item.Ip) {
-			name := RandString(6)
+			name := strings.Replace(item.Mac, ":", "", -1)
 			cmds = append(cmds, fmt.Sprintf("uci set dhcp.%s=host", name))
 			cmds = append(cmds, fmt.Sprintf("uci set dhcp.%s.name=\"%s\"", name, item.Name))
 			cmds = append(cmds, fmt.Sprintf("uci set dhcp.%s.ip=\"%s\"", name, item.Ip))
@@ -340,4 +340,19 @@ func SameDHCPMacAndIPs(dbResult, result string) bool {
 		}
 	}
 	return same
+}
+
+func DelDeviceCmd(list []StaticLeasesModel) string {
+	var cmds []string
+	//
+	for _, item := range list {
+		if IsIp(item.Ip) {
+			name := strings.Replace(item.Mac, ":", "", -1)
+			cmds = append(cmds, fmt.Sprintf("uci del dhcp.host=%s", name))
+			cmds = append(cmds, fmt.Sprintf("sed -i '/%s/d' /etc/clients", item.Mac))
+		}
+	}
+	var envMap = make(map[string]interface{})
+	envMap["delDevice"] = strings.Join(cmds, "\n")
+	return SetStaticLeasesTemplate(envMap)
 }
