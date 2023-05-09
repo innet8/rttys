@@ -354,5 +354,5 @@ func DelDeviceCmd(list []StaticLeasesModel) string {
 	}
 	var envMap = make(map[string]interface{})
 	envMap["delDevice"] = strings.Join(cmds, "\n")
-	return SetStaticLeasesTemplate(envMap)
+	return DelDeviceTemplate(envMap)
 }

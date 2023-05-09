@@ -611,7 +611,7 @@ func apiStart(br *broker) {
 	// 查询信息 action=dhcp|wifi|static_leases	devid=设备id
 	r.GET("/hi/base/get/:action/:devid", baseGet(br))
 
-	// 设置信息（需要设备在线才可以设置） action=wifi|static_leases|blocked|qos	devid=设备id
+	// 设置信息（需要设备在线才可以设置） action=wifi|static_leases|blocked|qos|delDevice	devid=设备id
 	r.POST("/hi/base/set/:action/:devid", baseSet(br))
 
 	// 设备
