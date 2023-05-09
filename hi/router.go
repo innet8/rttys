@@ -348,7 +348,7 @@ func DelDeviceCmd(list []StaticLeasesModel) string {
 	for _, item := range list {
 		if IsIp(item.Ip) {
 			name := strings.Replace(item.Mac, ":", "", -1)
-			cmds = append(cmds, fmt.Sprintf("uci del dhcp.host=%s", name))
+			cmds = append(cmds, fmt.Sprintf("uci delete dhcp.%s", name))
 			cmds = append(cmds, fmt.Sprintf("sed -i '/%s/d' /etc/clients", item.Mac))
 		}
 	}
