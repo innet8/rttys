@@ -39,6 +39,7 @@ const (
 	SyncWireguard   = "sync_wireguard"
 	ClearCustomWifi = "clear_custom_wifi"
 	GetVersion      = "get_version"
+	GetWanInfo      = "get_wan_info"
 	Connected       = "connected"
 	Disconnected    = "disconnected"
 	FetchLog        = "fetch_log"
@@ -605,7 +606,7 @@ func deviceList(br *broker) gin.HandlerFunc {
 	}
 }
 
-// deviceAction 设备绑定、解绑、重启、获取版本、连接
+// deviceAction 设备绑定、解绑、重启、获取版本、连接、获取wan口信息
 func deviceAction(br *broker) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		action := c.Param("action")
@@ -701,9 +702,8 @@ func deviceAction(br *broker) gin.HandlerFunc {
 				})
 			}
 			return
-		} else if action == "version" {
-			// 获取版本
-			name := c.Query("name")
+		} else if action == "version" || action == "wan_info" {
+			// 获取版本 or wan口信息
 			onlyid := devidGetOnlyid(br, devid)
 			if len(onlyid) == 0 {
 				c.JSON(http.StatusOK, gin.H{
@@ -712,7 +712,14 @@ func deviceAction(br *broker) gin.HandlerFunc {
 					"data": nil,
 				})
 			} else {
-				cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.VersionCmd(name), GetVersion)
+				var cmdr *hi.CmdrModel
+				var terr error
+				if action == "version" {
+					name := c.Query("name")
+					cmdr, terr = hi.CreateCmdr(db, devid, onlyid, hi.VersionCmd(name), GetVersion)
+				} else {
+					cmdr, terr = hi.CreateCmdr(db, devid, onlyid, hi.WanInfoCmd(), GetWanInfo)
+				}
 				if terr != nil {
 					c.JSON(http.StatusOK, gin.H{
 						"ret": 0,

@@ -63,6 +63,10 @@ func VersionCmd(name string) string {
 	return GetVersion(name)
 }
 
+func WanInfoCmd() string {
+	return "ubus -v call network.interface.wan status"
+}
+
 func WireguardCmd(wg WgModel) string {
 	var cmds []string
 	//
