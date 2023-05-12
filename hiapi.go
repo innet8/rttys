@@ -665,7 +665,7 @@ func deviceAction(br *broker) gin.HandlerFunc {
 				// 已被绑定
 				c.JSON(http.StatusOK, gin.H{
 					"ret":  0,
-					"msg":  "设备已被绑定",
+					"msg":  "路由器已被绑定，请重置路由器后重试",
 					"data": nil,
 				})
 				return
