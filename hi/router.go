@@ -282,7 +282,7 @@ func ClientQosCmd(list []QosModal, action string) string {
 	var cmds []string
 	if action == "stop" {
 		cmds = append(cmds, "ubus call uci delete '{\"config\":\"qos\",\"type\":\"queue\"}'")
-		cmds = append(cmds, "uci commit dhcp")
+		cmds = append(cmds, "uci commit qos")
 		cmds = append(cmds, "eqos stop")
 	} else {
 		for _, item := range list {
