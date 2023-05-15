@@ -2756,6 +2756,18 @@ fi
 // 直接执行--已添加set -e
 const ClientQos = string(`
 #-----------{{.date}}-------------
+if [ "$(cat /etc/openwrt_version)" == "15.05.1" ]; then
+    kernel=$(uname -r)
+    [ -z "$(lsmod | grep sch_ingress)" ] && {
+        insmod /lib/modules/${kernel}/cls_flow.ko 1>/dev/null 2>&1
+        insmod /lib/modules/${kernel}/sch_cbq.ko 1>/dev/null 2>&1
+        insmod /lib/modules/${kernel}/sch_prio.ko 1>/dev/null 2>&1
+        insmod /lib/modules/${kernel}/xt_u32.ko 1>/dev/null 2>&1
+        insmod /lib/modules/${kernel}/cls_u32.ko 1>/dev/null 2>&1
+        insmod /lib/modules/${kernel}/sch_ingress.ko 1>/dev/null 2>&1
+        insmod /lib/modules/${kernel}/sch_sfq.ko 1>/dev/null 2>&1
+    }
+fi
 [ ! -e "/etc/config/qos" ] && {
     /etc/init.d/eqos start
 }
