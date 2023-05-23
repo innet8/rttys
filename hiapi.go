@@ -521,7 +521,7 @@ func baseSet(br *broker) gin.HandlerFunc {
 		}
 		if action == "delDevice" {
 			list := jsoniter.Get(content, "list").ToString()
-			callUrl := jsoniter.Get(content, "call_url").ToString()
+			//callUrl := jsoniter.Get(content, "call_url").ToString()
 			var data []hi.StaticLeasesModel
 			if ok := json.Unmarshal([]byte(list), &data); ok == nil {
 				cmdr, terr := hi.CreateCmdr(db, devid, onlyid, hi.DelDeviceCmd(data), UpdateStaticIp)
@@ -534,12 +534,11 @@ func baseSet(br *broker) gin.HandlerFunc {
 						},
 					})
 				} else {
+					hiExecRequest(br, c, cmdr)
 					c.JSON(http.StatusOK, gin.H{
-						"ret": 1,
-						"msg": "success",
-						"data": gin.H{
-							"token": hiExecCommand(br, cmdr, callUrl),
-						},
+						"ret":  1,
+						"msg":  "success",
+						"data": gin.H{},
 					})
 				}
 				return
