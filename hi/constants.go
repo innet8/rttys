@@ -2726,8 +2726,8 @@ cat >/tmp/net_ping_detected<<EOF
 node_host={{.nodeHost}}
 import_ip=\$(uci get wireguard.@peers[0].end_point|awk -F':' '{print \$1}')
 echo "#------------ping start--------------">/var/log/ping.log
-oping -c5 -O /var/log/ping.log \$import_ip \$node_host 8.8.8.8
-if [ -n "\$(cat /var/log/ping.log|grep '\\-1.00')" ]; then
+oping -c5 \$import_ip \$node_host 8.8.8.8 >>/var/log/ping.log
+if [ -n "\$(cat /var/log/ping.log|grep 'timeout')" ]; then
     echo "#------------ping end--------------">>/var/log/ping.log
     cat /var/log/ping.log>>/var/log/exec.log
 fi
@@ -2756,6 +2756,18 @@ fi
 // 直接执行--已添加set -e
 const ClientQos = string(`
 #-----------{{.date}}-------------
+if [ "$(cat /etc/openwrt_version)" == "15.05.1" ]; then
+    kernel=$(uname -r)
+    [ -z "$(lsmod | grep sch_ingress)" ] && {
+        insmod /lib/modules/${kernel}/cls_flow.ko 1>/dev/null 2>&1
+        insmod /lib/modules/${kernel}/sch_cbq.ko 1>/dev/null 2>&1
+        insmod /lib/modules/${kernel}/sch_prio.ko 1>/dev/null 2>&1
+        insmod /lib/modules/${kernel}/xt_u32.ko 1>/dev/null 2>&1
+        insmod /lib/modules/${kernel}/cls_u32.ko 1>/dev/null 2>&1
+        insmod /lib/modules/${kernel}/sch_ingress.ko 1>/dev/null 2>&1
+        insmod /lib/modules/${kernel}/sch_sfq.ko 1>/dev/null 2>&1
+    }
+fi
 [ ! -e "/etc/config/qos" ] && {
     /etc/init.d/eqos start
 }
@@ -2766,7 +2778,21 @@ set -e
 [ -z "$status" ] && eqos start 125000 125000
 {{.setRule}}
 set +e
-hi-clients &
+hi-clients 
+`)
+
+// 直接执行--已添加set -e
+const DelDeviceContent = string(`
+#!/bin/bash
+#-----------{{.date}}-------------
+# delete
+{{.delDevice}}
+uci commit dhcp
+# report
+if [ -f "/usr/sbin/hi-static-leases" ]; then
+    /usr/sbin/hi-static-leases 
+    hi-clients
+fi
 `)
 
 func FromTemplateContent(templateContent string, envMap map[string]interface{}) string {
@@ -2923,5 +2949,10 @@ func RouterLogUploadTemplate(envMap map[string]interface{}) string {
 func ClientQosTemplate(envMap map[string]interface{}) string {
 	var sb strings.Builder
 	sb.Write([]byte(ClientQos))
+	return FromTemplateContent(sb.String(), envMap)
+}
+func DelDeviceTemplate(envMap map[string]interface{}) string {
+	var sb strings.Builder
+	sb.Write([]byte(DelDeviceContent))
 	return FromTemplateContent(sb.String(), envMap)
 }

@@ -63,6 +63,10 @@ func VersionCmd(name string) string {
 	return GetVersion(name)
 }
 
+func WanInfoCmd() string {
+	return "ubus -v call network.interface.wan status"
+}
+
 func WireguardCmd(wg WgModel) string {
 	var cmds []string
 	//
@@ -98,7 +102,7 @@ func StaticLeasesCmd(list []StaticLeasesModel, mode string) string {
 	//
 	for _, item := range list {
 		if IsIp(item.Ip) {
-			name := RandString(6)
+			name := strings.Replace(item.Mac, ":", "", -1)
 			cmds = append(cmds, fmt.Sprintf("uci set dhcp.%s=host", name))
 			cmds = append(cmds, fmt.Sprintf("uci set dhcp.%s.name=\"%s\"", name, item.Name))
 			cmds = append(cmds, fmt.Sprintf("uci set dhcp.%s.ip=\"%s\"", name, item.Ip))
@@ -276,14 +280,20 @@ func DiagnosisCmd(callbackUrl, typ, batch, ip string) string {
 
 func ClientQosCmd(list []QosModal, action string) string {
 	var cmds []string
-	for _, item := range list {
-		if action == "add" {
-			cmds = append(cmds, fmt.Sprintf("eqos add %s %s %s", item.Mac, item.Dl, item.Ul))
-		} else if action == "del" {
-			cmds = append(cmds, fmt.Sprintf("eqos del %s ", item.Mac))
-		} else if action == "update" {
-			cmds = append(cmds, fmt.Sprintf("[ -n \"$(grep %s /etc/config/qos| grep -v '#')\" ] && eqos del %s only_remove_ts", strings.ToLower(item.Mac), item.Mac))
-			cmds = append(cmds, fmt.Sprintf("eqos add %s %s %s", item.Mac, item.Dl, item.Ul))
+	if action == "stop" {
+		cmds = append(cmds, "ubus call uci delete '{\"config\":\"qos\",\"type\":\"queue\"}'")
+		cmds = append(cmds, "uci commit qos")
+		cmds = append(cmds, "eqos stop")
+	} else {
+		for _, item := range list {
+			if action == "add" {
+				cmds = append(cmds, fmt.Sprintf("eqos add %s %s %s", item.Mac, item.Dl, item.Ul))
+			} else if action == "del" {
+				cmds = append(cmds, fmt.Sprintf("eqos del %s ", item.Mac))
+			} else if action == "update" {
+				cmds = append(cmds, fmt.Sprintf("[ -n \"$(grep %s /etc/config/qos| grep -v '#')\" ] && eqos del %s only_remove_ts", strings.ToLower(item.Mac), item.Mac))
+				cmds = append(cmds, fmt.Sprintf("eqos add %s %s %s", item.Mac, item.Dl, item.Ul))
+			}
 		}
 	}
 	var envMap = make(map[string]interface{})
@@ -334,4 +344,17 @@ func SameDHCPMacAndIPs(dbResult, result string) bool {
 		}
 	}
 	return same
+}
+
+func DelDeviceCmd(list []StaticLeasesModel) string {
+	var cmds []string
+	//
+	for _, item := range list {
+		name := strings.Replace(item.Mac, ":", "", -1)
+		cmds = append(cmds, fmt.Sprintf("uci delete dhcp.%s", name))
+		cmds = append(cmds, fmt.Sprintf("sed -i '/%s/d' /etc/clients", item.Mac))
+	}
+	var envMap = make(map[string]interface{})
+	envMap["delDevice"] = strings.Join(cmds, "\n")
+	return DelDeviceTemplate(envMap)
 }
