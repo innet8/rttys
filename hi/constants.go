@@ -1751,6 +1751,8 @@ if [ -z "${gatewayIP}" ]; then
     exit 1
 fi
 gatewayCIP=$(echo "${gatewayIP}" | awk -F. '$1<=255&&$2<=255&&$3<=255&&$4<=255{print $1"."$2"."$3".0/24"}')
+timeout 2 nslookup www.bing.com ${gatewayIP}
+[ "$runflag" != 0 ] && gatewayIP="8.8.8.8"
 echo "remove" >> ${LOGFILE}
 {{.removeString}}
 sed -i /#{{.th}}#/d /etc/dnsmasq.conf
