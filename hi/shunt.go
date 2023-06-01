@@ -34,7 +34,7 @@ func GetCmd(apiUrl string, shunt ShuntModel) string {
 	//
 	sources := String2Array(shunt.Source)
 	rules := String2Array(shunt.Rule)
-	dnsIp := "${gatewayIP}"
+	dnsIp := "${gwdns}"
 	//
 	var install []string
 	var remove []string
