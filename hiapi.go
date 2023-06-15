@@ -1188,11 +1188,20 @@ func shuntBatch(br *broker) gin.HandlerFunc {
 			c.Status(http.StatusBadRequest)
 			return
 		}
+		var sids []uint32
+		for _, item := range sp.ShuntList {
+			if item.Sid != 0 {
+				sids = append(sids, item.Sid)
+			}
+		}
 
 		newShunts := make(map[string]interface{})
 		var shuntIds []uint32
 		onlyId := devidGetOnlyid(br, devid)
 		err = db.Transaction(func(tx *gorm.DB) error {
+			if len(sids) > 0 {
+				tx.Table("hi_shunt").Where("devid = ? and id not in ?", devid, sids).Update("use", "delete")
+			}
 			if len(sp.ShuntList) == 0 {
 				tx.Table("hi_shunt").Where("devid = ?", devid).Update("status", "delete")
 			} else {
