@@ -1193,49 +1193,53 @@ func shuntBatch(br *broker) gin.HandlerFunc {
 		var shuntIds []uint32
 		onlyId := devidGetOnlyid(br, devid)
 		err = db.Transaction(func(tx *gorm.DB) error {
-			for _, item := range sp.ShuntList {
-				var shunt hi.ShuntModel
-				if item.Sid > 0 {
-					shuntIds = append(shuntIds, item.Sid)
-					db.Table("hi_shunt").Where(map[string]interface{}{
-						"id":     item.Sid,
-						"status": "use",
-						"devid":  devid,
-					}).Last(&shunt)
-					if shunt.ID == 0 {
-						return errors.New("分流不存在")
-					}
-					shunt.Onlyid = onlyId // devidGetOnlyid(br, devid)
-					shunt.Source = item.Source
-					shunt.Rule = item.Rule
-					shunt.Prio = item.Prio
-					shunt.OutIp = item.OutIp
-					shunt.SourceRemark = item.SourceRemark
-					shunt.RuleRemark = item.RuleRemark
-					shunt.OutRemark = item.OutRemark
-					shunt.Status = "use"
-					result := db.Table("hi_shunt").Save(&shunt)
-					if result.Error != nil {
-						return errors.New("更新失败")
-					}
-				} else {
-					shunt.Devid = devid
-					shunt.Onlyid = onlyId
-					shunt.Source = item.Source
-					shunt.Rule = item.Rule
-					shunt.Prio = item.Prio
-					shunt.OutIp = item.OutIp
-					shunt.SourceRemark = item.SourceRemark
-					shunt.RuleRemark = item.RuleRemark
-					shunt.OutRemark = item.OutRemark
-					shunt.Status = "use"
-					result := db.Table("hi_shunt").Create(&shunt)
-					if result.Error != nil {
-						return errors.New("创建失败")
-					}
+			if len(sp.ShuntList) == 0 {
+				tx.Table("hi_shunt").Where("devid = ?", devid).Update("status", "delete")
+			} else {
+				for _, item := range sp.ShuntList {
+					var shunt hi.ShuntModel
+					if item.Sid > 0 {
+						shuntIds = append(shuntIds, item.Sid)
+						tx.Table("hi_shunt").Where(map[string]interface{}{
+							"id":     item.Sid,
+							"status": "use",
+							"devid":  devid,
+						}).Last(&shunt)
+						if shunt.ID == 0 {
+							return errors.New("分流不存在")
+						}
+						shunt.Onlyid = onlyId // devidGetOnlyid(br, devid)
+						shunt.Source = item.Source
+						shunt.Rule = item.Rule
+						shunt.Prio = item.Prio
+						shunt.OutIp = item.OutIp
+						shunt.SourceRemark = item.SourceRemark
+						shunt.RuleRemark = item.RuleRemark
+						shunt.OutRemark = item.OutRemark
+						shunt.Status = "use"
+						result := db.Table("hi_shunt").Save(&shunt)
+						if result.Error != nil {
+							return errors.New("更新失败")
+						}
+					} else {
+						shunt.Devid = devid
+						shunt.Onlyid = onlyId
+						shunt.Source = item.Source
+						shunt.Rule = item.Rule
+						shunt.Prio = item.Prio
+						shunt.OutIp = item.OutIp
+						shunt.SourceRemark = item.SourceRemark
+						shunt.RuleRemark = item.RuleRemark
+						shunt.OutRemark = item.OutRemark
+						shunt.Status = "use"
+						result := tx.Table("hi_shunt").Create(&shunt)
+						if result.Error != nil {
+							return errors.New("创建失败")
+						}
 
-					shuntIds = append(shuntIds, shunt.ID)
-					newShunts[item.Uuid] = shunt.ID
+						shuntIds = append(shuntIds, shunt.ID)
+						newShunts[item.Uuid] = shunt.ID
+					}
 				}
 			}
 			return nil
