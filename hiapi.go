@@ -1200,7 +1200,7 @@ func shuntBatch(br *broker) gin.HandlerFunc {
 		onlyId := devidGetOnlyid(br, devid)
 		err = db.Transaction(func(tx *gorm.DB) error {
 			if len(sids) > 0 {
-				tx.Table("hi_shunt").Where("devid = ? and id not in ?", devid, sids).Update("use", "delete")
+				tx.Table("hi_shunt").Where("devid = ? and id not in ?", devid, sids).Update("status", "delete")
 			}
 			if len(sp.ShuntList) == 0 {
 				tx.Table("hi_shunt").Where("devid = ?", devid).Update("status", "delete")
