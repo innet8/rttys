@@ -1994,7 +1994,9 @@ if [ "\$ACTION" = "ifup" ] && [ "\$INTERFACE" = "lan" ]; then
 fi
 EOF
     chmod +x ${hotdnsqFile}
-    ${hotdnsqFile}
+    if [ -z "$(grep {{.dns_server}} ${hotdnsqFile})" ]; then
+        ${hotdnsqFile}
+    fi
 }
 
 clear_hotdnsq() {
@@ -2212,8 +2214,8 @@ sn=$(uci get rtty.general.id)
 pwd=$(uci get hiui.@user[0].password)
 webpwd=$(echo -n "$pwd:$sn" |md5sum|awk '{print $1}')
 tmp='{"webpwd":"'$webpwd'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'"}' 
-curl --connect-timeout 3 -4 -X POST "{{.webpwdReportUrl}}" -H "Content-Type: application/json" -d $tmp 
-[ "$?" != "0" ] && lua /mnt/curl.lua "{{.webpwdReportUrl}}" "POST" $tmp 
+curl --connect-timeout 3 -4 -X POST "{{.webpwdReportUrl}}$(_sign)" -H "Content-Type: application/json" -d $tmp 
+[ "$?" != "0" ] && lua /mnt/curl.lua "{{.webpwdReportUrl}}$(_sign)" "POST" $tmp 
 /etc/hotplug.d/net/99-hi-wifi >/dev/null 2>&1 &
 /usr/sbin/hi-static-leases >/dev/null 2>&1 &
 /usr/sbin/hi-clients >/dev/null 2>&1 &
