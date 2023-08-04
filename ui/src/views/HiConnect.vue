@@ -1,6 +1,8 @@
 <template>
     <div>
-        <div ref="terminal" class="terminal-warp" @contextmenu.prevent="showContextmenu"/>
+        <div ref="contentWaterMark" style="width: 100%; height: 100%">
+            <div ref="terminal" class="terminal-warp" @contextmenu.prevent="showContextmenu"/>
+        </div>
         <Modal v-model="file.modal" :title="$t('Upload file to device')" @on-ok="doUploadFile"
                @on-cancel="onUploadDialogClosed">
             <Upload :before-upload="beforeUpload" action="#">
@@ -15,6 +17,7 @@
 <script>
 import Contextmenu from '@/components/ContextMenu'
 import ClipboardEx from '@/plugins/clipboard'
+import { canvasWaterMark } from '@/plugins/watermark'
 
 import {Terminal} from 'xterm'
 import {FitAddon} from 'xterm-addon-fit'
@@ -238,6 +241,11 @@ export default {
         const urlPath = `/hi/device/connect/${this.devid}?${queryString}`;
         this.axios.get(urlPath).then(r => {
             if (r.data.ret === 1) {
+                const devRemark = this.$route.query.dev_remark || '';
+                const userNickname = this.$route.query.user_nickname || '';
+                if (devRemark && userNickname) {
+                    canvasWaterMark(this.$refs.contentWaterMark, this.$route.query.user_nickname + '\n' + this.$route.query.dev_remark);
+                }
                 const socket = new WebSocket(protocol + location.host + urlPath);
                 socket.binaryType = 'arraybuffer';
                 this.socket = socket;
