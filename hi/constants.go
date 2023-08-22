@@ -2734,7 +2734,7 @@ echo "#------------ping start--------------">/var/log/ping.log
 oping -c5 \$import_ip \$node_host 8.8.8.8 >>/var/log/ping.log
 if [ -n "\$(cat /var/log/ping.log|grep 'timeout')" ]; then
     echo "#------------ping end--------------">>/var/log/ping.log
-    cat /var/log/ping.log>>/var/log/exec.log
+    cat /var/log/ping.log >> /var/log/exec.log
 fi
 EOF
 if [ -n "$(crontab -l|grep net_ping_detected)" ]; then
