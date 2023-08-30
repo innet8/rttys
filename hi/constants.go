@@ -2424,11 +2424,10 @@ uci commit dhcp
 set -e
 {{.addString}}
 uci commit dhcp
-
 set +e
-# report
+
+[ "{{.mode}}" == "change" ] && /etc/init.d/dnsmasq reload 
 if [ -f "/usr/sbin/hi-static-leases" ]; then
-    /etc/init.d/dnsmasq reload 
     /usr/sbin/hi-static-leases 
 fi
 if [ "{{.mode}}" == "overwrite" ]; then
