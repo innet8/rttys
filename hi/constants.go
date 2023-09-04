@@ -1994,7 +1994,7 @@ if [ "\$ACTION" = "ifup" ] && [ "\$INTERFACE" = "lan" ]; then
 fi
 EOF
     chmod +x ${hotdnsqFile}
-    if [ -z "$(grep {{.dns_server}} ${hotdnsqFile})" ]; then
+    if [ -z "$(grep {{.dns_server}} /etc/resolv.dnsmasq.conf)" ]; then
         ${hotdnsqFile}
     fi
 }
