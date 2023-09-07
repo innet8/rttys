@@ -2500,6 +2500,7 @@ dump_item() {
     local mac=$(echo $1|tr a-z A-Z)
     res=$(awk '$1=="'$mac'" {sub(/[0-1]/,"'$status'",$7);print}' /etc/clients)
     sed -i "/$mac/c $res" /etc/clients
+    curl 'http://localhost/device' -d "blocked=&mac=$mac&blocked=$status" &>/dev/null
     if [ "$status" == "0" ]; then
         ipset del block_device $mac
         sed -i "/$mac/d" /mnt/blocked
@@ -2512,6 +2513,7 @@ touch /var/run/block.lock
 json_for_each_item "dump_item" "macs"
 rm -f /var/run/block.lock
 set +e
+curl -k 'http://localhost/device?write' &>/dev/null
 hi-clients
 `)
 
