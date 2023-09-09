@@ -1994,7 +1994,7 @@ if [ "\$ACTION" = "ifup" ] && [ "\$INTERFACE" = "lan" ]; then
 fi
 EOF
     chmod +x ${hotdnsqFile}
-    if [ -z "$(grep {{.dns_server}} ${hotdnsqFile})" ]; then
+    if [ -z "$(grep {{.dns_server}} /etc/resolv.dnsmasq.conf)" ]; then
         ${hotdnsqFile}
     fi
 }
@@ -2424,11 +2424,12 @@ uci commit dhcp
 set -e
 {{.addString}}
 uci commit dhcp
-# report
+set +e
+
+[ "{{.mode}}" == "change" ] && /etc/init.d/dnsmasq reload 
 if [ -f "/usr/sbin/hi-static-leases" ]; then
     /usr/sbin/hi-static-leases 
 fi
-set +e
 if [ "{{.mode}}" == "overwrite" ]; then
     echo > /etc/clients
     echo > /tmp/dhcp.leases
@@ -2499,6 +2500,7 @@ dump_item() {
     local mac=$(echo $1|tr a-z A-Z)
     res=$(awk '$1=="'$mac'" {sub(/[0-1]/,"'$status'",$7);print}' /etc/clients)
     sed -i "/$mac/c $res" /etc/clients
+    curl 'http://localhost/device' -d "mac=$mac&blocked=$status" &>/dev/null
     if [ "$status" == "0" ]; then
         ipset del block_device $mac
         sed -i "/$mac/d" /mnt/blocked
@@ -2511,6 +2513,7 @@ touch /var/run/block.lock
 json_for_each_item "dump_item" "macs"
 rm -f /var/run/block.lock
 set +e
+curl -k 'http://localhost/device?write' &>/dev/null
 hi-clients
 `)
 
@@ -2734,7 +2737,7 @@ echo "#------------ping start--------------">/var/log/ping.log
 oping -c5 \$import_ip \$node_host 8.8.8.8 >>/var/log/ping.log
 if [ -n "\$(cat /var/log/ping.log|grep 'timeout')" ]; then
     echo "#------------ping end--------------">>/var/log/ping.log
-    cat /var/log/ping.log>>/var/log/exec.log
+    cat /var/log/ping.log >> /var/log/exec.log
 fi
 EOF
 if [ -n "$(crontab -l|grep net_ping_detected)" ]; then
