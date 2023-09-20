@@ -2433,6 +2433,7 @@ fi
 if [ "{{.mode}}" == "overwrite" ]; then
     echo > /etc/clients
     echo > /tmp/dhcp.leases
+    /etc/init.d/nginx restart
     hi-clients
     ifup lan &
 fi
