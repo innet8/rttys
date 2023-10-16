@@ -2795,6 +2795,7 @@ set -e
 {{.setRule}}
 set +e
 hi-clients 
+hi-static-leases 
 `)
 
 // 直接执行--已添加set -e
