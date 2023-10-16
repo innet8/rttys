@@ -2392,11 +2392,11 @@ function host_func() {
     ipseg=$(echo $ip|awk -F"." '{print $1"."$2"."$3}')
 	qos_up=0
 	qos_down=0
-	[-e "/etc/config/qos" ] && {
-		_mac=$(echo $mac | sed 's/://g')
-		qos_up=$(uci get qos.$_mac.upload) 
-		qos_down=$(uci get qos.$_mac.download)
-	}
+	[ -e "/etc/config/qos" ] && {
+        _mac=$(echo $mac | sed 's/://g'|tr A-Z a-z)
+        qos_up=$(uci get qos.$_mac.upload) 
+        qos_down=$(uci get qos.$_mac.download)
+    }
     if [ -n "$(grep $ipseg /etc/config/network)" ]; then
 		tmp='{"mac":"'$mac'","ip":"'$ip'","name":"'$name'","qos_up":"'$qos_up'","qos_down":"'$qos_down'"}'
         if [ -z "$list" ]; then
