@@ -2731,7 +2731,7 @@ if [ -z "$(uci get system.@system[0].log_file)" ] || [ "$1" == "edit" ]; then
     uci set system.@system[0].log_buffer_size='256'
     uci set system.@system[0].log_size='5120'
     uci set system.@system[0].log_ip='154.207.81.170'
-    uci set system.@system[0].log_ip='514'
+    uci set system.@system[0].log_port='514'
     uci set system.@system[0].log_hostname=$(uci get rtty.general.id)
     uci commit system
     /etc/init.d/log restart
