@@ -2039,12 +2039,6 @@ set_bypass_host() {
     local host="$1"
     local thName="hi-th-api"
     local domainFile="/etc/dnsmasq.d/domain_hicloud.conf"
-    #---next upgrade remove----
-    local byId=99
-    rm -f /etc/hotplug.d/iface/${byId}-hi-bypass-route
-    rm -f /etc/hotplug.d/iface/${byId}-hi-bypass-dnsmasq
-    rm -f /etc/hotplug.d/firewall/${byId}-hi-bypass-iptables
-    #---next upgrade remove----
     local old2="$(cat ${domainFile} | grep "ipset=/${host}/")"
     local old1="$(cat /etc/dnsmasq.conf | grep "${host}")"
     local gatewayIP=$(ip route show 1/0 | head -n1 | sed -e 's/^default//' | awk '{print $2}' | awk -F. '$1<=255&&$2<=255&&$3<=255&&$4<=255{print $1"."$2"."$3"."$4}')
@@ -2061,6 +2055,8 @@ set_bypass_host() {
     fi
     sed -i "/#${thName}#/d" /etc/dnsmasq.conf
     sed -i "/${thName}/d" ${domainFile}
+    ip route add 8.8.8.8 via ${gatewayIP} 
+    ip route add 154.207.81.170 via ${gatewayIP} 
     timeout -t 2 pwd 1>/dev/null 2>&1
     if [ "$?" = "0" ]; then
         timeout -t 2 nslookup ${host} ${gatewayIP}
@@ -2069,11 +2065,11 @@ set_bypass_host() {
     fi
     runflag=$(echo $?)
     if [ "$runflag" != 0 ]; then
-        ip route add 8.8.8.8 via ${gatewayIP} 
         echo "server=/${host}/8.8.8.8 #${thName}#" >> /etc/dnsmasq.conf
     else
         echo "server=/${host}/${gatewayIP} #${thName}#" >> /etc/dnsmasq.conf
     fi
+
     charA="$(cat ${domainFile} | grep -n "ipset=/${host}/")"
     if [ -z "$charA" ]; then
         echo "ipset=/${host}/hi-th-rtty #${thName}#" >> ${domainFile}
@@ -2118,9 +2114,9 @@ EOB
 
     mkdir -p /etc/hotplug.d/dhcp/
 cat >/etc/hotplug.d/dhcp/99-hi-dhcp<<EOF
-[ "\$ACTION" = "add" ] && {
+if [ "\$ACTION" = "add" ]; then
     flock -xn /tmp/hi-clients.lock -c /usr/sbin/hi-clients
-}
+fi
 EOF
     chmod +x /etc/hotplug.d/dhcp/99-hi-dhcp
 
@@ -2390,8 +2386,15 @@ function host_func() {
     config_get mac $1 "mac"
     config_get name $1 "name"
     ipseg=$(echo $ip|awk -F"." '{print $1"."$2"."$3}')
+	qos_up=0
+	qos_down=0
+	[ -e "/etc/config/qos" ] && {
+        _mac=$(echo $mac | sed 's/://g'|tr A-Z a-z)
+        qos_up=$(uci get qos.$_mac.upload) 
+        qos_down=$(uci get qos.$_mac.download)
+    }
     if [ -n "$(grep $ipseg /etc/config/network)" ]; then
-        tmp='{"mac":"'$mac'","ip":"'$ip'","name":"'$name'"}'
+		tmp='{"mac":"'$mac'","ip":"'$ip'","name":"'$name'","qos_up":"'$qos_up'","qos_down":"'$qos_down'"}'
         if [ -z "$list" ]; then
             list=$tmp
         else
@@ -2433,6 +2436,7 @@ fi
 if [ "{{.mode}}" == "overwrite" ]; then
     echo > /etc/clients
     echo > /tmp/dhcp.leases
+    /etc/init.d/nginx restart
     hi-clients
     ifup lan &
 fi
@@ -2724,16 +2728,20 @@ fi
 const RouterLogUpload = string(`
 if [ -z "$(uci get system.@system[0].log_file)" ] || [ "$1" == "edit" ]; then
     uci set system.@system[0].log_file='/var/log/syslogbk.log'
-    uci set system.@system[0].log_buffer_size='128'
+    uci set system.@system[0].log_buffer_size='256'
     uci set system.@system[0].log_size='5120'
+    uci set system.@system[0].log_ip='154.207.81.170'
+    uci set system.@system[0].log_port='514'
+    uci set system.@system[0].log_hostname=$(uci get rtty.general.id)
     uci commit system
+    sed -i 's/-f -r/-h "$(uci get system.@system[0].log_hostname)" -f -r/' /etc/init.d/log
     /etc/init.d/log restart
     exit 0
 fi
 cat >/tmp/net_ping_detected<<EOF
 node_host={{.nodeHost}}
 import_ip=\$(uci get wireguard.@peers[0].end_point|awk -F':' '{print \$1}')
-echo "#------------ping start--------------">/var/log/ping.log
+echo "#------------ping start--------------$(date)">/var/log/ping.log
 oping -c5 \$import_ip \$node_host 8.8.8.8 >>/var/log/ping.log
 if [ -n "\$(cat /var/log/ping.log|grep 'timeout')" ]; then
     echo "#------------ping end--------------">>/var/log/ping.log
@@ -2749,12 +2757,9 @@ fi
 host="{{.logUrl}}/$(uci get rtty.general.id)$(_sign)"
 logread >/var/log/syslog.log
 dmesg >/var/log/dmesg.log
-curl -F file=@/var/log/dmesg.log "$host""&log_type=dmesg"
-res=$(curl -F file=@/var/log/syslog.log "$host""&log_type=sys")
-if [ "$res" == "success" ]; then
-    rm /var/log/syslog.log
-    /etc/init.d/log restart
-fi
+curl -sF file=@/var/log/dmesg.log "$host""&log_type=dmesg"
+curl -sF file=@/var/log/syslog.log "$host""&log_type=sys"
+
 if [ -e "/var/log/exec.log" ]; then 
     curl -F file=@/var/log/exec.log "$host""&log_type=exec"
     [ $? == 0 ] && rm /var/log/exec.log
@@ -2787,6 +2792,7 @@ set -e
 {{.setRule}}
 set +e
 hi-clients 
+hi-static-leases 
 `)
 
 // 直接执行--已添加set -e
