@@ -17,6 +17,12 @@ var (
 	BotDialogId = ""
 	BotSilence  = ""
 
+	LineBotUrl      = ""
+	LineBotVersion  = ""
+	LineBotToken    = ""
+	LineBotDialogId = ""
+	LineBotSilence  = ""
+
 	RedisHost     = ""
 	RedisPort     = ""
 	RedisPassword = ""
@@ -103,6 +109,13 @@ func Parse(c *cli.Context) *Config {
 		getConfigOpt(yamlCfg, "bot-token", &BotToken)
 		getConfigOpt(yamlCfg, "bot-dialog_id", &BotDialogId)
 		getConfigOpt(yamlCfg, "bot-silence", &BotSilence)
+
+		// 上下线推送消息机器人
+		getConfigOpt(yamlCfg, "line-bot-url", &LineBotUrl)
+		getConfigOpt(yamlCfg, "line-bot-version", &LineBotVersion)
+		getConfigOpt(yamlCfg, "line-bot-token", &LineBotToken)
+		getConfigOpt(yamlCfg, "line-bot-dialog_id", &LineBotDialogId)
+		getConfigOpt(yamlCfg, "line-bot-silence", &LineBotSilence)
 
 		getConfigOpt(yamlCfg, "redis-host", &RedisHost)
 		getConfigOpt(yamlCfg, "redis-port", &RedisPort)

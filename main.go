@@ -188,6 +188,22 @@ func main() {
 	if len(os.Getenv("RTTYS_BOT_SILENCE")) > 0 {
 		config.BotSilence = os.Getenv("RTTYS_BOT_SILENCE")
 	}
+	// 推送上下线消息机器人
+	if len(os.Getenv("RTTYS_LINE_BOT_URL")) > 0 {
+		config.LineBotUrl = os.Getenv("RTTYS_LINE_BOT_URL")
+	}
+	if len(os.Getenv("RTTYS_LINE_BOT_VERSION")) > 0 {
+		config.LineBotVersion = os.Getenv("RTTYS_LINE_BOT_VERSION")
+	}
+	if len(os.Getenv("RTTYS_LINE_BOT_TOKEN")) > 0 {
+		config.LineBotToken = os.Getenv("RTTYS_LINE_BOT_TOKEN")
+	}
+	if len(os.Getenv("RTTYS_LINE_BOT_DIALOG_ID")) > 0 {
+		config.LineBotDialogId = os.Getenv("RTTYS_LINE_BOT_DIALOG_ID")
+	}
+	if len(os.Getenv("RTTYS_LINE_BOT_SILENCE")) > 0 {
+		config.LineBotSilence = os.Getenv("RTTYS_LINE_BOT_SILENCE")
+	}
 
 	// redis 配置
 	if len(os.Getenv("REDIS_HOST")) > 0 {
