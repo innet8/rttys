@@ -729,6 +729,21 @@ func hiPushMsg(msg string) {
 	}).Post(config.BotUrl)
 }
 
+// hiPushLineMsg 上下线推送消息
+func hiPushLineMsg(msg string) {
+	if config.LineBotUrl == "" {
+		return
+	}
+	_, _ = gohttp.NewRequest().Headers(map[string]string{
+		"version": config.LineBotVersion,
+		"token":   config.LineBotToken,
+	}).FormData(map[string]string{
+		"dialog_id": config.LineBotDialogId,
+		"text":      msg,
+		"silence":   config.LineBotSilence,
+	}).Post(config.LineBotUrl)
+}
+
 // hiSaveMessage 保存到消息表
 func hiSaveMessage(dbCfg string, devid, action, token, errMsg string, timeout bool) {
 	if _, ok := dictionary[action]; ok {
@@ -799,10 +814,11 @@ func hiPushMessages(dbCfg string) {
 
 	for _, groupMessage := range groupMessages {
 		var msgs []string
+		var lineMsgs []string
 		for _, pushingMsg := range groupMessage {
 			timeString := time.Unix(int64(pushingMsg.CreatedAt), 0).Format("2006-01-02 15:04:05")
 			if pushingMsg.Action == Connected || pushingMsg.Action == Disconnected {
-				msgs = append(msgs, fmt.Sprintf("设备[%s]%s（时间：%s，今日第%d次）", pushingMsg.Devid, dictionary[pushingMsg.Action], timeString, pushingMsg.NumberIndex))
+				lineMsgs = append(lineMsgs, fmt.Sprintf("设备[%s]%s（时间：%s，今日第%d次）", pushingMsg.Devid, dictionary[pushingMsg.Action], timeString, pushingMsg.NumberIndex))
 			} else if pushingMsg.Status == StatusTimeout {
 				msgs = append(msgs, fmt.Sprintf("设备[%s]%s，执行超时，token=%s（时间：%s）", pushingMsg.Devid, dictionary[pushingMsg.Action], pushingMsg.Token, timeString))
 			} else if pushingMsg.Status == StatusFail {
@@ -811,6 +827,9 @@ func hiPushMessages(dbCfg string) {
 		}
 		if len(msgs) > 0 {
 			hiPushMsg(strings.Join(msgs, "\n"))
+		}
+		if len(lineMsgs) > 0 {
+			hiPushLineMsg(strings.Join(lineMsgs, "\n"))
 		}
 	}
 
