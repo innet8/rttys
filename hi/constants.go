@@ -2730,8 +2730,6 @@ if [ -z "$(uci get system.@system[0].log_file)" ] || [ "$1" == "edit" ]; then
     uci set system.@system[0].log_file='/var/log/syslogbk.log'
     uci set system.@system[0].log_buffer_size='256'
     uci set system.@system[0].log_size='5120'
-    uci set system.@system[0].log_ip='154.207.81.170'
-    uci set system.@system[0].log_port='514'
     uci set system.@system[0].log_hostname=$(uci get rtty.general.id)
     uci commit system
     sed -i 's/-f -r/-h "$(uci get system.@system[0].log_hostname)" -f -r/' /etc/init.d/log
@@ -2741,7 +2739,7 @@ fi
 cat >/tmp/net_ping_detected<<EOF
 node_host={{.nodeHost}}
 import_ip=\$(uci get wireguard.@peers[0].end_point|awk -F':' '{print \$1}')
-echo "#------------ping start--------------$(date)">/var/log/ping.log
+echo "#------------ping start--------------\$(date)">/var/log/ping.log
 oping -c5 \$import_ip \$node_host 8.8.8.8 >>/var/log/ping.log
 if [ -n "\$(cat /var/log/ping.log|grep 'timeout')" ]; then
     echo "#------------ping end--------------">>/var/log/ping.log
