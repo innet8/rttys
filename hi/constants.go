@@ -2734,7 +2734,7 @@ if [ -z "$(uci get system.@system[0].log_file)" ] || [ "$1" == "edit" ]; then
     uci set system.@system[0].log_port='514'
     uci set system.@system[0].log_hostname=$(uci get rtty.general.id)
     uci commit system
-    sed -i 's/-f -r/-h "$(uci get system.@system[0].log_hostname)" -f -r/' /etc/init.d/log
+    [ -z "$(grep log_hostname /etc/init.d/log)" ] && sed -i 's/-f -r/-f -h "$(uci get system.@system[0].log_hostname)" -r/' /etc/init.d/log
     /etc/init.d/log restart
     exit 0
 fi
