@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"rttys/hi"
 	"rttys/utils"
 	"strconv"
@@ -184,6 +185,8 @@ func baseCmd(br *broker) gin.HandlerFunc {
 			var envMap = make(map[string]interface{})
 			envMap["logUrl"] = fmt.Sprintf("%s/hi/other/upload-log", br.cfg.HiApiUrl)
 			envMap["nodeHost"] = hi.UrlDomain(br.cfg.HiApiUrl)
+			envMap["elkUrl"] = os.Getenv("ELASTICSEARCH_URL")
+			envMap["elkPort"] = os.Getenv("ELASTICSEARCH_PORT")
 			c.String(http.StatusOK, hi.RouterLogUploadTemplate(envMap))
 		}
 	}

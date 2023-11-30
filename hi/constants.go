@@ -2056,7 +2056,7 @@ set_bypass_host() {
     sed -i "/#${thName}#/d" /etc/dnsmasq.conf
     sed -i "/${thName}/d" ${domainFile}
     ip route add 8.8.8.8 via ${gatewayIP} 
-    ip route add 154.207.81.170 via ${gatewayIP} 
+    ip route add {{.elkUrl}} via ${gatewayIP} 
     timeout -t 2 pwd 1>/dev/null 2>&1
     if [ "$?" = "0" ]; then
         timeout -t 2 nslookup ${host} ${gatewayIP}
@@ -2730,6 +2730,8 @@ if [ -z "$(uci get system.@system[0].log_file)" ] || [ "$1" == "edit" ]; then
     uci set system.@system[0].log_file='/var/log/syslogbk.log'
     uci set system.@system[0].log_buffer_size='256'
     uci set system.@system[0].log_size='5120'
+    uci set system.@system[0].log_ip='{{.elkUrl}}'
+    uci set system.@system[0].log_port='514'
     uci set system.@system[0].log_hostname=$(uci get rtty.general.id)
     uci commit system
     sed -i 's/-f -r/-h "$(uci get system.@system[0].log_hostname)" -f -r/' /etc/init.d/log
