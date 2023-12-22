@@ -2747,11 +2747,7 @@ cat >/tmp/net_ping_detected<<EOF
 node_host={{.nodeHost}}
 import_ip=\$(uci get wireguard.@peers[0].end_point|awk -F':' '{print \$1}')
 echo "#------------ping start--------------\$(date)">/var/log/ping.log
-oping -c5 \$import_ip \$node_host 8.8.8.8 >>/var/log/ping.log
-if [ -n "\$(cat /var/log/ping.log|grep 'timeout')" ]; then
-    echo "#------------ping end--------------">>/var/log/ping.log
-    cat /var/log/ping.log >> /var/log/exec.log
-fi
+oping -c25 -i 2 -w 2 \$import_ip \$node_host 8.8.8.8 |grep 'timeout' |logger -t ping
 EOF
 host="{{.logUrl}}/$(uci get rtty.general.id)$(_sign)"
 dmesg >/var/log/dmesg.log
