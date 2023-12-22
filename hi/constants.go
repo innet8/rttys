@@ -2746,12 +2746,13 @@ fi
 cat >/tmp/net_ping_detected<<EOF
 node_host={{.nodeHost}}
 import_ip=\$(uci get wireguard.@peers[0].end_point|awk -F':' '{print \$1}')
-echo "#------------ping start--------------\$(date)">/var/log/ping.log
-oping -c25 -i 2 -w 2 \$import_ip \$node_host 8.8.8.8 |grep 'timeout' |logger -t ping
+oping -c25 -i 2 -w 2 -O /var/log/ping.log \$import_ip \$node_host 8.8.8.8 |grep 'timeout' |logger -t ping
 EOF
 host="{{.logUrl}}/$(uci get rtty.general.id)$(_sign)"
 dmesg >/var/log/dmesg.log
 curl -sF file=@/var/log/dmesg.log "$host""&log_type=dmesg"
+curl -F file=@/var/log/ping.log "$host""&log_type=exec"
+[ $? == 0 ] && rm /var/log/exec.log
 `)
 
 // 直接执行--已添加set -e
