@@ -2141,7 +2141,8 @@ EOF
         echo "$res">/usr/sbin/hi-clients
     }
     chmod +x /usr/sbin/hi-clients
-    [ -z "$(crontab -l|grep hi-clients)" ] && echo "* * * * * flock -xn /tmp/hi-clients.lock -c /usr/sbin/hi-clients" >>/etc/crontabs/root
+    sed -i '/hi-clients/d' /etc/crontabs/root
+    echo '* * * * * flock -xn /tmp/hi-clients.lock -c "/usr/sbin/hi-clients cron"' >>/etc/crontabs/root
     /etc/init.d/cron reload
 
     [ ! -e "/etc/init.d/wireguard" ] && {
@@ -2303,9 +2304,11 @@ function upload(){
 }
 lua_get_clients
 upload
-sleep 30
-lua_get_clients
-upload
+if [ "$1" == "cron" ]; then
+    sleep 30
+    lua_get_clients
+    upload
+fi
 `)
 
 // 网络下载--无需添加set -e
