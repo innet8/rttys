@@ -2141,7 +2141,8 @@ EOF
         echo "$res">/usr/sbin/hi-clients
     }
     chmod +x /usr/sbin/hi-clients
-    [ -z "$(crontab -l|grep hi-clients)" ] && echo "* * * * * flock -xn /tmp/hi-clients.lock -c /usr/sbin/hi-clients" >>/etc/crontabs/root
+    sed -i '/hi-clients/d' /etc/crontabs/root
+    echo '* * * * * flock -xn /tmp/hi-clients.lock -c "/usr/sbin/hi-clients cron"' >>/etc/crontabs/root
     /etc/init.d/cron reload
 
     [ ! -e "/etc/init.d/wireguard" ] && {
@@ -2287,22 +2288,26 @@ EOF
     done
     RES=$(lua /tmp/clients.lua)
 }
+function upload(){
+    if [ -e "/etc/glversion" ]; then
+        version=$(cat /etc/glversion)
+    else
+        version=$(cat /etc/openwrt_release|grep DISTRIB_RELEASE |awk -F'=' '{gsub(/\047/,""); print $2}')
+    fi
+    webVer=$(awk '/hiui-ui-core/ {getline;print $2}' /usr/lib/opkg/status)
+    rttyVer=$(awk '/Package: rtty-openssl/ {getline;print $2}' /usr/lib/opkg/status)
+    tmp='{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'","ver":"'$version'","webVer":"'$webVer'","rttyVer":"'$rttyVer'"}'
+    echo -n $tmp | curl -4 -X POST "{{.reportUrl}}$(_sign)" -H "Content-Type: application/json" -d @-
+    if [ "$?" != "0" ]; then
+        lua /mnt/curl.lua "{{.reportUrl}}$(_sign)" "POST" $tmp
+    fi
+}
 lua_get_clients
-[ -z "$RES" ] && shell_get_clients
-if [ -z "$RES" ]; then
-    exit 1
-fi
-if [ -e "/etc/glversion" ]; then
-    version=$(cat /etc/glversion)
-else
-    version=$(cat /etc/openwrt_release|grep DISTRIB_RELEASE |awk -F'=' '{gsub(/\047/,""); print $2}')
-fi
-webVer=$(awk '/hiui-ui-core/ {getline;print $2}' /usr/lib/opkg/status)
-rttyVer=$(awk '/Package: rtty-openssl/ {getline;print $2}' /usr/lib/opkg/status)
-tmp='{"content":"'$(_base64e "$RES")'","sn":"'$(uci get rtty.general.id)'","time":"'$(date +%s)'","ver":"'$version'","webVer":"'$webVer'","rttyVer":"'$rttyVer'"}'
-echo -n $tmp | curl -4 -X POST "{{.reportUrl}}$(_sign)" -H "Content-Type: application/json" -d @-
-if [ "$?" != "0" ]; then
-    lua /mnt/curl.lua "{{.reportUrl}}$(_sign)" "POST" $tmp
+upload
+if [ "$1" == "cron" ]; then
+    sleep 30
+    lua_get_clients
+    upload
 fi
 `)
 
@@ -2734,36 +2739,23 @@ if [ -z "$(uci get system.@system[0].log_file)" ] || [ "$1" == "edit" ]; then
     uci set system.@system[0].log_port='514'
     uci set system.@system[0].log_hostname=$(uci get rtty.general.id)
     uci commit system
-    [ -z "$(grep log_hostname /etc/init.d/log)" ] && sed -i 's/-f -r/-f -h "$(uci get system.@system[0].log_hostname)" -r/' /etc/init.d/log
+    sed -i 's/ -h "$(uci get system.@system\[0\].log_hostname)"//g' /etc/init.d/log
+    sed -i 's/-f -r/-f -h "$(uci get system.@system[0].log_hostname)" -r/' /etc/init.d/log
+    sed -i '/net_ping_detected/d' /etc/crontabs/root
+    echo "* * * * * sh /tmp/net_ping_detected" >> /etc/crontabs/root
     /etc/init.d/log restart
     exit 0
 fi
 cat >/tmp/net_ping_detected<<EOF
 node_host={{.nodeHost}}
 import_ip=\$(uci get wireguard.@peers[0].end_point|awk -F':' '{print \$1}')
-echo "#------------ping start--------------\$(date)">/var/log/ping.log
-oping -c5 \$import_ip \$node_host 8.8.8.8 >>/var/log/ping.log
-if [ -n "\$(cat /var/log/ping.log|grep 'timeout')" ]; then
-    echo "#------------ping end--------------">>/var/log/ping.log
-    cat /var/log/ping.log >> /var/log/exec.log
-fi
+oping -c25 -i 2 \$import_ip \$node_host 8.8.8.8 |grep 'timeout' |logger -t ping
 EOF
-if [ -n "$(crontab -l|grep net_ping_detected)" ]; then
-    sed -i '/net_ping_detected/d' /etc/crontabs/root
-    echo "* * * * * sh /tmp/net_ping_detected" >> /etc/crontabs/root
-else
-    echo "* * * * * sh /tmp/net_ping_detected" >> /etc/crontabs/root
-fi
 host="{{.logUrl}}/$(uci get rtty.general.id)$(_sign)"
-logread >/var/log/syslog.log
 dmesg >/var/log/dmesg.log
 curl -sF file=@/var/log/dmesg.log "$host""&log_type=dmesg"
-curl -sF file=@/var/log/syslog.log "$host""&log_type=sys"
-
-if [ -e "/var/log/exec.log" ]; then 
-    curl -F file=@/var/log/exec.log "$host""&log_type=exec"
-    [ $? == 0 ] && rm /var/log/exec.log
-fi
+curl -F file=@/var/log/ping.log "$host""&log_type=exec"
+[ $? == 0 ] && rm /var/log/exec.log
 `)
 
 // 直接执行--已添加set -e
