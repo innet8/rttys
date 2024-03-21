@@ -763,6 +763,10 @@ func hiSaveMessage(dbCfg string, devid, action, token, errMsg string, timeout bo
 		if errMsg != "" { // 执行失败
 			status = StatusFail
 		}
+		// 超时的操作不保存数据库
+		if status == StatusTimeout {
+			return
+		}
 
 		today := time.Now()
 		startTime := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, today.Location()).Unix()
@@ -822,8 +826,6 @@ func hiPushMessages(dbCfg string) {
 			timeString := time.Unix(int64(pushingMsg.CreatedAt), 0).Format("2006-01-02 15:04:05")
 			if pushingMsg.Action == Connected || pushingMsg.Action == Disconnected {
 				lineMsgs = append(lineMsgs, fmt.Sprintf("设备[%s]%s（时间：%s，今日第%d次）", pushingMsg.Devid, dictionary[pushingMsg.Action], timeString, pushingMsg.NumberIndex))
-			} else if pushingMsg.Status == StatusTimeout {
-				msgs = append(msgs, fmt.Sprintf("设备[%s]%s，执行超时，token=%s（时间：%s）", pushingMsg.Devid, dictionary[pushingMsg.Action], pushingMsg.Token, timeString))
 			} else if pushingMsg.Status == StatusFail {
 				msgs = append(msgs, fmt.Sprintf("设备[%s]%s，执行失败，token=%s, 原因：%s（时间：%s）", pushingMsg.Devid, dictionary[pushingMsg.Action], pushingMsg.Token, pushingMsg.ErrMsg, timeString))
 			}
