@@ -729,6 +729,7 @@ func hiPushMsg(msg string) {
 		"dialog_id": config.BotDialogId,
 		"text":      msg,
 		"silence":   config.BotSilence,
+		"key":       "", // search term (auto-generated if left blank)
 	}).Post(config.BotUrl)
 }
 
@@ -744,6 +745,7 @@ func hiPushLineMsg(msg string) {
 		"dialog_id": config.LineBotDialogId,
 		"text":      msg,
 		"silence":   config.LineBotSilence,
+		"key":       "", // search term (auto-generated if left blank)
 	}).Post(config.LineBotUrl)
 }
 
